@@ -1,0 +1,690 @@
+// Copyright 2025, compose-miuix-ui contributors
+// SPDX-License-Identifier: Apache-2.0
+
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.expandHorizontally
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.shrinkVertically
+import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.WindowInsetsSides
+import androidx.compose.foundation.layout.calculateEndPadding
+import androidx.compose.foundation.layout.calculateStartPadding
+import androidx.compose.foundation.layout.captionBarPadding
+import androidx.compose.foundation.layout.displayCutout
+import androidx.compose.foundation.layout.exclude
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.only
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.systemBars
+import androidx.compose.foundation.layout.union
+import androidx.compose.foundation.pager.HorizontalPager
+import androidx.compose.foundation.pager.PagerState
+import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateListOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Alignment.Companion.CenterHorizontally
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalUriHandler
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.navigation3.adaptive.utils.shouldShowSplitPane
+import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.entryProvider
+import androidx.navigation3.runtime.rememberDecoratedNavEntries
+import androidx.navigation3.ui.NavDisplay
+import kotlinx.coroutines.launch
+import navigation3.Navigator
+import navigation3.Route
+import top.yukonga.miuix.kmp.basic.FabPosition
+import top.yukonga.miuix.kmp.basic.FloatingActionButton
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBar
+import top.yukonga.miuix.kmp.basic.FloatingNavigationBarItem
+import top.yukonga.miuix.kmp.basic.FloatingToolbar
+import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.IconButton
+import top.yukonga.miuix.kmp.basic.NavigationBar
+import top.yukonga.miuix.kmp.basic.NavigationBarItem
+import top.yukonga.miuix.kmp.basic.NavigationDisplayMode
+import top.yukonga.miuix.kmp.basic.NavigationItem
+import top.yukonga.miuix.kmp.basic.NavigationRail
+import top.yukonga.miuix.kmp.basic.NavigationRailItem
+import top.yukonga.miuix.kmp.basic.Scaffold
+import top.yukonga.miuix.kmp.basic.SnackbarHost
+import top.yukonga.miuix.kmp.basic.SnackbarHostState
+import top.yukonga.miuix.kmp.basic.ToolbarPosition
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Create
+import top.yukonga.miuix.kmp.icon.extended.Delete
+import top.yukonga.miuix.kmp.icon.extended.Edit
+import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
+import top.yukonga.miuix.kmp.icon.extended.Image
+import top.yukonga.miuix.kmp.icon.extended.Link
+import top.yukonga.miuix.kmp.icon.extended.More
+import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.icon.extended.Sort
+import top.yukonga.miuix.kmp.theme.MiuixTheme
+import utils.FPSMonitor
+
+private object UIConstants {
+    const val MAIN_PAGE_INDEX = 0
+    const val ICON_PAGE_INDEX = 1
+    const val COLOR_PAGE_INDEX = 2
+    const val DROPDOWN_PAGE_INDEX = 3
+    const val PAGE_COUNT = 5
+    const val GITHUB_URL = "https://github.com/compose-miuix-ui/miuix"
+
+    val PAGE_TITLES = listOf("Home", "Icon", "Color", "Dropdown", "Settings")
+}
+
+enum class FloatingNavigationBarAlignment(val value: Int) {
+    Center(0),
+    Start(1),
+    End(2),
+    ;
+
+    companion object {
+        fun fromInt(value: Int) = entries.find { it.value == value } ?: Center
+    }
+}
+
+data class UIState(
+    val showFPSMonitor: Boolean = false,
+    val showTopAppBar: Boolean = true,
+    val showNavigationBar: Boolean = true,
+    val navigationBarMode: Int = 0,
+    val navigationRailMode: Int = 0,
+    val useFloatingNavigationBar: Boolean = false,
+    val floatingNavigationBarMode: Int = 0,
+    val floatingNavigationBarPosition: Int = 0,
+    val showFloatingToolbar: Boolean = false,
+    val floatingToolbarPosition: Int = 1,
+    val floatingToolbarOrientation: Int = 1,
+    val showFloatingActionButton: Boolean = false,
+    val floatingActionButtonPosition: Int = 2,
+    val enablePageUserScroll: Boolean = false,
+    val enableScrollEndHaptic: Boolean = true,
+    val enableOverScroll: Boolean = true,
+    val isWideScreen: Boolean = false,
+)
+
+val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator found!") }
+val LocalPagerState = staticCompositionLocalOf<PagerState> { error("No pager state") }
+val LocalHandlePageChange = staticCompositionLocalOf<(Int) -> Unit> { error("No handle page change") }
+
+@Composable
+fun UITest(
+    colorMode: MutableState<Int>,
+    seedIndex: MutableState<Int>,
+    padding: PaddingValues,
+    enableOverScroll: Boolean,
+) {
+    val pagerState = rememberPagerState(pageCount = { UIConstants.PAGE_COUNT })
+    val coroutineScope = rememberCoroutineScope()
+
+    val navigationItems = remember {
+        listOf(
+            NavigationItem(UIConstants.PAGE_TITLES[0], MiuixIcons.HorizontalSplit),
+            NavigationItem(UIConstants.PAGE_TITLES[1], MiuixIcons.Create),
+            NavigationItem(UIConstants.PAGE_TITLES[2], MiuixIcons.Image),
+            NavigationItem(UIConstants.PAGE_TITLES[3], MiuixIcons.Sort),
+            NavigationItem(UIConstants.PAGE_TITLES[4], MiuixIcons.Settings),
+        )
+    }
+
+    var uiState by remember { mutableStateOf(UIState()) }
+    val backStack = remember { mutableStateListOf<NavKey>().apply { add(Route.Main) } }
+    val navigator = remember(backStack) { Navigator(backStack) }
+    val handlePageChange: (Int) -> Unit = remember(pagerState, coroutineScope) {
+        { page ->
+            coroutineScope.launch {
+                if (uiState.isWideScreen) {
+                    pagerState.scrollToPage(page)
+                } else {
+                    pagerState.animateScrollToPage(page)
+                }
+            }
+        }
+    }
+
+    CompositionLocalProvider(
+        LocalPagerState provides pagerState,
+        LocalHandlePageChange provides handlePageChange,
+        LocalNavigator provides navigator,
+    ) {
+        val isWideScreen = shouldShowSplitPane()
+
+        LaunchedEffect(isWideScreen) {
+            if (uiState.isWideScreen != isWideScreen) {
+                uiState = uiState.copy(isWideScreen = isWideScreen)
+            }
+        }
+        LaunchedEffect(enableOverScroll) {
+            if (uiState.enableOverScroll != enableOverScroll) {
+                uiState = uiState.copy(enableOverScroll = enableOverScroll)
+            }
+        }
+
+        val entryProvider = remember(backStack, uiState, colorMode, seedIndex) {
+            entryProvider<NavKey> {
+                entry<Route.Main> {
+                    Home(
+                        uiState = uiState,
+                        onUiStateChange = { uiState = it },
+                        colorMode = colorMode,
+                        seedIndex = seedIndex,
+                        padding = padding,
+                        navigationItems = navigationItems,
+                    )
+                }
+                entry<Route.About> {
+                    AboutPage(
+                        padding = padding,
+                        showTopAppBar = uiState.showTopAppBar,
+                        isWideScreen = uiState.isWideScreen,
+                        enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                        enableOverScroll = uiState.enableOverScroll,
+                    )
+                }
+                entry<Route.License> {
+                    LicensePage(
+                        padding = padding,
+                        showTopAppBar = uiState.showTopAppBar,
+                        enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                        enableOverScroll = uiState.enableOverScroll,
+                        isWideScreen = uiState.isWideScreen,
+                    )
+                }
+                entry<Route.NavTest> { route ->
+                    val index = backStack.filterIsInstance<Route.NavTest>().indexOf(route) + 1
+                    NavTestPage(
+                        index = index,
+                        padding = padding,
+                        showTopAppBar = uiState.showTopAppBar,
+                        isWideScreen = uiState.isWideScreen,
+                        enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                        enableOverScroll = uiState.enableOverScroll,
+                    )
+                }
+            }
+        }
+
+        val entries = rememberDecoratedNavEntries(
+            backStack = backStack,
+            entryProvider = entryProvider,
+        )
+
+        NavDisplay(
+            entries = entries,
+            onBack = { navigator.pop() },
+        )
+    }
+
+    AnimatedVisibility(
+        visible = uiState.showFPSMonitor,
+        enter = fadeIn() + expandHorizontally(),
+        exit = fadeOut() + shrinkHorizontally(),
+    ) {
+        FPSMonitor(
+            modifier = Modifier
+                .statusBarsPadding()
+                .captionBarPadding()
+                .padding(all = 12.dp),
+        )
+    }
+}
+
+@Composable
+private fun Home(
+    uiState: UIState,
+    onUiStateChange: (UIState) -> Unit,
+    colorMode: MutableState<Int>,
+    seedIndex: MutableState<Int>,
+    padding: PaddingValues,
+    navigationItems: List<NavigationItem>,
+) {
+    val layoutDirection = LocalLayoutDirection.current
+    val snackbarHostState = remember { SnackbarHostState() }
+    Scaffold(
+        snackbarHost = {
+            if (uiState.isWideScreen) {
+                SnackbarHost(state = snackbarHostState)
+            }
+        },
+    ) {
+        if (uiState.isWideScreen) {
+            WideScreenContent(
+                navigationItems = navigationItems,
+                uiState = uiState,
+                onUiStateChange = onUiStateChange,
+                colorMode = colorMode,
+                seedIndex = seedIndex,
+                snackbarHostState = snackbarHostState,
+                layoutDirection = layoutDirection,
+            )
+        } else {
+            CompactScreenLayout(
+                navigationItems = navigationItems,
+                uiState = uiState,
+                onUiStateChange = onUiStateChange,
+                colorMode = colorMode,
+                seedIndex = seedIndex,
+                snackbarHostState = snackbarHostState,
+                padding = padding,
+            )
+        }
+    }
+}
+
+@Composable
+private fun WideScreenContent(
+    navigationItems: List<NavigationItem>,
+    uiState: UIState,
+    onUiStateChange: (UIState) -> Unit,
+    colorMode: MutableState<Int>,
+    seedIndex: MutableState<Int>,
+    snackbarHostState: SnackbarHostState,
+    layoutDirection: LayoutDirection,
+) {
+    val page = LocalPagerState.current.targetPage
+    val handlePageChange = LocalHandlePageChange.current
+    Row {
+        if (uiState.showNavigationBar) {
+            NavigationRail(
+                modifier = Modifier.background(MiuixTheme.colorScheme.surface),
+                mode = NavigationDisplayMode.entries[uiState.navigationRailMode],
+            ) {
+                navigationItems.forEachIndexed { index, item ->
+                    NavigationRailItem(
+                        selected = page == index,
+                        onClick = { handlePageChange(index) },
+                        icon = item.icon,
+                        label = item.label,
+                    )
+                }
+            }
+        }
+        Scaffold(
+            modifier = Modifier
+                .fillMaxSize(),
+            contentWindowInsets =
+            WindowInsets.systemBars.union(
+                WindowInsets.displayCutout.exclude(
+                    WindowInsets.displayCutout.only(WindowInsetsSides.Start),
+                ),
+            ),
+            floatingActionButton = {
+                FloatingActionButton(show = uiState.showFloatingActionButton)
+            },
+            floatingActionButtonPosition = uiState.floatingActionButtonPosition.toFabPosition(),
+            floatingToolbar = {
+                FloatingToolbar(
+                    showFloatingToolbar = uiState.showFloatingToolbar,
+                    floatingToolbarOrientation = uiState.floatingToolbarOrientation,
+                )
+            },
+            floatingToolbarPosition = uiState.floatingToolbarPosition.toToolbarPosition(),
+            popupHost = { },
+        ) { padding ->
+            AppPager(
+                snackbarHostState = snackbarHostState,
+                padding = PaddingValues(top = padding.calculateTopPadding()),
+                uiState = uiState,
+                onUiStateChange = onUiStateChange,
+                colorMode = colorMode,
+                seedIndex = seedIndex,
+                modifier = Modifier
+                    .imePadding()
+                    .padding(end = padding.calculateEndPadding(layoutDirection)),
+            )
+        }
+    }
+}
+
+@Composable
+private fun CompactScreenLayout(
+    navigationItems: List<NavigationItem>,
+    uiState: UIState,
+    onUiStateChange: (UIState) -> Unit,
+    colorMode: MutableState<Int>,
+    seedIndex: MutableState<Int>,
+    snackbarHostState: SnackbarHostState,
+    padding: PaddingValues,
+) {
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        bottomBar = {
+            NavigationBar(
+                uiState = uiState,
+                navigationItems = navigationItems,
+                modifier = Modifier.padding(bottom = padding.calculateBottomPadding()),
+            )
+        },
+        floatingActionButton = {
+            FloatingActionButton(show = uiState.showFloatingActionButton)
+        },
+        floatingActionButtonPosition = uiState.floatingActionButtonPosition.toFabPosition(),
+        floatingToolbar = {
+            FloatingToolbar(
+                showFloatingToolbar = uiState.showFloatingToolbar,
+                floatingToolbarOrientation = uiState.floatingToolbarOrientation,
+            )
+        },
+        floatingToolbarPosition = uiState.floatingToolbarPosition.toToolbarPosition(),
+        snackbarHost = {
+            if (!uiState.isWideScreen) {
+                SnackbarHost(state = snackbarHostState)
+            }
+        },
+        popupHost = { },
+    ) { innerPadding ->
+        AppPager(
+            snackbarHostState = snackbarHostState,
+            padding = innerPadding,
+            uiState = uiState,
+            onUiStateChange = onUiStateChange,
+            colorMode = colorMode,
+            seedIndex = seedIndex,
+            modifier = Modifier
+                .padding(
+                    top = padding.calculateTopPadding(),
+                    start = padding.calculateStartPadding(LocalLayoutDirection.current),
+                    end = padding.calculateEndPadding(LocalLayoutDirection.current),
+                )
+                .imePadding(),
+        )
+    }
+}
+
+@Composable
+private fun NavigationBar(
+    uiState: UIState,
+    navigationItems: List<NavigationItem>,
+    modifier: Modifier = Modifier,
+) {
+    val page = LocalPagerState.current.targetPage
+    val handlePageChange = LocalHandlePageChange.current
+    AnimatedVisibility(
+        visible = uiState.showNavigationBar,
+        enter = fadeIn() + expandVertically(),
+        exit = fadeOut() + shrinkVertically(),
+    ) {
+        AnimatedVisibility(
+            visible = !uiState.useFloatingNavigationBar,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+        ) {
+            Box(
+                modifier = Modifier
+                    .background(MiuixTheme.colorScheme.surface)
+                    .pointerInput(Unit) {
+                        awaitPointerEventScope {
+                            while (true) {
+                                val event = awaitPointerEvent()
+                                event.changes.forEach { change ->
+                                    if (change.pressed) change.consume()
+                                }
+                            }
+                        }
+                    }
+                    .then(modifier),
+            ) {
+                NavigationBar(
+                    modifier = Modifier,
+                    mode = NavigationDisplayMode.entries[uiState.navigationBarMode],
+                ) {
+                    navigationItems.forEachIndexed { index, item ->
+                        NavigationBarItem(
+                            selected = page == index,
+                            onClick = { handlePageChange(index) },
+                            icon = item.icon,
+                            label = item.label,
+                        )
+                    }
+                }
+            }
+        }
+        AnimatedVisibility(
+            visible = uiState.useFloatingNavigationBar,
+            enter = fadeIn() + expandVertically(expandFrom = Alignment.Top),
+            exit = fadeOut() + shrinkVertically(shrinkTowards = Alignment.Top),
+        ) {
+            Box(
+                modifier = modifier,
+            ) {
+                FloatingNavigationBar(
+                    mode = NavigationDisplayMode.entries[uiState.floatingNavigationBarMode],
+                    horizontalAlignment = FloatingNavigationBarAlignment.fromInt(uiState.floatingNavigationBarPosition)
+                        .toAlignment(),
+                ) {
+                    navigationItems.forEachIndexed { index, item ->
+                        FloatingNavigationBarItem(
+                            selected = page == index,
+                            onClick = { handlePageChange(index) },
+                            icon = item.icon,
+                            label = item.label,
+                        )
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+private fun FloatingActionButton(
+    show: Boolean,
+) {
+    if (show) {
+        val uriHandler = LocalUriHandler.current
+        FloatingActionButton(
+            onClick = {
+                uriHandler.openUri(UIConstants.GITHUB_URL)
+            },
+        ) {
+            Icon(
+                imageVector = MiuixIcons.Link,
+                tint = MiuixTheme.colorScheme.onPrimary,
+                contentDescription = "GitHub",
+            )
+        }
+    }
+}
+
+@Composable
+private fun FloatingToolbar(
+    showFloatingToolbar: Boolean,
+    floatingToolbarOrientation: Int,
+) {
+    AnimatedVisibility(
+        visible = showFloatingToolbar,
+        enter = fadeIn(),
+        exit = fadeOut(),
+    ) {
+        FloatingToolbar(
+            color = MiuixTheme.colorScheme.primary,
+            cornerRadius = 20.dp,
+        ) {
+            AnimatedContent(
+                targetState = floatingToolbarOrientation,
+            ) { orientation ->
+                val iconTint = MiuixTheme.colorScheme.onPrimary
+                val content = @Composable {
+                    IconButton(onClick = { /* Action 1 */ }) {
+                        Icon(
+                            MiuixIcons.Edit,
+                            contentDescription = "Edit",
+                            tint = iconTint,
+                        )
+                    }
+                    IconButton(onClick = { /* Action 2 */ }) {
+                        Icon(
+                            MiuixIcons.Delete,
+                            contentDescription = "Delete",
+                            tint = iconTint,
+                        )
+                    }
+                    IconButton(onClick = { /* Action 3 */ }) {
+                        Icon(
+                            MiuixIcons.More,
+                            contentDescription = "More",
+                            tint = iconTint,
+                        )
+                    }
+                }
+                when (orientation) {
+                    0 -> Row(
+                        modifier = Modifier.padding(8.dp),
+                        horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    ) { content() }
+
+                    else -> Column(
+                        modifier = Modifier.padding(8.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp),
+                    ) { content() }
+                }
+            }
+        }
+    }
+}
+
+private fun Int.toFabPosition(): FabPosition = when (this) {
+    0 -> FabPosition.Start
+    1 -> FabPosition.Center
+    2 -> FabPosition.End
+    else -> FabPosition.EndOverlay
+}
+
+private fun Int.toToolbarPosition(): ToolbarPosition = when (this) {
+    0 -> ToolbarPosition.TopStart
+    1 -> ToolbarPosition.CenterStart
+    2 -> ToolbarPosition.BottomStart
+    3 -> ToolbarPosition.TopEnd
+    4 -> ToolbarPosition.CenterEnd
+    5 -> ToolbarPosition.BottomEnd
+    6 -> ToolbarPosition.TopCenter
+    else -> ToolbarPosition.BottomCenter
+}
+
+private fun FloatingNavigationBarAlignment.toAlignment(): Alignment.Horizontal = when (this) {
+    FloatingNavigationBarAlignment.Center -> CenterHorizontally
+    FloatingNavigationBarAlignment.Start -> Alignment.Start
+    FloatingNavigationBarAlignment.End -> Alignment.End
+}
+
+@Composable
+fun AppPager(
+    snackbarHostState: SnackbarHostState,
+    padding: PaddingValues,
+    uiState: UIState,
+    onUiStateChange: (UIState) -> Unit,
+    colorMode: MutableState<Int>,
+    seedIndex: MutableState<Int>,
+    modifier: Modifier = Modifier,
+) {
+    HorizontalPager(
+        state = LocalPagerState.current,
+        modifier = modifier,
+        userScrollEnabled = uiState.enablePageUserScroll,
+        verticalAlignment = Alignment.Top,
+        beyondViewportPageCount = 1,
+        overscrollEffect = null,
+        pageContent = { page ->
+            when (page) {
+                UIConstants.MAIN_PAGE_INDEX -> MainPage(
+                    snackbarHostState = snackbarHostState,
+                    padding = padding,
+                    enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                    enableOverScroll = uiState.enableOverScroll,
+                    isWideScreen = uiState.isWideScreen,
+                    showTopAppBar = uiState.showTopAppBar,
+                )
+
+                UIConstants.ICON_PAGE_INDEX -> IconsPage(
+                    padding = padding,
+                    enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                    enableOverScroll = uiState.enableOverScroll,
+                    isWideScreen = uiState.isWideScreen,
+                    showTopAppBar = uiState.showTopAppBar,
+                )
+
+                UIConstants.COLOR_PAGE_INDEX -> ColorPage(
+                    padding = padding,
+                    enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                    enableOverScroll = uiState.enableOverScroll,
+                    isWideScreen = uiState.isWideScreen,
+                    showTopAppBar = uiState.showTopAppBar,
+                )
+
+                UIConstants.DROPDOWN_PAGE_INDEX -> DropdownPage(
+                    padding = padding,
+                    enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                    enableOverScroll = uiState.enableOverScroll,
+                    isWideScreen = uiState.isWideScreen,
+                    showTopAppBar = uiState.showTopAppBar,
+                )
+
+                else -> SettingsPage(
+                    padding = padding,
+                    showFPSMonitor = uiState.showFPSMonitor,
+                    onShowFPSMonitorChange = { onUiStateChange(uiState.copy(showFPSMonitor = it)) },
+                    showTopAppBar = uiState.showTopAppBar,
+                    onShowTopAppBarChange = { onUiStateChange(uiState.copy(showTopAppBar = it)) },
+                    showNavigationBar = uiState.showNavigationBar,
+                    onShowNavigationBarChange = { onUiStateChange(uiState.copy(showNavigationBar = it)) },
+                    navigationBarMode = uiState.navigationBarMode,
+                    onNavigationBarModeChange = { onUiStateChange(uiState.copy(navigationBarMode = it)) },
+                    navigationRailMode = uiState.navigationRailMode,
+                    onNavigationRailModeChange = { onUiStateChange(uiState.copy(navigationRailMode = it)) },
+                    showFloatingToolbar = uiState.showFloatingToolbar,
+                    onShowFloatingToolbarChange = { onUiStateChange(uiState.copy(showFloatingToolbar = it)) },
+                    useFloatingNavigationBar = uiState.useFloatingNavigationBar,
+                    onUseFloatingNavigationBarChange = { onUiStateChange(uiState.copy(useFloatingNavigationBar = it)) },
+                    floatingNavigationBarMode = uiState.floatingNavigationBarMode,
+                    onFloatingNavigationBarModeChange = { onUiStateChange(uiState.copy(floatingNavigationBarMode = it)) },
+                    floatingNavigationBarPosition = uiState.floatingNavigationBarPosition,
+                    onFloatingNavigationBarPositionChange = { onUiStateChange(uiState.copy(floatingNavigationBarPosition = it)) },
+                    floatingToolbarPosition = uiState.floatingToolbarPosition,
+                    onFloatingToolbarPositionChange = { onUiStateChange(uiState.copy(floatingToolbarPosition = it)) },
+                    floatingToolbarOrientation = uiState.floatingToolbarOrientation,
+                    onFloatingToolbarOrientationChange = { onUiStateChange(uiState.copy(floatingToolbarOrientation = it)) },
+                    showFloatingActionButton = uiState.showFloatingActionButton,
+                    onShowFloatingActionButtonChange = { onUiStateChange(uiState.copy(showFloatingActionButton = it)) },
+                    fabPosition = uiState.floatingActionButtonPosition,
+                    onFabPositionChange = { onUiStateChange(uiState.copy(floatingActionButtonPosition = it)) },
+                    enablePageUserScroll = uiState.enablePageUserScroll,
+                    onEnablePageUserScrollChange = { onUiStateChange(uiState.copy(enablePageUserScroll = it)) },
+                    enableScrollEndHaptic = uiState.enableScrollEndHaptic,
+                    onScrollEndHapticChange = { onUiStateChange(uiState.copy(enableScrollEndHaptic = it)) },
+                    enableOverScroll = uiState.enableOverScroll,
+                    isWideScreen = uiState.isWideScreen,
+                    colorMode = colorMode,
+                    seedIndex = seedIndex,
+                )
+            }
+        },
+    )
+}
