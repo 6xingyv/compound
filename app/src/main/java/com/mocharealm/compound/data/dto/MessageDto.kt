@@ -3,6 +3,7 @@ package com.mocharealm.compound.data.dto
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.StickerFormat
+import com.mocharealm.compound.domain.model.TextEntity
 
 data class MessageDto(
     val id: Long,
@@ -15,7 +16,8 @@ data class MessageDto(
     val messageType: MessageType = MessageType.TEXT,
     val fileId: Int? = null,
     val avatarUrl: String? = null,
-    val stickerFormat: StickerFormat? = null
+    val stickerFormat: StickerFormat? = null,
+    val entities: List<TextEntity> = emptyList()
 ) {
     fun toDomain(): Message = Message(
         id = id,
@@ -29,6 +31,7 @@ data class MessageDto(
         fileUrl = null,
         fileId = fileId,
         avatarUrl = avatarUrl,
-        stickerFormat = stickerFormat
+        stickerFormat = stickerFormat,
+        entities = entities
     )
 }

@@ -11,6 +11,8 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.StickerFormat
+import com.mocharealm.compound.domain.model.TextEntity
+import com.mocharealm.compound.domain.model.TextEntityType
 import com.mocharealm.compound.domain.model.User
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import kotlinx.coroutines.flow.SharedFlow
@@ -342,7 +344,8 @@ class TelegramRepositoryImpl(
             messageType = parsed.type,
             fileId = parsed.fileId,
             avatarUrl = avatarPath,
-            stickerFormat = parsed.stickerFormat
+            stickerFormat = parsed.stickerFormat,
+            entities = parsed.entities
         ).toDomain()
     }
 
@@ -350,19 +353,26 @@ class TelegramRepositoryImpl(
         val text: String,
         val type: MessageType,
         val fileId: Int?,
-        val stickerFormat: StickerFormat? = null
+        val stickerFormat: StickerFormat? = null,
+        val entities: List<TextEntity> = emptyList()
     )
 
     private fun parseMessageContent(content: TdApi.MessageContent): ParsedContent =
         when (content) {
-            is TdApi.MessageText -> ParsedContent(content.text.text, MessageType.TEXT, null)
+            is TdApi.MessageText -> ParsedContent(
+                content.text.text,
+                MessageType.TEXT,
+                null,
+                entities = mapFormattedTextEntities(content.text)
+            )
             is TdApi.MessagePhoto -> {
                 val caption = content.caption.text
                 val photoFileId = content.photo.sizes.lastOrNull()?.photo?.id
                 ParsedContent(
                     if (caption.isNotEmpty()) "Photo: $caption" else "Photo",
                     MessageType.PHOTO,
-                    photoFileId
+                    photoFileId,
+                    entities = if (caption.isNotEmpty()) mapFormattedTextEntities(content.caption) else emptyList()
                 )
             }
             is TdApi.MessageSticker -> {
@@ -383,4 +393,32 @@ class TelegramRepositoryImpl(
             is TdApi.MessageVoiceNote -> ParsedContent("Voice message", MessageType.VOICE, null)
             else -> ParsedContent("Message", MessageType.TEXT, null)
         }
+
+    private fun mapFormattedTextEntities(formattedText: TdApi.FormattedText): List<TextEntity> {
+        if (formattedText.entities.isNullOrEmpty()) return emptyList()
+        return formattedText.entities.mapNotNull { entity ->
+            val type = when (entity.type) {
+                is TdApi.TextEntityTypeBold -> TextEntityType.Bold
+                is TdApi.TextEntityTypeItalic -> TextEntityType.Italic
+                is TdApi.TextEntityTypeUnderline -> TextEntityType.Underline
+                is TdApi.TextEntityTypeStrikethrough -> TextEntityType.Strikethrough
+                is TdApi.TextEntityTypeCode -> TextEntityType.Code
+                is TdApi.TextEntityTypePre -> TextEntityType.Pre
+                is TdApi.TextEntityTypePreCode -> TextEntityType.PreCode(
+                    (entity.type as TdApi.TextEntityTypePreCode).language
+                )
+                is TdApi.TextEntityTypeTextUrl -> TextEntityType.TextUrl(
+                    (entity.type as TdApi.TextEntityTypeTextUrl).url
+                )
+                is TdApi.TextEntityTypeUrl -> TextEntityType.Url
+                is TdApi.TextEntityTypeMention -> TextEntityType.Mention
+                is TdApi.TextEntityTypeMentionName -> TextEntityType.Mention
+                is TdApi.TextEntityTypeSpoiler -> TextEntityType.Spoiler
+                is TdApi.TextEntityTypeEmailAddress -> TextEntityType.EmailAddress
+                is TdApi.TextEntityTypePhoneNumber -> TextEntityType.PhoneNumber
+                else -> null
+            } ?: return@mapNotNull null
+            TextEntity(offset = entity.offset, length = entity.length, type = type)
+        }
+    }
 }

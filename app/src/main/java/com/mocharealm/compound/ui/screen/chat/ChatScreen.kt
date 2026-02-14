@@ -70,6 +70,8 @@ import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
+import com.mocharealm.compound.ui.util.URL_ANNOTATION_TAG
+import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -137,8 +139,8 @@ fun ChatScreen(
                 .overScrollVertical()
                 .scrollEndHaptic(),
             contentPadding = PaddingValues(
-                top = 12.dp,
-                bottom = innerPadding.calculateTopPadding(),
+                top = innerPadding.calculateTopPadding(),
+                bottom = 12.dp,
             ),
             overscrollEffect = null,
         ) {
@@ -338,6 +340,16 @@ private fun MessageContent(message: Message, hasTail: Boolean) {
     } else {
         Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
     }
+
+    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    val contentColor = LocalContentColor.current
+    val linkColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
+        else MiuixTheme.colorScheme.primary
+
+    val richText = remember(message.content, message.entities) {
+        buildAnnotatedString(message.content, message.entities, linkColor)
+    }
+
     when (message.messageType) {
         MessageType.PHOTO -> {
             if (!message.fileUrl.isNullOrEmpty()) {
@@ -348,27 +360,29 @@ private fun MessageContent(message: Message, hasTail: Boolean) {
                             .build(),
                         contentDescription = "Photo",
                         modifier = Modifier
-                            .heightIn(max = 300.dp) // 限制最大高度
-                            .wrapContentWidth(),    // 宽度根据比例自适应
-                        contentScale = ContentScale.Fit // 确保不被裁剪
+                            .heightIn(max = 300.dp)
+                            .wrapContentWidth(),
+                        contentScale = ContentScale.Fit
                     )
 
                     val caption = message.content.removePrefix("Photo: ").takeIf { it != "Photo" }
                     if (!caption.isNullOrBlank()) {
-                        Text(
-                            text = caption,
-                            style = MiuixTheme.textStyles.body1,
-                            modifier = textPadding
-                                .fillMaxWidth()
+                        val captionRich = remember(caption, message.entities) {
+                            buildAnnotatedString(caption, message.entities, linkColor)
+                        }
+                        androidx.compose.foundation.text.ClickableText(
+                            text = captionRich,
+                            style = MiuixTheme.textStyles.body1.copy(color = contentColor),
+                            modifier = textPadding.fillMaxWidth(),
+                            onClick = { offset ->
+                                captionRich.getStringAnnotations(URL_ANNOTATION_TAG, offset, offset)
+                                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+                            }
                         )
                     }
                 }
             } else {
-                Text(
-                    text = message.content,
-                    style = MiuixTheme.textStyles.body1,
-                    modifier = textPadding
-                )
+                RichTextContent(richText, contentColor, textPadding, uriHandler)
             }
         }
 
@@ -393,18 +407,37 @@ private fun MessageContent(message: Message, hasTail: Boolean) {
                     )
                 }
             } else {
-                Text(
-                    text = message.content,
-                    style = MiuixTheme.textStyles.body1,
-                    modifier = textPadding
-                )
+                RichTextContent(richText, contentColor, textPadding, uriHandler)
             }
         }
 
-        else -> Text(
-            text = message.content,
+        else -> RichTextContent(richText, contentColor, textPadding, uriHandler)
+    }
+}
+
+@Composable
+private fun RichTextContent(
+    text: androidx.compose.ui.text.AnnotatedString,
+    contentColor: Color,
+    modifier: Modifier,
+    uriHandler: androidx.compose.ui.platform.UriHandler,
+) {
+    if (text.spanStyles.isEmpty() && text.getStringAnnotations(0, text.length).isEmpty()) {
+        // 无富文本标注，使用普通 Text 组件
+        Text(
+            text = text.text,
             style = MiuixTheme.textStyles.body1,
-            modifier = textPadding
+            modifier = modifier
+        )
+    } else {
+        androidx.compose.foundation.text.ClickableText(
+            text = text,
+            style = MiuixTheme.textStyles.body1.copy(color = contentColor),
+            modifier = modifier,
+            onClick = { offset ->
+                text.getStringAnnotations(URL_ANNOTATION_TAG, offset, offset)
+                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
+            }
         )
     }
 }
