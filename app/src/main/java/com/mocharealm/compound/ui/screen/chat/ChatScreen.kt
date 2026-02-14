@@ -58,6 +58,10 @@ import androidx.media3.ui.AspectRatioFrameLayout
 import androidx.media3.ui.PlayerView
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import com.airbnb.lottie.compose.LottieAnimation
+import com.airbnb.lottie.compose.LottieCompositionSpec
+import com.airbnb.lottie.compose.LottieConstants
+import com.airbnb.lottie.compose.rememberLottieComposition
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.StickerFormat
@@ -269,28 +273,34 @@ private fun MessageBubble(
                     overflow = TextOverflow.Ellipsis
                 )
             }
+            val isSticker = message.messageType == MessageType.STICKER
             CompositionLocalProvider(
                 LocalContentColor provides
                         if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
                         else MiuixTheme.colorScheme.onSurfaceContainer,
             ) {
-                Box(
-                    modifier = Modifier
-                        .surface(
-                            shape = shape,
-                            backgroundColor =
-                                if (message.isOutgoing) MiuixTheme.colorScheme.primary
-                                else MiuixTheme.colorScheme.surfaceContainer,
-                            border = null,
-                            shadowElevation = 0f,
-                        )
-                        .semantics(mergeDescendants = false) {
-                            isTraversalGroup = true
-                        },
-                    propagateMinConstraints = true,
-                ) {
-                    Column(Modifier.widthIn(min = 44.dp)) {
-                        MessageContent(message, hasTail = isLast)
+                if (isSticker) {
+                    // 贴纸：透明背景，不使用 shape clip
+                    MessageContent(message, hasTail = isLast)
+                } else {
+                    Box(
+                        modifier = Modifier
+                            .surface(
+                                shape = shape,
+                                backgroundColor =
+                                    if (message.isOutgoing) MiuixTheme.colorScheme.primary
+                                    else MiuixTheme.colorScheme.surfaceContainer,
+                                border = null,
+                                shadowElevation = 0f,
+                            )
+                            .semantics(mergeDescendants = false) {
+                                isTraversalGroup = true
+                            },
+                        propagateMinConstraints = true,
+                    ) {
+                        Column(Modifier.widthIn(min = 44.dp)) {
+                            MessageContent(message, hasTail = isLast)
+                        }
                     }
                 }
             }
@@ -364,22 +374,21 @@ private fun MessageContent(message: Message, hasTail: Boolean) {
 
         MessageType.STICKER -> {
             if (!message.fileUrl.isNullOrEmpty()) {
-                if (message.stickerFormat == StickerFormat.WEBM) {
-                    LoopingVideoSticker(
+                when (message.stickerFormat) {
+                    StickerFormat.WEBM -> LoopingVideoSticker(
                         filePath = message.fileUrl,
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(ContinuousRoundedRectangle(8.dp))
+                        modifier = Modifier.size(120.dp)
                     )
-                } else {
-                    AsyncImage(
+                    StickerFormat.TGS -> LottieSticker(
+                        filePath = message.fileUrl,
+                        modifier = Modifier.size(120.dp)
+                    )
+                    else -> AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(java.io.File(message.fileUrl))
                             .build(),
                         contentDescription = "Sticker",
-                        modifier = Modifier
-                            .size(120.dp)
-                            .clip(ContinuousRoundedRectangle(8.dp)),
+                        modifier = Modifier.size(120.dp),
                         contentScale = ContentScale.Fit
                     )
                 }
@@ -437,3 +446,23 @@ private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier)
     )
 }
 
+@Composable
+private fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
+    val jsonString = remember(filePath) {
+        try {
+            java.util.zip.GZIPInputStream(java.io.File(filePath).inputStream()).bufferedReader()
+                .use { it.readText() }
+        } catch (_: Exception) {
+            null
+        }
+    }
+
+    if (jsonString != null) {
+        val composition by rememberLottieComposition(LottieCompositionSpec.JsonString(jsonString))
+        LottieAnimation(
+            composition = composition,
+            iterations = LottieConstants.IterateForever,
+            modifier = modifier,
+        )
+    }
+}
