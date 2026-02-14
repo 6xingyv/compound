@@ -10,6 +10,7 @@ import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
+import com.mocharealm.compound.domain.model.ReplyInfo
 import com.mocharealm.compound.domain.model.StickerFormat
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.TextEntityType
@@ -333,6 +334,9 @@ class TelegramRepositoryImpl(
             }
         }
 
+        // ── Reply info ──────────────────────────────────────────────────
+        val replyInfo = resolveReplyInfo(msg)
+
         return MessageDto(
             id = msg.id,
             chatId = msg.chatId,
@@ -345,8 +349,77 @@ class TelegramRepositoryImpl(
             fileId = parsed.fileId,
             avatarUrl = avatarPath,
             stickerFormat = parsed.stickerFormat,
-            entities = parsed.entities
+            entities = parsed.entities,
+            replyTo = replyInfo,
+            mediaAlbumId = msg.mediaAlbumId
         ).toDomain()
+    }
+
+    private suspend fun resolveReplyInfo(msg: TdApi.Message): ReplyInfo? {
+        val reply = msg.replyTo as? TdApi.MessageReplyToMessage ?: return null
+        val replyChatId = if (reply.chatId != 0L) reply.chatId else msg.chatId
+        val replyMsgId = reply.messageId
+        if (replyMsgId == 0L) return null
+
+        // Try to get the original message for sender info
+        val originalMsg = sendSafe(TdApi.GetMessage(replyChatId, replyMsgId)).getOrNull()
+
+        val replySenderName = if (originalMsg != null) {
+            when (originalMsg.senderId) {
+                is TdApi.MessageSenderUser -> {
+                    val u = sendSafe(TdApi.GetUser((originalMsg.senderId as TdApi.MessageSenderUser).userId)).getOrNull()
+                    u?.let {
+                        buildString {
+                            append(it.firstName)
+                            if (it.lastName.isNotEmpty()) append(' ').append(it.lastName)
+                        }
+                    } ?: "User"
+                }
+                is TdApi.MessageSenderChat -> {
+                    val c = sendSafe(TdApi.GetChat((originalMsg.senderId as TdApi.MessageSenderChat).chatId)).getOrNull()
+                    c?.title ?: "Chat"
+                }
+                else -> "Unknown"
+            }
+        } else {
+            // If message is from another chat, try origin
+            when (reply.origin) {
+                is TdApi.MessageOriginUser -> {
+                    val u = sendSafe(TdApi.GetUser((reply.origin as TdApi.MessageOriginUser).senderUserId)).getOrNull()
+                    u?.let {
+                        buildString {
+                            append(it.firstName)
+                            if (it.lastName.isNotEmpty()) append(' ').append(it.lastName)
+                        }
+                    } ?: "User"
+                }
+                is TdApi.MessageOriginHiddenUser -> (reply.origin as TdApi.MessageOriginHiddenUser).senderName
+                is TdApi.MessageOriginChat -> {
+                    val c = sendSafe(TdApi.GetChat((reply.origin as TdApi.MessageOriginChat).senderChatId)).getOrNull()
+                    c?.title ?: "Chat"
+                }
+                is TdApi.MessageOriginChannel -> {
+                    val c = sendSafe(TdApi.GetChat((reply.origin as TdApi.MessageOriginChannel).chatId)).getOrNull()
+                    c?.title ?: "Channel"
+                }
+                else -> "Unknown"
+            }
+        }
+
+        // Preview text: prefer quote text, then original message content summary
+        val previewText = reply.quote?.text?.text
+            ?: if (originalMsg != null) {
+                val p = parseMessageContent(originalMsg.content)
+                p.text
+            } else {
+                reply.content?.let { parseMessageContent(it).text } ?: ""
+            }
+
+        return ReplyInfo(
+            messageId = replyMsgId,
+            senderName = replySenderName,
+            text = previewText
+        )
     }
 
     private data class ParsedContent(

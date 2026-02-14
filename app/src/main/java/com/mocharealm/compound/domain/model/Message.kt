@@ -13,7 +13,9 @@ data class Message(
     val fileId: Int? = null,
     val avatarUrl: String? = null,
     val stickerFormat: StickerFormat? = null,
-    val entities: List<TextEntity> = emptyList()
+    val entities: List<TextEntity> = emptyList(),
+    val replyTo: ReplyInfo? = null,
+    val mediaAlbumId: Long = 0L
 )
 
 enum class MessageType {
@@ -31,6 +33,12 @@ enum class StickerFormat {
     TGS,
     WEBM
 }
+
+data class ReplyInfo(
+    val messageId: Long,
+    val senderName: String,
+    val text: String
+)
 
 data class TextEntity(
     val offset: Int,

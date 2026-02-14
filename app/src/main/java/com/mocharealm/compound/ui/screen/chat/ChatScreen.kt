@@ -7,6 +7,7 @@ import androidx.annotation.OptIn
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -17,6 +18,7 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -35,6 +37,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -73,6 +76,7 @@ import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.URL_ANNOTATION_TAG
 import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -86,6 +90,11 @@ import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 private enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
+
+private data class DisplayItem(
+    val messages: List<Message>,
+    val isAlbum: Boolean
+)
 
 @Composable
 fun ChatScreen(
@@ -131,6 +140,47 @@ fun ChatScreen(
         },
         popupHost = {},
     ) { innerPadding ->
+        val displayMessages = state.messages.reversed()
+
+        // Pre-group album messages: find runs of consecutive messages
+        // with the same non-zero mediaAlbumId
+        val displayItems = remember(displayMessages) {
+            val items = mutableListOf<DisplayItem>()
+            var i = 0
+            while (i < displayMessages.size) {
+                val msg = displayMessages[i]
+                val isMediaAlbumType = msg.messageType == MessageType.PHOTO ||
+                    msg.messageType == MessageType.VIDEO
+                if (msg.mediaAlbumId != 0L && isMediaAlbumType) {
+                    val albumId = msg.mediaAlbumId
+                    val albumMessages = mutableListOf(msg)
+                    while (i + 1 < displayMessages.size &&
+                        displayMessages[i + 1].mediaAlbumId == albumId &&
+                        (displayMessages[i + 1].messageType == MessageType.PHOTO ||
+                            displayMessages[i + 1].messageType == MessageType.VIDEO)
+                    ) {
+                        i++
+                        albumMessages.add(displayMessages[i])
+                    }
+                    items.add(DisplayItem(albumMessages, isAlbum = true))
+                } else {
+                    items.add(DisplayItem(listOf(msg), isAlbum = false))
+                }
+                i++
+            }
+            items
+        }
+
+        val scope = rememberCoroutineScope()
+        val onReplyClick: (Long) -> Unit = { replyMessageId ->
+            val targetIdx = displayItems.indexOfFirst { item ->
+                item.messages.any { it.id == replyMessageId }
+            }
+            if (targetIdx >= 0) {
+                scope.launch { listState.animateScrollToItem(targetIdx) }
+            }
+        }
+
         LazyColumn(
             state = listState,
             reverseLayout = true,
@@ -171,23 +221,36 @@ fun ChatScreen(
                     }
                 }
             } else {
-                val displayMessages = state.messages.reversed()
-                items(displayMessages.size, key = { displayMessages[it].id }) { index ->
-                    val message = displayMessages[index]
-                    val belowSender = displayMessages.getOrNull(index - 1)?.senderId
-                    val aboveSender = displayMessages.getOrNull(index + 1)?.senderId
-                    val sameBelow = belowSender == message.senderId
-                    val sameAbove = aboveSender == message.senderId
+                items(displayItems.size, key = { displayItems[it].messages.first().id }) { index ->
+                    val item = displayItems[index]
+                    val primaryMessage = item.messages.first()
+
+                    // Group position based on the primary message's senderId
+                    val prevSender = displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
+                    val nextSender = displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
+                    val sameBelow = prevSender == primaryMessage.senderId
+                    val sameAbove = nextSender == primaryMessage.senderId
                     val groupPosition = when {
                         !sameAbove && !sameBelow -> GroupPosition.SINGLE
                         !sameAbove -> GroupPosition.FIRST
                         !sameBelow -> GroupPosition.LAST
                         else -> GroupPosition.MIDDLE
                     }
-                    MessageBubble(
-                        message = message,
-                        groupPosition = groupPosition,
-                    )
+
+                    if (item.isAlbum) {
+                        MessageBubble(
+                            message = primaryMessage,
+                            groupPosition = groupPosition,
+                            albumMessages = item.messages,
+                            onReplyClick = onReplyClick,
+                        )
+                    } else {
+                        MessageBubble(
+                            message = primaryMessage,
+                            groupPosition = groupPosition,
+                            onReplyClick = onReplyClick,
+                        )
+                    }
                 }
 
                 if (state.loadingMore) {
@@ -214,6 +277,8 @@ fun ChatScreen(
 private fun MessageBubble(
     message: Message,
     groupPosition: GroupPosition,
+    albumMessages: List<Message>? = null,
+    onReplyClick: (Long) -> Unit = {},
 ) {
     val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
     val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
@@ -283,7 +348,7 @@ private fun MessageBubble(
             ) {
                 if (isSticker) {
                     // 贴纸：透明背景，不使用 shape clip
-                    MessageContent(message, hasTail = isLast)
+                    MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
                 } else {
                     Box(
                         modifier = Modifier
@@ -301,7 +366,12 @@ private fun MessageBubble(
                         propagateMinConstraints = true,
                     ) {
                         Column(Modifier.widthIn(min = 44.dp)) {
-                            MessageContent(message, hasTail = isLast)
+                            MessageContent(
+                                message = message,
+                                hasTail = isLast,
+                                albumMessages = albumMessages,
+                                onReplyClick = onReplyClick,
+                            )
                         }
                     }
                 }
@@ -332,7 +402,12 @@ private fun Modifier.surface(
     .clip(shape)
 
 @Composable
-private fun MessageContent(message: Message, hasTail: Boolean) {
+private fun MessageContent(
+    message: Message,
+    hasTail: Boolean,
+    albumMessages: List<Message>? = null,
+    onReplyClick: (Long) -> Unit = {},
+) {
     val textPadding = if (hasTail) {
         Modifier
             .padding(top = 10.dp, bottom = 18.dp)
@@ -348,6 +423,34 @@ private fun MessageContent(message: Message, hasTail: Boolean) {
 
     val richText = remember(message.content, message.entities) {
         buildAnnotatedString(message.content, message.entities, linkColor)
+    }
+
+    // Reply preview
+    if (message.replyTo != null) {
+        ReplyPreview(
+            senderName = message.replyTo.senderName,
+            text = message.replyTo.text,
+            accentColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
+                else MiuixTheme.colorScheme.primary,
+            onClick = { onReplyClick(message.replyTo.messageId) },
+        )
+    }
+
+    // Media album
+    if (albumMessages != null && albumMessages.size > 1) {
+        MediaAlbumGrid(albumMessages)
+        // Caption from first message with text content
+        val caption = albumMessages.firstNotNullOfOrNull { msg ->
+            msg.content.removePrefix("Photo: ").removePrefix("Video: ")
+                .takeIf { it != "Photo" && it != "Video" && it.isNotBlank() }
+        }
+        if (caption != null) {
+            val captionRich = remember(caption) {
+                buildAnnotatedString(caption, message.entities, linkColor)
+            }
+            RichTextContent(captionRich, contentColor, textPadding, uriHandler)
+        }
+        return
     }
 
     when (message.messageType) {
@@ -497,5 +600,95 @@ private fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
             iterations = LottieConstants.IterateForever,
             modifier = modifier,
         )
+    }
+}
+
+@Composable
+private fun ReplyPreview(
+    senderName: String,
+    text: String,
+    accentColor: Color,
+    onClick: () -> Unit = {},
+) {
+    Row(
+        modifier = Modifier
+            .clickable(onClick = onClick)
+            .padding(start = 12.dp, end = 12.dp, top = 8.dp)
+            .fillMaxWidth(),
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(
+            modifier = Modifier
+                .width(3.dp)
+                .height(36.dp)
+                .background(
+                    color = accentColor,
+                    shape = ContinuousRoundedRectangle(2.dp)
+                )
+        )
+        Column(
+            modifier = Modifier
+                .padding(start = 8.dp)
+                .weight(1f)
+        ) {
+            Text(
+                text = senderName,
+                style = MiuixTheme.textStyles.footnote1,
+                fontWeight = FontWeight.SemiBold,
+                color = accentColor,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = text,
+                style = MiuixTheme.textStyles.footnote1,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+        }
+    }
+}
+
+@Composable
+private fun MediaAlbumGrid(messages: List<Message>) {
+    val columns = if (messages.size >= 2) 2 else 1
+    val rows = (messages.size + columns - 1) / columns
+
+    Column(modifier = Modifier.fillMaxWidth()) {
+        for (row in 0 until rows) {
+            Row(modifier = Modifier.fillMaxWidth()) {
+                for (col in 0 until columns) {
+                    val idx = row * columns + col
+                    if (idx < messages.size) {
+                        val msg = messages[idx]
+                        val fileUrl = msg.fileUrl
+                        if (!fileUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(java.io.File(fileUrl))
+                                    .build(),
+                                contentDescription = "Album photo",
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 80.dp, max = 200.dp)
+                                    .padding(1.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .height(120.dp)
+                                    .padding(1.dp)
+                                    .background(Color.Gray.copy(alpha = 0.2f))
+                            )
+                        }
+                    } else {
+                        // Empty spacer for uneven grid
+                        Spacer(modifier = Modifier.weight(1f))
+                    }
+                }
+            }
+        }
     }
 }
