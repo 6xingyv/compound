@@ -47,7 +47,7 @@ interface TelegramRepository {
      * @param fromMessageId 从哪条消息开始向前加载，0 表示从最新消息加载
      * @param onlyLocal 是否只返回本地缓存的消息
      */
-    suspend fun getChatMessages(chatId: Long, limit: Int = 20, fromMessageId: Long = 0, onlyLocal: Boolean = false): Result<List<Message>>
+    suspend fun getChatMessages(chatId: Long, limit: Int = 20, fromMessageId: Long = 0, onlyLocal: Boolean = false, offset: Int = 0): Result<List<Message>>
 
     /**
      * 下载文件并返回本地路径

@@ -6,7 +6,7 @@ import com.mocharealm.compound.domain.repository.TelegramRepository
 class GetChatMessagesUseCase(
     private val repository: TelegramRepository
 ) {
-    suspend operator fun invoke(chatId: Long, limit: Int = 20, fromMessageId: Long = 0, onlyLocal: Boolean = false): Result<List<Message>> {
-        return repository.getChatMessages(chatId, limit, fromMessageId, onlyLocal)
+    suspend operator fun invoke(chatId: Long, limit: Int = 20, fromMessageId: Long = 0, onlyLocal: Boolean = false, offset: Int = 0): Result<List<Message>> {
+        return repository.getChatMessages(chatId, limit, fromMessageId, onlyLocal, offset)
     }
 }

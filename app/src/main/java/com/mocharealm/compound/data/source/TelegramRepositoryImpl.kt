@@ -190,9 +190,9 @@ class TelegramRepositoryImpl(
         chats
     }
 
-    override suspend fun getChatMessages(chatId: Long, limit: Int, fromMessageId: Long, onlyLocal: Boolean): Result<List<Message>> = runCatching {
+    override suspend fun getChatMessages(chatId: Long, limit: Int, fromMessageId: Long, onlyLocal: Boolean, offset: Int): Result<List<Message>> = runCatching {
         val result = send(
-            TdApi.GetChatHistory(chatId, fromMessageId, 0, limit, onlyLocal)
+            TdApi.GetChatHistory(chatId, fromMessageId, offset, limit, onlyLocal)
         )
         if (result !is TdApi.Messages) error("Invalid messages response type")
 

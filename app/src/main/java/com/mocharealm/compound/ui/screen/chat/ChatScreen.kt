@@ -173,11 +173,20 @@ fun ChatScreen(
 
         val scope = rememberCoroutineScope()
         val onReplyClick: (Long) -> Unit = { replyMessageId ->
-            val targetIdx = displayItems.indexOfFirst { item ->
-                item.messages.any { it.id == replyMessageId }
-            }
-            if (targetIdx >= 0) {
-                scope.launch { listState.animateScrollToItem(targetIdx) }
+            viewModel.scrollToMessage(replyMessageId)
+        }
+
+        // Observe scrollToMessageId and scroll to it when it arrives
+        val scrollTarget = state.scrollToMessageId
+        LaunchedEffect(scrollTarget, displayItems) {
+            if (scrollTarget != null) {
+                val targetIdx = displayItems.indexOfFirst { item ->
+                    item.messages.any { it.id == scrollTarget }
+                }
+                if (targetIdx >= 0) {
+                    listState.animateScrollToItem(targetIdx)
+                    viewModel.clearScrollTarget()
+                }
             }
         }
 

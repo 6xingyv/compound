@@ -20,7 +20,8 @@ data class ChatUiState(
     val loadingMore: Boolean = false,
     val hasMore: Boolean = true,
     val initialLoaded: Boolean = false,
-    val error: String? = null
+    val error: String? = null,
+    val scrollToMessageId: Long? = null
 )
 
 class ChatViewModel(
@@ -128,6 +129,43 @@ class ChatViewModel(
                     }
                 )
         }
+    }
+
+    /**
+     * 跳转到指定消息：如果尚未加载，则加载包含该消息的批次
+     */
+    fun scrollToMessage(messageId: Long) {
+        // If already in the list, just signal scroll
+        if (_uiState.value.messages.any { it.id == messageId }) {
+            _uiState.update { it.copy(scrollToMessageId = messageId) }
+            return
+        }
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingMore = true) }
+            // Load a page of messages starting from the target message
+            getChatMessages(currentChatId, PAGE_SIZE, fromMessageId = messageId, offset = -1)
+                .fold(
+                    onSuccess = { loaded ->
+                        val existingIds = _uiState.value.messages.map { it.id }.toSet()
+                        val newMessages = loaded.filter { it.id !in existingIds }
+                        _uiState.update { state ->
+                            state.copy(
+                                messages = (newMessages + state.messages).sortedBy { it.timestamp },
+                                loadingMore = false,
+                                scrollToMessageId = messageId
+                            )
+                        }
+                        downloadMissingFiles(newMessages)
+                    },
+                    onFailure = { error ->
+                        _uiState.update { it.copy(loadingMore = false, error = error.message) }
+                    }
+                )
+        }
+    }
+
+    fun clearScrollTarget() {
+        _uiState.update { it.copy(scrollToMessageId = null) }
     }
 
     private fun downloadMissingFiles(messages: List<Message>) {
