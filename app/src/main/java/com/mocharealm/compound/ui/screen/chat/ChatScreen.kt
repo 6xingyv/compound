@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.runtime.Composable
@@ -79,6 +78,8 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+
+private enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
 
 @Composable
 fun ChatScreen(
@@ -164,8 +165,23 @@ fun ChatScreen(
                     }
                 }
             } else {
-                items(state.messages.reversed(), key = { it.id }) { message ->
-                    MessageBubble(message = message, viewModel = viewModel)
+                val displayMessages = state.messages.reversed()
+                items(displayMessages.size, key = { displayMessages[it].id }) { index ->
+                    val message = displayMessages[index]
+                    val belowSender = displayMessages.getOrNull(index - 1)?.senderId
+                    val aboveSender = displayMessages.getOrNull(index + 1)?.senderId
+                    val sameBelow = belowSender == message.senderId
+                    val sameAbove = aboveSender == message.senderId
+                    val groupPosition = when {
+                        !sameAbove && !sameBelow -> GroupPosition.SINGLE
+                        !sameAbove -> GroupPosition.FIRST
+                        !sameBelow -> GroupPosition.LAST
+                        else -> GroupPosition.MIDDLE
+                    }
+                    MessageBubble(
+                        message = message,
+                        groupPosition = groupPosition,
+                    )
                 }
 
                 if (state.loadingMore) {
@@ -189,11 +205,20 @@ fun ChatScreen(
 }
 
 @Composable
-private fun MessageBubble(message: Message, viewModel: ChatViewModel) {
+private fun MessageBubble(
+    message: Message,
+    groupPosition: GroupPosition,
+) {
+    val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
+    val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
+
+    val topPad = if (isFirst) 8.dp else 2.dp
+    val bottomPad = if (isLast) 8.dp else 2.dp
+
     val rowPadding = if (message.isOutgoing) {
-        Modifier.padding(start = 64.dp, end = 12.dp, top = 8.dp, bottom = 8.dp)
+        Modifier.padding(start = 64.dp, end = 12.dp, top = topPad, bottom = bottomPad)
     } else {
-        Modifier.padding(start = 12.dp, end = 64.dp, top = 8.dp, bottom = 8.dp)
+        Modifier.padding(start = 12.dp, end = 64.dp, top = topPad, bottom = bottomPad)
     }
 
     Row(
@@ -203,26 +228,36 @@ private fun MessageBubble(message: Message, viewModel: ChatViewModel) {
         horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom
     ) {
-        // 接收到的消息显示头像
         if (!message.isOutgoing) {
-            Avatar(
-                initials = message.senderName.take(2).uppercase(),
-                modifier = Modifier.size(36.dp), // 稍微调大一点匹配气泡高度
-                photoPath = message.avatarUrl
-            )
+            if (isLast) {
+                Avatar(
+                    initials = message.senderName.take(2).uppercase(),
+                    modifier = Modifier.size(36.dp),
+                    photoPath = message.avatarUrl
+                )
+            } else {
+                Spacer(Modifier.size(36.dp))
+            }
             Spacer(Modifier.width(8.dp))
         }
-        val shape = remember {
-            BubbleContinuousShape(
-                if (message.isOutgoing) BubbleSide.Right else BubbleSide.Left,
-                CornerSize(20.dp)
-            )
+
+        val shape: Shape = remember(isLast) {
+            if (isLast) {
+                BubbleContinuousShape(
+                    if (message.isOutgoing) BubbleSide.Right else BubbleSide.Left,
+                    CornerSize(20.dp)
+                )
+            } else {
+                ContinuousRoundedRectangle(20.dp)
+            }
         }
+
         Column(
             Modifier.weight(1f, fill = false),
-            verticalArrangement = Arrangement.spacedBy(8.dp)
+            verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
-            if (!message.isOutgoing) {
+            // 发送者名字仅在第一条 / 单条消息时显示
+            if (!message.isOutgoing && isFirst) {
                 Text(
                     text = message.senderName.ifBlank { message.senderId.toString() },
                     fontWeight = FontWeight.SemiBold,
@@ -255,7 +290,7 @@ private fun MessageBubble(message: Message, viewModel: ChatViewModel) {
                     propagateMinConstraints = true,
                 ) {
                     Column(Modifier.widthIn(min = 44.dp)) {
-                        MessageContent(message)
+                        MessageContent(message, hasTail = isLast)
                     }
                 }
             }
@@ -285,7 +320,14 @@ private fun Modifier.surface(
     .clip(shape)
 
 @Composable
-private fun MessageContent(message: Message) {
+private fun MessageContent(message: Message, hasTail: Boolean) {
+    val textPadding = if (hasTail) {
+        Modifier
+            .padding(top = 10.dp, bottom = 18.dp)
+            .padding(horizontal = 12.dp)
+    } else {
+        Modifier.padding(horizontal = 12.dp, vertical = 10.dp)
+    }
     when (message.messageType) {
         MessageType.PHOTO -> {
             if (!message.fileUrl.isNullOrEmpty()) {
@@ -306,9 +348,7 @@ private fun MessageContent(message: Message) {
                         Text(
                             text = caption,
                             style = MiuixTheme.textStyles.body1,
-                            modifier = Modifier
-                                .padding(top = 10.dp, bottom = 18.dp)
-                                .padding(horizontal = 12.dp)
+                            modifier = textPadding
                                 .fillMaxWidth()
                         )
                     }
@@ -317,9 +357,7 @@ private fun MessageContent(message: Message) {
                 Text(
                     text = message.content,
                     style = MiuixTheme.textStyles.body1,
-                    modifier = Modifier
-                        .padding(top = 10.dp, bottom = 18.dp)
-                        .padding(horizontal = 12.dp)
+                    modifier = textPadding
                 )
             }
         }
@@ -349,9 +387,7 @@ private fun MessageContent(message: Message) {
                 Text(
                     text = message.content,
                     style = MiuixTheme.textStyles.body1,
-                    modifier = Modifier
-                        .padding(top = 10.dp, bottom = 18.dp)
-                        .padding(horizontal = 12.dp)
+                    modifier = textPadding
                 )
             }
         }
@@ -359,9 +395,7 @@ private fun MessageContent(message: Message) {
         else -> Text(
             text = message.content,
             style = MiuixTheme.textStyles.body1,
-            modifier = Modifier
-                .padding(top = 10.dp, bottom = 18.dp)
-                .padding(horizontal = 12.dp)
+            modifier = textPadding
         )
     }
 }
