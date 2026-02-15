@@ -43,6 +43,7 @@ media3-ui = { module = "androidx.media3:media3-ui", version.ref="media3" }
 gaze-capsule = { module = "com.mocharealm.gaze:capsule", version = "2.1.1-patch2" }
 gaze-glassy-liquid-effect = { module = "com.mocharealm.gaze:glassy-liquid-effect", version = "2.0.0" }
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version = "6.7.1" }
+kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version = "1.10.0"}
 
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
@@ -51,4 +52,4 @@ miuix-nav3 = ["miuix-nav3-ui", "miuix-nav3-adaptive"]
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref="kotlin" }

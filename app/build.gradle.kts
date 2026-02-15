@@ -3,11 +3,16 @@ import java.util.Properties
 plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
+    alias(libs.plugins.kotlin.serialization)
 }
 
 val localProperties = Properties().apply {
     val file = rootProject.file("local.properties")
     if (file.exists()) load(file.inputStream())
+}
+
+fun getSecretProperty(key: String): String? {
+    return localProperties.getProperty(key) ?: project.findProperty(key) as? String
 }
 
 android {
@@ -27,8 +32,11 @@ android {
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
-        buildConfigField("int", "TD_API_ID", localProperties.getProperty("API_ID"))
-        buildConfigField("String", "TD_API_HASH", "\"${localProperties.getProperty("API_HASH")}\"")
+        val apiId = getSecretProperty("API_ID") ?: "0"
+        val apiHash = getSecretProperty("API_HASH") ?: ""
+
+        buildConfigField("int", "TD_API_ID", apiId)
+        buildConfigField("String", "TD_API_HASH", "\"$apiHash\"")
     }
 
     sourceSets {
@@ -38,10 +46,10 @@ android {
     }
 
     signingConfigs {
-        val sFile = project.findProperty("RELEASE_STORE_FILE") as? String
-        val sPassword = project.findProperty("RELEASE_STORE_PASSWORD") as? String
-        val kAlias = project.findProperty("RELEASE_KEY_ALIAS") as? String
-        val kPassword = project.findProperty("RELEASE_KEY_PASSWORD") as? String
+        val sFile = getSecretProperty("RELEASE_STORE_FILE")
+        val sPassword = getSecretProperty("RELEASE_STORE_PASSWORD")
+        val kAlias = getSecretProperty("RELEASE_KEY_ALIAS")
+        val kPassword = getSecretProperty("RELEASE_KEY_PASSWORD")
 
         if (sFile != null && sPassword != null && kAlias != null && kPassword != null) {
             create("release") {
@@ -60,7 +68,7 @@ android {
 
     buildTypes {
         debug {
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
         release {
             isMinifyEnabled = true
@@ -68,7 +76,7 @@ android {
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"
             )
-            signingConfig = signingConfigs.getByName("release")
+            signingConfig = signingConfigs.findByName("release") ?: signingConfigs.getByName("debug")
         }
     }
     compileOptions {
@@ -119,6 +127,8 @@ dependencies {
     implementation(libs.lottie.compose)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
+
+    implementation(libs.kotlinx.serialization.core)
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
