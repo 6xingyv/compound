@@ -44,8 +44,6 @@ We welcome contributions that align with the project's vision!
 2. Submit a Pull Request.
 3. Once merged, your changes will be part of the official distribution.
 
-To prevent ecosystem fragmentation and ensure security. All improvements should be submitted via Pull Requests to the main repository.
-
 ---
 
 *Disclaimer: This project is not officially affiliated with Telegram Messenger LLP.*
