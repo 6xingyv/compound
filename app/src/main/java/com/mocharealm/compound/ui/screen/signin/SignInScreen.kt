@@ -51,12 +51,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
             TopAppBar(
                 title = "Sign In",
                 scrollBehavior = topAppBarScrollBehavior,
-                navigationIcon = {
-                    BackNavigationIcon(
-                        modifier = Modifier.padding(start = 16.dp),
-                        onClick = { navigator.pop() },
-                    )
-                },
+                navigationIcon = {},
             )
         },
         popupHost = {},

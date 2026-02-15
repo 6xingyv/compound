@@ -17,6 +17,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation3.runtime.NavKey
+import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
@@ -24,6 +25,7 @@ import com.mocharealm.compound.ui.screen.contact.ContactScreen
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
 import kotlinx.coroutines.launch
+import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
 import org.koin.core.annotation.KoinExperimentalAPI
@@ -38,9 +40,13 @@ import top.yukonga.miuix.kmp.icon.extended.Contacts
 import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
 import top.yukonga.miuix.kmp.icon.extended.Settings
 
+@Serializable
 sealed interface Screen : NavKey {
+    @Serializable
     data object Home : Screen
+    @Serializable
     data class Chat(val chatId: Long) : Screen
+    @Serializable
     data object SignIn : Screen
 }
 
@@ -72,15 +78,13 @@ private object AppConstants {
 @OptIn(KoinExperimentalAPI::class)
 @Composable
 fun AppNav() {
-    val backStack = remember { mutableStateListOf<NavKey>(Screen.Home) }
+    val backStack = rememberNavBackStack(Screen.Home)
     val navigator = remember(backStack) { Navigator(backStack) }
     val getAuthState: GetAuthenticationStateUseCase = koinInject()
 
-    // Check auth state on startup — navigate to SignIn if not authenticated
     LaunchedEffect(Unit) {
         val authState = getAuthState()
         if (authState !is AuthState.Ready) {
-            // Replace Home with SignIn as the initial destination
             if (backStack.size == 1 && backStack.first() == Screen.Home) {
                 backStack[0] = Screen.SignIn
             } else {
