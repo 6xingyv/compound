@@ -17,18 +17,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation3.runtime.NavKey
-import androidx.navigation3.runtime.entryProvider
-import androidx.navigation3.runtime.rememberDecoratedNavEntries
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
-import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.contact.ContactScreen
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
-import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
+import org.koin.compose.navigation3.koinEntryProvider
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -91,34 +88,16 @@ fun AppNav() {
     }
 
     CompositionLocalProvider(LocalNavigator provides navigator) {
-        val entryProvider = remember(backStack) {
-            entryProvider<NavKey> {
-                entry(Screen.Home) {
-                    HomeScreen()
-                }
-                entry<Screen.Chat> { screen ->
-                    ChatScreen(
-                        chatId = screen.chatId,
-                    )
-                }
-                entry(Screen.SignIn) { SignInScreen() }
-            }
-        }
-
-        val entries = rememberDecoratedNavEntries(
-            backStack = backStack,
-            entryProvider = entryProvider,
-        )
-
         NavDisplay(
-            entries = entries,
+            backStack = backStack,
             onBack = { navigator.pop() },
+            entryProvider = koinEntryProvider<NavKey>(),
         )
     }
 }
 
 @Composable
-private fun HomeScreen() {
+internal fun HomeScreen() {
     val pagerState = rememberPagerState(pageCount = { AppConstants.PAGE_COUNT })
     val coroutineScope = rememberCoroutineScope()
     val navigator = LocalNavigator.current

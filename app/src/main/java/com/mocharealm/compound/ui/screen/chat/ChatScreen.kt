@@ -27,6 +27,7 @@ import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -46,7 +47,6 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyItemScope
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
@@ -98,7 +98,6 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.lerp
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
@@ -156,18 +155,14 @@ private data class DisplayItem(
     val isAlbum: Boolean
 )
 
+@kotlin.OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
-    chatId: Long,
     viewModel: ChatViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
     val navigator = LocalNavigator.current
     val listState = rememberLazyListState()
-
-    LaunchedEffect(chatId) {
-        viewModel.loadMessages(chatId)
-    }
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -197,6 +192,8 @@ fun ChatScreen(
     val density = LocalDensity.current
     val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
 
+    val focusRequester = remember { FocusRequester() }
+
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore && !state.loading && state.hasMore) {
             viewModel.loadOlderMessages()
@@ -205,6 +202,7 @@ fun ChatScreen(
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
+        popupHost = {},
         topBar = {
             Box(
                 Modifier
@@ -295,7 +293,6 @@ fun ChatScreen(
                 }
             }
         },
-        popupHost = {},
         bottomBar = {
             Row(
                 Modifier
@@ -360,7 +357,8 @@ fun ChatScreen(
                                 }
                             }
                         }
-                        .size(45.dp))
+                        .size(45.dp)
+                )
                 Spacer(Modifier.width(16.dp))
                 Row(
                     Modifier
@@ -557,27 +555,36 @@ fun ChatScreen(
         ) {
             if (state.loading && state.messages.isEmpty()) {
                 item {
-                    Card(modifier = Modifier.animateItem().padding(12.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .padding(12.dp)
+                    ) {
                         BasicComponent(title = "Loading messages...")
                     }
                 }
             } else if (state.error != null && state.messages.isEmpty()) {
                 item {
-                    Card(modifier = Modifier.animateItem().padding(12.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .padding(12.dp)
+                    ) {
                         BasicComponent(
                             title = "Error",
                             summary = state.error,
                         )
                         TextButton(
                             text = "Retry",
-                            onClick = { viewModel.loadMessages(chatId) },
+                            onClick = { viewModel.loadMessages() },
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         )
                     }
                 }
             } else if (state.messages.isEmpty() && state.initialLoaded) {
                 item {
-                    Card(modifier = Modifier.animateItem().padding(12.dp)) {
+                    Card(
+                        modifier = Modifier
+                            .padding(12.dp)
+                    ) {
                         BasicComponent(title = "No messages in this chat")
                     }
                 }
@@ -624,7 +631,6 @@ fun ChatScreen(
                         Row(
                             modifier = Modifier
                                 .fillMaxWidth()
-                                .animateItem()
                                 .padding(12.dp),
                             horizontalArrangement = Arrangement.Center
                         ) {
@@ -641,7 +647,7 @@ fun ChatScreen(
 }
 
 @Composable
-private fun LazyItemScope.MessageBubble(
+private fun MessageBubble(
     message: Message,
     groupPosition: GroupPosition,
     albumMessages: List<Message>? = null,
@@ -661,7 +667,6 @@ private fun LazyItemScope.MessageBubble(
 
     Row(
         modifier = Modifier
-            .animateItem()
             .fillMaxWidth()
             .then(rowPadding),
         horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start,
@@ -969,9 +974,6 @@ private fun RichTextContent(
         onTextLayout = { layoutResult.value = it },
         modifier = modifier
             .drawWithContent {
-                val layout = layoutResult.value ?: return@drawWithContent
-
-                // 1. 合并所有需要被遮挡的区域
                 val obscuredPath = Path()
                 var hasObscured = false
                 spoilerPaths.forEach { (index, path) ->

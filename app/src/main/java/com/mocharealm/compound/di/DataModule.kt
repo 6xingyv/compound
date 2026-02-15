@@ -43,40 +43,4 @@ val dataModule = module {
     single<TelegramRepository> {
         TelegramRepositoryImpl(get(), get(), get(), get())
     }
-    factory {
-        SetAuthenticationPhoneNumberUseCase(get())
-    }
-    factory {
-        CheckAuthenticationCodeUseCase(get())
-    }
-    factory {
-        CheckAuthenticationPasswordUseCase(get())
-    }
-    factory {
-        GetCurrentUserUseCase(get())
-    }
-    factory {
-        LogoutUseCase(get())
-    }
-    factory {
-        GetAuthenticationStateUseCase(get())
-    }
-    factory {
-        GetChatsUseCase(get())
-    }
-    factory {
-        GetChatMessagesUseCase(get())
-    }
-    factory {
-        DownloadFileUseCase(get())
-    }
-    factory {
-        SendMessageUseCase(get())
-    }
-    factory {
-        GetChatUseCase(get())
-    }
-    factory {
-        SubscribeToMessageUpdatesUseCase(get())
-    }
 }

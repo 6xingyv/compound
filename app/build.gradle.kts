@@ -1,4 +1,3 @@
-import org.gradle.language.nativeplatform.internal.Dimensions.applicationVariants
 import java.util.Properties
 
 plugins {
@@ -107,6 +106,7 @@ dependencies {
     implementation(libs.androidx.compose.ui.tooling.preview)
 
     implementation(libs.koin.androidx.compose)
+    implementation(libs.koin.compose.navigation3)
 
     implementation(libs.bundles.miuix.android)
     implementation(libs.androidx.nav3.runtime)

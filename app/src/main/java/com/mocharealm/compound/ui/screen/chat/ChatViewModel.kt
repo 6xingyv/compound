@@ -32,6 +32,7 @@ data class ChatUiState(
 )
 
 class ChatViewModel(
+    private val chatId: Long,
     private val getChatMessages: GetChatMessagesUseCase,
     private val downloadFile: DownloadFileUseCase,
     private val sendMessage: SendMessageUseCase,
@@ -48,13 +49,13 @@ class ChatViewModel(
     
     val inputState = TextFieldState()
 
-    private var currentChatId: Long = 0
-
     init {
+        loadMessages()
+        loadChatInfo()
         viewModelScope.launch {
             subscribeToMessageUpdates()
                 .collect { message ->
-                    if (message.chatId == currentChatId) {
+                    if (message.chatId == chatId) {
                         _uiState.update { state ->
                             // Avoid duplicates
                             if (state.messages.none { it.id == message.id }) {
@@ -70,7 +71,7 @@ class ChatViewModel(
         }
     }
     
-    fun loadChatInfo(chatId: Long) {
+    private fun loadChatInfo() {
         viewModelScope.launch {
             getChat(chatId).onSuccess { chat ->
                 _uiState.update { it.copy(chatInfo = chat) }
@@ -89,7 +90,7 @@ class ChatViewModel(
             // But we should probably disable send button while sending? 
             // The prompt didn't require advanced state, just "Implement Send Message".
             // I'll clear input on success.
-            sendMessage(currentChatId, text).onSuccess {
+            sendMessage(chatId, text).onSuccess {
                  inputState.clearText()
             }.onFailure { e ->
                 // Maybe show a toast or something? 
@@ -103,9 +104,7 @@ class ChatViewModel(
     /**
      * 加载消息：先从本地缓存加载，再从网络获取最新消息
      */
-    fun loadMessages(chatId: Long) {
-        currentChatId = chatId
-        loadChatInfo(chatId)
+     fun loadMessages() {
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null, hasMore = true, initialLoaded = false) }
 
@@ -168,7 +167,7 @@ class ChatViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
-            getChatMessages(currentChatId, PAGE_SIZE, fromMessageId = oldestMessageId)
+            getChatMessages(chatId, PAGE_SIZE, fromMessageId = oldestMessageId)
                 .fold(
                     onSuccess = { olderMessages ->
                         if (olderMessages.isEmpty()) {
@@ -206,7 +205,7 @@ class ChatViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
             // Load a page of messages starting from the target message
-            getChatMessages(currentChatId, PAGE_SIZE, fromMessageId = messageId, offset = -1)
+            getChatMessages(chatId, PAGE_SIZE, fromMessageId = messageId, offset = -1)
                 .fold(
                     onSuccess = { loaded ->
                         val existingIds = _uiState.value.messages.map { it.id }.toSet()
