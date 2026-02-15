@@ -1,3 +1,5 @@
+package com.mocharealm.compound.ui.screen.chat
+
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.lifecycle.ViewModel
@@ -10,12 +12,7 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
-
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
-
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase

@@ -1,6 +1,5 @@
 package com.mocharealm.compound.ui.screen.chat
 
-import ChatViewModel
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
@@ -147,7 +146,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
-import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 import kotlin.math.hypot
 

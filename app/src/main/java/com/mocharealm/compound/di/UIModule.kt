@@ -1,6 +1,6 @@
 package com.mocharealm.compound.di
 
-import ChatViewModel
+import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
@@ -52,7 +52,7 @@ val uiModule = module {
     }
     navigation<Screen.Chat> { route ->
         ChatScreen(
-            viewModel = koinViewModel { parametersOf(route.chatId) }
+            viewModel = koinViewModel(key = "ChatViewModel_${route.chatId}") { parametersOf(route.chatId) }
         )
     }
     navigation<Screen.SignIn> {

@@ -26,6 +26,7 @@ import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
 import kotlinx.coroutines.launch
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
+import org.koin.core.annotation.KoinExperimentalAPI
 import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
 import top.yukonga.miuix.kmp.basic.NavigationBar
 import top.yukonga.miuix.kmp.basic.NavigationBarItem
@@ -68,6 +69,7 @@ private object AppConstants {
     val PAGE_TITLES = listOf("Messages", "Contacts", "Profile")
 }
 
+@OptIn(KoinExperimentalAPI::class)
 @Composable
 fun AppNav() {
     val backStack = remember { mutableStateListOf<NavKey>(Screen.Home) }
