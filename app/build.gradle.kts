@@ -112,6 +112,7 @@ dependencies {
     implementation(libs.androidx.nav3.runtime)
     implementation(libs.bundles.miuix.nav3)
     implementation(libs.gaze.capsule)
+    implementation(libs.gaze.glassy.liquid.effect)
 
     implementation(libs.coil.compose)
     implementation(libs.coil.gif)
