@@ -32,7 +32,8 @@ import kotlin.coroutines.resumeWithException
 class TelegramRepositoryImpl(
     private val client: Client,
     private val context: Context,
-    private val fileUpdates: SharedFlow<TdApi.UpdateFile>
+    private val fileUpdates: SharedFlow<TdApi.UpdateFile>,
+    private val messageUpdatesFlow: SharedFlow<TdApi.UpdateNewMessage>
 ) : TelegramRepository {
     private suspend fun <T : TdApi.Object> send(query: TdApi.Function<T>): T =
         suspendCancellableCoroutine { cont ->
@@ -223,6 +224,39 @@ class TelegramRepositoryImpl(
 
     // ── File download ────────────────────────────────────────────────────
 
+    override suspend fun sendMessage(chatId: Long, text: String, entities: List<TextEntity>, replyToMessageId: Long): Result<Message> {
+        return try {
+            val content = TdApi.InputMessageText(
+                TdApi.FormattedText(
+                    text,
+                    mapToTdApiEntities(entities)
+                ),
+                null,
+                false
+            )
+
+            val replyTo = if (replyToMessageId != 0L) {
+                TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
+            } else {
+                null
+            }
+
+            val sentMessage = send(
+                TdApi.SendMessage(
+                    chatId,
+                    null,
+                    replyTo,
+                    null,
+                    null,
+                    content
+                )
+            )
+            Result.success(mapMessageFast(sentMessage))
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     override suspend fun downloadFile(fileId: Int): Result<String> = runCatching {
         // First check if file is already downloaded locally
         val existingFile = send(TdApi.GetFile(fileId))
@@ -233,6 +267,17 @@ class TelegramRepositoryImpl(
         val downloaded = send(TdApi.DownloadFile(fileId, 32, 0, 0, true))
         downloaded.local?.path ?: error("Download failed: local path is null")
     }
+
+    override suspend fun getChat(chatId: Long): Result<Chat> = runCatching {
+        val chat = send(TdApi.GetChat(chatId))
+        if (chat !is TdApi.Chat) error("Invalid chat response")
+        mapChatFast(chat)
+    }
+
+    override val messageUpdates: kotlinx.coroutines.flow.Flow<Message> = messageUpdatesFlow
+        .map { update ->
+            mapMessageFast(update.message)
+        }
 
     private suspend fun getLocalFileOrDownload(file: TdApi.File): TdApi.LocalFile? {
         if (file.local?.isDownloadingCompleted == true) return file.local
@@ -493,6 +538,33 @@ class TelegramRepositoryImpl(
                 else -> null
             } ?: return@mapNotNull null
             TextEntity(offset = entity.offset, length = entity.length, type = type)
+            TextEntity(offset = entity.offset, length = entity.length, type = type)
         }
+    }
+
+    private fun mapToTdApiEntities(entities: List<TextEntity>): Array<TdApi.TextEntity> {
+        return entities.mapNotNull { entity ->
+            val type = when (entity.type) {
+                is TextEntityType.Bold -> TdApi.TextEntityTypeBold()
+                is TextEntityType.Italic -> TdApi.TextEntityTypeItalic()
+                is TextEntityType.Underline -> TdApi.TextEntityTypeUnderline()
+                is TextEntityType.Strikethrough -> TdApi.TextEntityTypeStrikethrough()
+                is TextEntityType.Code -> TdApi.TextEntityTypeCode()
+                is TextEntityType.Pre -> TdApi.TextEntityTypePre()
+                is TextEntityType.PreCode -> TdApi.TextEntityTypePreCode(entity.type.language)
+                is TextEntityType.TextUrl -> TdApi.TextEntityTypeTextUrl(entity.type.url)
+                is TextEntityType.Url -> TdApi.TextEntityTypeUrl()
+                is TextEntityType.Mention -> TdApi.TextEntityTypeMention()
+                is TextEntityType.Spoiler -> TdApi.TextEntityTypeSpoiler()
+                is TextEntityType.EmailAddress -> TdApi.TextEntityTypeEmailAddress()
+                is TextEntityType.PhoneNumber -> TdApi.TextEntityTypePhoneNumber()
+                else -> null
+            }
+            if (type != null) {
+                TdApi.TextEntity(entity.offset, entity.length, type)
+            } else {
+                null
+            }
+        }.toTypedArray()
     }
 }

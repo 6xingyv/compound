@@ -42,7 +42,7 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 
 sealed interface Screen : NavKey {
     data object Home : Screen
-    data class Chat(val chatId: Long, val chatTitle: String) : Screen
+    data class Chat(val chatId: Long) : Screen
     data object SignIn : Screen
 }
 
@@ -99,7 +99,6 @@ fun AppNav() {
                 entry<Screen.Chat> { screen ->
                     ChatScreen(
                         chatId = screen.chatId,
-                        chatTitle = screen.chatTitle
                     )
                 }
                 entry(Screen.SignIn) { SignInScreen() }
@@ -179,8 +178,8 @@ private fun HomeScreen() {
                 when (page) {
                     AppConstants.MESSAGES_PAGE -> MsgListScreen(
                         padding = innerPadding,
-                        onChatClick = { chatId, chatTitle ->
-                            navigator.push(Screen.Chat(chatId, chatTitle))
+                        onChatClick = { chatId ->
+                            navigator.push(Screen.Chat(chatId))
                         },
                         refreshSignal = msgListRefreshSignal,
                     )

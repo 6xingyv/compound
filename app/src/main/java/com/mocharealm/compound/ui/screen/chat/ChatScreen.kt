@@ -12,21 +12,26 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.fillMaxHeight
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.captionBarPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imePadding
+import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.statusBars
+import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -42,17 +47,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.zIndex
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -75,15 +84,15 @@ import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.URL_ANNOTATION_TAG
 import com.mocharealm.compound.ui.util.buildAnnotatedString
+import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
-import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.SmallTopAppBar
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -99,7 +108,6 @@ private data class DisplayItem(
 @Composable
 fun ChatScreen(
     chatId: Long,
-    chatTitle: String,
     viewModel: ChatViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsState()
@@ -110,7 +118,6 @@ fun ChatScreen(
         viewModel.loadMessages(chatId)
     }
 
-    // 当滚动到顶部（reverseLayout 下即列表末尾）时，加载更多旧消息
     val shouldLoadMore by remember {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
@@ -118,6 +125,10 @@ fun ChatScreen(
             lastVisibleItem != null && lastVisibleItem.index >= layoutInfo.totalItemsCount - 3
         }
     }
+
+    val surfaceColor = MiuixTheme.colorScheme.surface
+    val density = LocalDensity.current
+    val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
 
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore && !state.loading && state.hasMore) {
@@ -128,36 +139,115 @@ fun ChatScreen(
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            SmallTopAppBar(
-                title = chatTitle,
-                navigationIcon = {
+            Box(
+                Modifier
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(1f),
+                                    1f to surfaceColor.copy(0f),
+                                    startY = statusBarHeightPx.toFloat()
+                                )
+                            )
+                        }
+                    }
+                    .statusBarsPadding()) {
+                Row(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth()
+                ) {
                     BackNavigationIcon(
-                        modifier = Modifier.padding(start = 16.dp),
+                        modifier = Modifier
+                            .padding(start = 16.dp)
+                            .background(
+                                MiuixTheme.colorScheme.surfaceContainer,
+                                CircleShape
+                            ),
                         onClick = { navigator.pop() },
                     )
-                },
-            )
+                }
+                state.chatInfo?.let { chatInfo ->
+                    Column(
+                        Modifier.align(Alignment.Center),
+                        verticalArrangement = Arrangement.spacedBy(-4.dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
+                    ) {
+                        Avatar(
+                            chatInfo.title.take(2),
+                            modifier = Modifier.size(48.dp).zIndex(20f),
+                            photoPath = chatInfo.photoUrl
+                        )
+                        Text(
+                            chatInfo.title,
+                            style = MiuixTheme.textStyles.footnote1,
+                            modifier = Modifier
+                                .background(
+                                    MiuixTheme.colorScheme.surfaceContainer,
+                                    ContinuousCapsule
+                                )
+                                .padding(8.dp, 4.dp)
+                        )
+                    }
+                }
+            }
         },
         popupHost = {},
+        bottomBar = {
+            Row(
+                Modifier
+                    .imePadding()
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(0f),
+                                    1f to surfaceColor.copy(1f)
+                                )
+                            )
+                        }
+                    }
+                    .navigationBarsPadding()
+                    .captionBarPadding()
+                    .padding(horizontal = 8.dp)
+                    .padding(bottom = 8.dp)
+                    .fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                verticalAlignment = Alignment.Bottom
+            ) {
+                TextField(
+                    modifier = Modifier.weight(1f),
+                    value = state.inputText,
+                    onValueChange = viewModel::onInputTextChanged,
+                    label = "Message",
+                    useLabelAsPlaceholder = true,
+                )
+                TextButton(
+                    text = "Send",
+                    onClick = viewModel::sendMessage,
+                    modifier = Modifier.wrapContentWidth(),
+                    enabled = !state.loading && state.inputText.isNotBlank(),
+                )
+            }
+        }
     ) { innerPadding ->
         val displayMessages = state.messages.reversed()
 
-        // Pre-group album messages: find runs of consecutive messages
-        // with the same non-zero mediaAlbumId
         val displayItems = remember(displayMessages) {
             val items = mutableListOf<DisplayItem>()
             var i = 0
             while (i < displayMessages.size) {
                 val msg = displayMessages[i]
                 val isMediaAlbumType = msg.messageType == MessageType.PHOTO ||
-                    msg.messageType == MessageType.VIDEO
+                        msg.messageType == MessageType.VIDEO
                 if (msg.mediaAlbumId != 0L && isMediaAlbumType) {
                     val albumId = msg.mediaAlbumId
                     val albumMessages = mutableListOf(msg)
                     while (i + 1 < displayMessages.size &&
                         displayMessages[i + 1].mediaAlbumId == albumId &&
                         (displayMessages[i + 1].messageType == MessageType.PHOTO ||
-                            displayMessages[i + 1].messageType == MessageType.VIDEO)
+                                displayMessages[i + 1].messageType == MessageType.VIDEO)
                     ) {
                         i++
                         albumMessages.add(displayMessages[i])
@@ -189,18 +279,14 @@ fun ChatScreen(
                 }
             }
         }
-
         LazyColumn(
             state = listState,
             reverseLayout = true,
             modifier = Modifier
-                .fillMaxHeight()
+                .fillMaxSize()
                 .overScrollVertical()
                 .scrollEndHaptic(),
-            contentPadding = PaddingValues(
-                top = innerPadding.calculateTopPadding(),
-                bottom = 12.dp,
-            ),
+            contentPadding = innerPadding,
             overscrollEffect = null,
         ) {
             if (state.loading && state.messages.isEmpty()) {
@@ -230,13 +316,17 @@ fun ChatScreen(
                     }
                 }
             } else {
-                items(displayItems.size, key = { displayItems[it].messages.first().id }) { index ->
+                items(
+                    displayItems.size,
+                    key = { displayItems[it].messages.first().id }) { index ->
                     val item = displayItems[index]
                     val primaryMessage = item.messages.first()
 
                     // Group position based on the primary message's senderId
-                    val prevSender = displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
-                    val nextSender = displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
+                    val prevSender =
+                        displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
+                    val nextSender =
+                        displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
                     val sameBelow = prevSender == primaryMessage.senderId
                     val sameAbove = nextSender == primaryMessage.senderId
                     val groupPosition = when {
@@ -395,17 +485,18 @@ private fun Modifier.surface(
     backgroundColor: Color,
     border: BorderStroke?,
     shadowElevation: Float,
-) = this.then(
-    if (shadowElevation > 0f) {
-        Modifier.graphicsLayer(
-            shadowElevation = shadowElevation,
-            shape = shape,
-            clip = false,
-        )
-    } else {
-        Modifier
-    },
-)
+) = this
+    .then(
+        if (shadowElevation > 0f) {
+            Modifier.graphicsLayer(
+                shadowElevation = shadowElevation,
+                shape = shape,
+                clip = false,
+            )
+        } else {
+            Modifier
+        },
+    )
     .then(if (border != null) Modifier.border(border, shape) else Modifier)
     .background(color = backgroundColor, shape = shape)
     .clip(shape)
@@ -428,7 +519,7 @@ private fun MessageContent(
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val contentColor = LocalContentColor.current
     val linkColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
-        else MiuixTheme.colorScheme.primary
+    else MiuixTheme.colorScheme.primary
 
     val richText = remember(message.content, message.entities) {
         buildAnnotatedString(message.content, message.entities, linkColor)
@@ -440,7 +531,7 @@ private fun MessageContent(
             senderName = message.replyTo.senderName,
             text = message.replyTo.text,
             accentColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
-                else MiuixTheme.colorScheme.primary,
+            else MiuixTheme.colorScheme.primary,
             onClick = { onReplyClick(message.replyTo.messageId) },
         )
     }
@@ -505,10 +596,12 @@ private fun MessageContent(
                         filePath = message.fileUrl,
                         modifier = Modifier.size(120.dp)
                     )
+
                     StickerFormat.TGS -> LottieSticker(
                         filePath = message.fileUrl,
                         modifier = Modifier.size(120.dp)
                     )
+
                     else -> AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
                             .data(java.io.File(message.fileUrl))

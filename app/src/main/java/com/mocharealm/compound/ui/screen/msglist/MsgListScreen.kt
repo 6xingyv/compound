@@ -43,7 +43,7 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 @Composable
 fun MsgListScreen(
     padding: PaddingValues,
-    onChatClick: (Long, String) -> Unit = { _, _ -> },
+    onChatClick: (Long) -> Unit = { _ -> },
     refreshSignal: Int = 0,
     viewModel: MsgListViewModel = koinViewModel()
 ) {
@@ -127,7 +127,7 @@ fun MsgListScreen(
                     Modifier
                         .fillMaxWidth()
                         .clickable {
-                            onChatClick(chat.id, chat.title)
+                            onChatClick(chat.id)
                         }
                         .drawWithCache {
                             onDrawBehind {

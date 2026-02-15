@@ -4,7 +4,7 @@ import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel
-import org.koin.androidx.viewmodel.dsl.viewModel
+import org.koin.core.module.dsl.viewModel
 import org.koin.dsl.module
 
 val uiModule = module {
@@ -31,7 +31,10 @@ val uiModule = module {
     viewModel {
         ChatViewModel(
             getChatMessages = get(),
-            downloadFile = get()
+            downloadFile = get(),
+            sendMessage = get(),
+            subscribeToMessageUpdates = get(),
+            getChat = get()
         )
     }
 }

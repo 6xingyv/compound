@@ -7,10 +7,13 @@ import com.mocharealm.compound.domain.usecase.CheckAuthenticationPasswordUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
+import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
 import com.mocharealm.compound.domain.usecase.LogoutUseCase
+import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
+import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import org.drinkless.tdlib.Client
@@ -21,12 +24,16 @@ import org.koin.dsl.module
 val dataModule = module {
     single { MutableSharedFlow<TdApi.UpdateFile>(extraBufferCapacity = 64) }
     single<SharedFlow<TdApi.UpdateFile>> { get<MutableSharedFlow<TdApi.UpdateFile>>() }
+    single { MutableSharedFlow<TdApi.UpdateNewMessage>(extraBufferCapacity = 64) }
+    single<SharedFlow<TdApi.UpdateNewMessage>> { get<MutableSharedFlow<TdApi.UpdateNewMessage>>() }
     single {
         // Wire TDLib client with basic update and exception handlers
         Client.create(
             { obj: Object? ->
                 if (obj is TdApi.UpdateFile) {
                     get<MutableSharedFlow<TdApi.UpdateFile>>().tryEmit(obj)
+                } else if (obj is TdApi.UpdateNewMessage) {
+                    get<MutableSharedFlow<TdApi.UpdateNewMessage>>().tryEmit(obj)
                 }
             },
             { _: Throwable? -> },
@@ -34,7 +41,7 @@ val dataModule = module {
         )
     }
     single<TelegramRepository> {
-        TelegramRepositoryImpl(get(), get(), get())
+        TelegramRepositoryImpl(get(), get(), get(), get())
     }
     factory {
         SetAuthenticationPhoneNumberUseCase(get())
@@ -62,5 +69,14 @@ val dataModule = module {
     }
     factory {
         DownloadFileUseCase(get())
+    }
+    factory {
+        SendMessageUseCase(get())
+    }
+    factory {
+        GetChatUseCase(get())
+    }
+    factory {
+        SubscribeToMessageUpdatesUseCase(get())
     }
 }
