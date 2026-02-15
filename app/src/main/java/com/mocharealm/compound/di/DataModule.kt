@@ -24,16 +24,16 @@ import org.koin.dsl.module
 val dataModule = module {
     single { MutableSharedFlow<TdApi.UpdateFile>(extraBufferCapacity = 64) }
     single<SharedFlow<TdApi.UpdateFile>> { get<MutableSharedFlow<TdApi.UpdateFile>>() }
-    single { MutableSharedFlow<TdApi.UpdateNewMessage>(extraBufferCapacity = 64) }
-    single<SharedFlow<TdApi.UpdateNewMessage>> { get<MutableSharedFlow<TdApi.UpdateNewMessage>>() }
+    single { MutableSharedFlow<TdApi.Update>(extraBufferCapacity = 64) }
+    single<SharedFlow<TdApi.Update>> { get<MutableSharedFlow<TdApi.Update>>() }
     single {
         // Wire TDLib client with basic update and exception handlers
         Client.create(
             { obj: Object? ->
                 if (obj is TdApi.UpdateFile) {
                     get<MutableSharedFlow<TdApi.UpdateFile>>().tryEmit(obj)
-                } else if (obj is TdApi.UpdateNewMessage) {
-                    get<MutableSharedFlow<TdApi.UpdateNewMessage>>().tryEmit(obj)
+                } else if (obj is TdApi.Update) {
+                    get<MutableSharedFlow<TdApi.Update>>().tryEmit(obj)
                 }
             },
             { _: Throwable? -> },

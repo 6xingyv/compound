@@ -3,8 +3,10 @@ package com.mocharealm.compound.domain.repository
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.User
+import kotlinx.coroutines.flow.Flow
 
 interface TelegramRepository {
     /**
@@ -63,7 +65,7 @@ interface TelegramRepository {
     /**
      * 实时消息流
      */
-    val messageUpdates: kotlinx.coroutines.flow.Flow<Message>
+    val messageUpdates: Flow<MessageUpdateEvent>
 
     /**
      * 获取单个聊天详情

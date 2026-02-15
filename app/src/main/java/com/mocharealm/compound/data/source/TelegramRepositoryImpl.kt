@@ -15,11 +15,15 @@ import com.mocharealm.compound.domain.model.StickerFormat
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.TextEntityType
 import com.mocharealm.compound.domain.model.User
+import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.repository.TelegramRepository
+import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.flow.filter
+import kotlinx.coroutines.flow.filterNotNull
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
@@ -33,7 +37,7 @@ class TelegramRepositoryImpl(
     private val client: Client,
     private val context: Context,
     private val fileUpdates: SharedFlow<TdApi.UpdateFile>,
-    private val messageUpdatesFlow: SharedFlow<TdApi.UpdateNewMessage>
+    private val updates: SharedFlow<TdApi.Update>
 ) : TelegramRepository {
     private suspend fun <T : TdApi.Object> send(query: TdApi.Function<T>): T =
         suspendCancellableCoroutine { cont ->
@@ -285,9 +289,23 @@ class TelegramRepositoryImpl(
         mapChatFast(chat)
     }
 
-    override val messageUpdates: kotlinx.coroutines.flow.Flow<Message> = messageUpdatesFlow
-        .map { update ->
-            mapMessageFast(update.message)
+    override val messageUpdates: Flow<MessageUpdateEvent> = updates
+        .transform { update ->
+            when (update) {
+                is TdApi.UpdateNewMessage -> emit(MessageUpdateEvent.NewMessage(mapMessageFast(update.message)))
+                is TdApi.UpdateMessageContent -> {
+                    val msg = sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
+                    if (msg is TdApi.Message) emit(MessageUpdateEvent.MessageUpdated(mapMessageFast(msg)))
+                }
+                is TdApi.UpdateMessageEdited -> {
+                    val msg = sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
+                    if (msg is TdApi.Message) emit(MessageUpdateEvent.MessageUpdated(mapMessageFast(msg)))
+                }
+                is TdApi.UpdateMessageSendSucceeded -> {
+                    val msg = sendSafe(TdApi.GetMessage(update.message.chatId, update.message.id)).getOrNull()
+                    if (msg is TdApi.Message) emit(MessageUpdateEvent.MessageSendSucceeded(update.oldMessageId, mapMessageFast(msg)))
+                }
+            }
         }
 
     private suspend fun getLocalFileOrDownload(file: TdApi.File): TdApi.LocalFile? {

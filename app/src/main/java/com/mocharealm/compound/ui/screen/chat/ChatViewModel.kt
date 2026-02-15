@@ -4,18 +4,19 @@ import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
+import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
+import com.mocharealm.compound.domain.usecase.GetChatUseCase
+import com.mocharealm.compound.domain.usecase.SendMessageUseCase
+import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import com.mocharealm.compound.domain.usecase.SendMessageUseCase
-import com.mocharealm.compound.domain.model.Chat
-import com.mocharealm.compound.domain.usecase.GetChatUseCase
-import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
@@ -43,7 +44,7 @@ class ChatViewModel(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
-    
+
     val inputState = TextFieldState()
 
     init {
@@ -51,23 +52,63 @@ class ChatViewModel(
         loadChatInfo()
         viewModelScope.launch {
             subscribeToMessageUpdates()
-                .collect { message ->
-                    if (message.chatId == chatId) {
-                        _uiState.update { state ->
-                            // Avoid duplicates
-                            if (state.messages.none { it.id == message.id }) {
-                                val newMessageList = state.messages + message
-                                state.copy(messages = newMessageList)
-                            } else {
-                                state
+                .collect { event ->
+                    when (event) {
+                        is MessageUpdateEvent.NewMessage -> {
+                            if (event.message.chatId == chatId) {
+                                _uiState.update { state ->
+                                    if (state.messages.any { it.id == event.message.id }) {
+                                        state
+                                    } else {
+                                        state.copy(messages = state.messages + event.message)
+                                    }
+                                }
+                                downloadMissingFiles(listOf(event.message))
                             }
                         }
-                        downloadMissingFiles(listOf(message))
+                        is MessageUpdateEvent.MessageUpdated -> {
+                            if (event.message.chatId == chatId) {
+                                _uiState.update { state ->
+                                    val index = state.messages.indexOfFirst { it.id == event.message.id }
+                                    if (index != -1) {
+                                        val updated = state.messages.toMutableList()
+                                        updated[index] = event.message
+                                        state.copy(messages = updated)
+                                    } else {
+                                        state
+                                    }
+                                }
+                                downloadMissingFiles(listOf(event.message))
+                            }
+                        }
+                        is MessageUpdateEvent.MessageSendSucceeded -> {
+                            if (event.message.chatId == chatId) {
+                                _uiState.update { state ->
+                                    val oldIndex = state.messages.indexOfFirst { it.id == event.oldMessageId }
+                                    if (oldIndex != -1) {
+                                        val updated = state.messages.toMutableList()
+                                        updated[oldIndex] = event.message
+                                        state.copy(messages = updated)
+                                    } else {
+                                        if (state.messages.any { it.id == event.message.id }) {
+                                            state
+                                        } else {
+                                            state.copy(messages = state.messages + event.message)
+                                        }
+                                    }
+                                }
+                                downloadMissingFiles(listOf(event.message))
+                            }
+                        }
+                        is MessageUpdateEvent.MessageDeleted -> {
+                            // Ignore for now
+                        }
                     }
                 }
+
         }
     }
-    
+
     private fun loadChatInfo() {
         viewModelScope.launch {
             getChat(chatId).onSuccess { chat ->
@@ -79,21 +120,11 @@ class ChatViewModel(
     fun sendMessage() {
         val text = inputState.text.toString()
         if (text.isBlank()) return
-        
+
         viewModelScope.launch {
-            // Optimistically clear input? Or wait for success? 
-            // Better to wait or show loading state for sending. 
-            // For now, let's keep it simple: call, if success clear.
-            // But we should probably disable send button while sending? 
-            // The prompt didn't require advanced state, just "Implement Send Message".
-            // I'll clear input on success.
             sendMessage(chatId, text).onSuccess {
-                 inputState.clearText()
+                inputState.clearText()
             }.onFailure { e ->
-                // Maybe show a toast or something? 
-                // For now just log or set error in state?
-                // Using error state might hide the list if we reuse 'error' field which is used for full screen error.
-                // Let's not disrupt the UI, just ignore failure or maybe a separate 'sendError' field later.
             }
         }
     }
@@ -101,9 +132,16 @@ class ChatViewModel(
     /**
      * 加载消息：先从本地缓存加载，再从网络获取最新消息
      */
-     fun loadMessages() {
+    fun loadMessages() {
         viewModelScope.launch {
-            _uiState.update { it.copy(loading = true, error = null, hasMore = true, initialLoaded = false) }
+            _uiState.update {
+                it.copy(
+                    loading = true,
+                    error = null,
+                    hasMore = true,
+                    initialLoaded = false
+                )
+            }
 
             // ① 先加载本地缓存消息（立即显示）
             val localResult = getChatMessages(chatId, PAGE_SIZE, onlyLocal = true)
