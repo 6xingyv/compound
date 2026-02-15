@@ -138,6 +138,7 @@ import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -990,21 +991,17 @@ private fun RichTextContent(
                     return@drawWithContent
                 }
 
-                // 2. 第一层：画出除了剧透框以外的所有正常文字
                 clipPath(obscuredPath, clipOp = ClipOp.Difference) {
                     this@drawWithContent.drawContent()
                 }
 
                 val hasRipples = revealingSpoilers.isNotEmpty()
 
-                // 3. 第二层：让文字伴随着涟漪【柔和且渐变】地浮现出来！
                 if (hasRipples) {
-                    clipPath(obscuredPath) { // 先把操作限制在剧透区域内
+                    clipPath(obscuredPath) {
                         val canvas = drawContext.canvas
-                        // 开启图层缓冲，用于计算 Alpha 遮罩
                         canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
 
-                        // a. 画出所有的柔和涟漪，作为接下来文字的“隐形面具”
                         revealingSpoilers.forEach { (index, anim) ->
                             revealingOrigins[index]?.let { origin ->
                                 val radius = anim.value
@@ -1024,15 +1021,13 @@ private fun RichTextContent(
                             }
                         }
 
-                        // b. 将文字画在这个面具上 (使用 SrcIn 混合模式)
-                        // SrcIn 魔法：文字只会在刚才画了涟漪的地方显示，并且完全继承涟漪的渐变透明度！
                         canvas.saveLayer(
                             Rect(0f, 0f, size.width, size.height),
                             Paint().apply { blendMode = BlendMode.SrcIn })
                         this@drawWithContent.drawContent()
-                        canvas.restore() // 应用 SrcIn
+                        canvas.restore()
 
-                        canvas.restore() // 将合成好的柔和文字画到屏幕上
+                        canvas.restore()
                     }
                 }
 
@@ -1040,7 +1035,6 @@ private fun RichTextContent(
                     val canvas = drawContext.canvas
                     canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
 
-                    // a. 铺满整片星尘
                     shader.setFloatUniform(
                         "particleColor",
                         contentColor.red,
@@ -1052,8 +1046,6 @@ private fun RichTextContent(
                     shader.setFloatUniform("resolution", size.width, size.height)
                     drawRect(brush = brush)
 
-                    // b. 伴随涟漪擦除星尘 (使用 DstOut 混合模式)
-                    // DstOut 魔法：就像一块柔和的橡皮擦，伴随径向渐变，平滑地擦出大窟窿，露出底部的文字
                     if (hasRipples) {
                         revealingSpoilers.forEach { (index, anim) ->
                             revealingOrigins[index]?.let { origin ->
@@ -1079,7 +1071,7 @@ private fun RichTextContent(
                     canvas.restore()
                 }
             }
-            .pointerInput(text, layoutResult) {
+            .pointerInput(text, layoutResult, revealedEntityIndices) { // 关键：将 revealedEntityIndices 加入 key
                 detectTapGestures { pos ->
                     val layout = layoutResult.value ?: return@detectTapGestures
                     if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
@@ -1092,7 +1084,9 @@ private fun RichTextContent(
                     text.getStringAnnotations("SPOILER", offset, offset).firstOrNull()?.let {
                         val index = it.item.toIntOrNull() ?: return@let
 
-                        if (index in revealedEntityIndices || index in revealingSpoilers) return@let
+                        if (index in revealedEntityIndices || revealingSpoilers.containsKey(index)) {
+                            return@let
+                        }
 
                         val maxRadius = hypot(
                             layout.size.width.toDouble(),
@@ -1109,6 +1103,7 @@ private fun RichTextContent(
                                 animationSpec = tween(durationMillis = 400, easing = LinearEasing)
                             )
                             onSpoilerClick(index)
+                            yield()
                             revealingSpoilers.remove(index)
                             revealingOrigins.remove(index)
                         }
@@ -1262,7 +1257,6 @@ private fun MediaAlbumGrid(messages: List<Message>) {
                             )
                         }
                     } else {
-                        // Empty spacer for uneven grid
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
