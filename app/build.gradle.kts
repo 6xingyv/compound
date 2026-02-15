@@ -1,3 +1,4 @@
+import com.android.utils.usLocaleDecapitalize
 import java.util.Properties
 
 plugins {
@@ -99,7 +100,7 @@ android {
 
 base {
     archivesName.set(
-        "${rootProject.name}-${libs.versions.appVersionName.get()}"
+        "${rootProject.name.usLocaleDecapitalize()}-${libs.versions.appVersionName.get().replace(" ", "-")}"
     )
 }
 
