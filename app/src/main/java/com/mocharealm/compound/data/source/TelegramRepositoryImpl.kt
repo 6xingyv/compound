@@ -408,7 +408,8 @@ class TelegramRepositoryImpl(
             stickerFormat = parsed.stickerFormat,
             entities = parsed.entities,
             replyTo = replyInfo,
-            mediaAlbumId = msg.mediaAlbumId
+            mediaAlbumId = msg.mediaAlbumId,
+            hasSpoiler = parsed.hasSpoiler
         ).toDomain()
     }
 
@@ -484,7 +485,8 @@ class TelegramRepositoryImpl(
         val type: MessageType,
         val fileId: Int?,
         val stickerFormat: StickerFormat? = null,
-        val entities: List<TextEntity> = emptyList()
+        val entities: List<TextEntity> = emptyList(),
+        val hasSpoiler: Boolean = false
     )
 
     private fun parseMessageContent(content: TdApi.MessageContent): ParsedContent =
@@ -502,7 +504,8 @@ class TelegramRepositoryImpl(
                     if (caption.isNotEmpty()) "Photo: $caption" else "Photo",
                     MessageType.PHOTO,
                     photoFileId,
-                    entities = if (caption.isNotEmpty()) mapFormattedTextEntities(content.caption) else emptyList()
+                    entities = if (caption.isNotEmpty()) mapFormattedTextEntities(content.caption) else emptyList(),
+                    hasSpoiler = content.hasSpoiler
                 )
             }
             is TdApi.MessageSticker -> {
@@ -516,7 +519,12 @@ class TelegramRepositoryImpl(
             }
             is TdApi.MessageVideo -> {
                 val caption = content.caption.text
-                ParsedContent(if (caption.isNotEmpty()) "Video: $caption" else "Video", MessageType.VIDEO, null)
+                ParsedContent(
+                    if (caption.isNotEmpty()) "Video: $caption" else "Video", 
+                    MessageType.VIDEO, 
+                    null,
+                    hasSpoiler = content.hasSpoiler
+                )
             }
             is TdApi.MessageDocument -> ParsedContent("Document: ${content.document.fileName}", MessageType.DOCUMENT, null)
             is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
@@ -554,7 +562,7 @@ class TelegramRepositoryImpl(
     }
 
     private fun mapToTdApiEntities(entities: List<TextEntity>): Array<TdApi.TextEntity> {
-        return entities.mapNotNull { entity ->
+        return entities.map { entity ->
             val type = when (entity.type) {
                 is TextEntityType.Bold -> TdApi.TextEntityTypeBold()
                 is TextEntityType.Italic -> TdApi.TextEntityTypeItalic()
@@ -569,13 +577,8 @@ class TelegramRepositoryImpl(
                 is TextEntityType.Spoiler -> TdApi.TextEntityTypeSpoiler()
                 is TextEntityType.EmailAddress -> TdApi.TextEntityTypeEmailAddress()
                 is TextEntityType.PhoneNumber -> TdApi.TextEntityTypePhoneNumber()
-                else -> null
             }
-            if (type != null) {
-                TdApi.TextEntity(entity.offset, entity.length, type)
-            } else {
-                null
-            }
+            TdApi.TextEntity(entity.offset, entity.length, type)
         }.toTypedArray()
     }
 }

@@ -20,7 +20,8 @@ data class MessageDto(
     val stickerFormat: StickerFormat? = null,
     val entities: List<TextEntity> = emptyList(),
     val replyTo: ReplyInfo? = null,
-    val mediaAlbumId: Long = 0L
+    val mediaAlbumId: Long = 0L,
+    val hasSpoiler: Boolean = false
 ) {
     fun toDomain(): Message = Message(
         id = id,
@@ -37,6 +38,7 @@ data class MessageDto(
         stickerFormat = stickerFormat,
         entities = entities,
         replyTo = replyTo,
-        mediaAlbumId = mediaAlbumId
+        mediaAlbumId = mediaAlbumId,
+        hasSpoiler = hasSpoiler
     )
 }

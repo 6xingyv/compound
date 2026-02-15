@@ -15,7 +15,8 @@ data class Message(
     val stickerFormat: StickerFormat? = null,
     val entities: List<TextEntity> = emptyList(),
     val replyTo: ReplyInfo? = null,
-    val mediaAlbumId: Long = 0L
+    val mediaAlbumId: Long = 0L,
+    val hasSpoiler: Boolean = false
 )
 
 enum class MessageType {

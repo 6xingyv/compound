@@ -8,11 +8,8 @@ import androidx.annotation.OptIn
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.RepeatMode
-import androidx.compose.animation.core.animateFloat
-import androidx.compose.animation.core.infiniteRepeatable
-import androidx.compose.animation.core.rememberInfiniteTransition
 import androidx.compose.animation.core.tween
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
@@ -59,6 +56,7 @@ import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.geometry.Offset
@@ -69,12 +67,10 @@ import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Paint
 import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.input.pointer.pointerInput
-import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.clipPath
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -114,6 +110,7 @@ import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -124,6 +121,7 @@ import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import kotlin.math.hypot
 
 private enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
 
@@ -581,16 +579,21 @@ private fun MessageContent(
         MessageType.PHOTO -> {
             if (!message.fileUrl.isNullOrEmpty()) {
                 Column(modifier = Modifier.width(IntrinsicSize.Min)) {
-                    AsyncImage(
-                        model = ImageRequest.Builder(LocalContext.current)
-                            .data(java.io.File(message.fileUrl))
-                            .build(),
-                        contentDescription = "Photo",
-                        modifier = Modifier
-                            .heightIn(max = 300.dp)
-                            .wrapContentWidth(),
-                        contentScale = ContentScale.Fit
-                    )
+                    SpoilerImage(
+                        hasSpoiler = message.hasSpoiler,
+                        modifier = Modifier.wrapContentWidth()
+                    ) {
+                        AsyncImage(
+                            model = ImageRequest.Builder(LocalContext.current)
+                                .data(java.io.File(message.fileUrl))
+                                .build(),
+                            contentDescription = "Photo",
+                            modifier = Modifier
+                                .heightIn(max = 300.dp)
+                                .wrapContentWidth(),
+                            contentScale = ContentScale.Fit
+                        )
+                    }
 
                     val caption = message.content.removePrefix("Photo: ").takeIf { it != "Photo" }
                     if (!caption.isNullOrBlank()) {
@@ -758,9 +761,10 @@ private fun RichTextContent(
                                 val radius = anim.value
                                 if (radius > 0f) {
                                     drawCircle(
-                                        // 使用径向渐变，中心纯黑(完全显现)，边缘透明(柔和消失)
                                         brush = Brush.radialGradient(
-                                            colors = listOf(Color.Black, Color.Transparent),
+                                            0.0f to Color.Black,
+                                            0.5f to Color.Black,
+                                            1.0f to Color.Transparent,
                                             center = origin,
                                             radius = radius
                                         ),
@@ -781,7 +785,6 @@ private fun RichTextContent(
                     }
                 }
 
-                // 4. 第三层：铺上星尘粒子，并让它们随着涟漪【柔和且渐变】地消散
                 clipPath(obscuredPath) {
                     val canvas = drawContext.canvas
                     canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
@@ -801,7 +804,9 @@ private fun RichTextContent(
                                 if (radius > 0f) {
                                     drawCircle(
                                         brush = Brush.radialGradient(
-                                            colors = listOf(Color.Black, Color.Transparent),
+                                            0.0f to Color.Black,
+                                            0.5f to Color.Black,
+                                            1.0f to Color.Transparent,
                                             center = origin,
                                             radius = radius
                                         ),
@@ -976,17 +981,22 @@ private fun MediaAlbumGrid(messages: List<Message>) {
                         val msg = messages[idx]
                         val fileUrl = msg.fileUrl
                         if (!fileUrl.isNullOrEmpty()) {
-                            AsyncImage(
-                                model = ImageRequest.Builder(LocalContext.current)
-                                    .data(java.io.File(fileUrl))
-                                    .build(),
-                                contentDescription = "Album photo",
+                            SpoilerImage(
                                 modifier = Modifier
                                     .weight(1f)
                                     .heightIn(min = 80.dp, max = 200.dp)
                                     .padding(1.dp),
-                                contentScale = ContentScale.Crop
-                            )
+                                hasSpoiler = msg.hasSpoiler
+                            ) {
+                                AsyncImage(
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(java.io.File(fileUrl))
+                                        .build(),
+                                    contentDescription = "Album photo",
+                                    modifier = Modifier.fillMaxSize(),
+                                    contentScale = ContentScale.Crop
+                                )
+                            }
                         } else {
                             Box(
                                 modifier = Modifier
@@ -1001,6 +1011,120 @@ private fun MediaAlbumGrid(messages: List<Message>) {
                         Spacer(modifier = Modifier.weight(1f))
                     }
                 }
+            }
+        }
+    }
+}
+
+@Composable
+private fun SpoilerImage(
+    modifier: Modifier = Modifier,
+    hasSpoiler: Boolean,
+    content: @Composable () -> Unit
+) {
+    if (!hasSpoiler) {
+        content()
+        return
+    }
+
+    var isRevealed by rememberSaveable { mutableStateOf(false) }
+
+    if (isRevealed) {
+        content()
+        return
+    }
+
+    val shader = remember { SpoilerShader.getShader() }
+    val brush = remember(shader) { ShaderBrush(shader) }
+
+    val revealAnim = remember { Animatable(0f) }
+    val revealOrigin = remember { mutableStateOf(Offset.Zero) }
+    val coroutineScope = rememberCoroutineScope()
+
+    var time by remember { mutableFloatStateOf(0f) }
+    LaunchedEffect(Unit) {
+        var lastFrameTime = withFrameNanos { it }
+        var accumulatedNanos = 0L
+        val thresholdNanos = 1_000_000_000_000L
+
+        while (true) {
+            withFrameNanos { frameTime ->
+                val deltaNanos = frameTime - lastFrameTime
+                lastFrameTime = frameTime
+                accumulatedNanos += deltaNanos
+                accumulatedNanos %= thresholdNanos
+                time = (accumulatedNanos / 1_000_000_000f) * 0.65f
+            }
+        }
+    }
+
+    Box(modifier = modifier) {
+        content()
+        Box(
+            modifier = Modifier
+                .matchParentSize()
+                .pointerInput(Unit) {
+                    detectTapGestures { pos ->
+                        if (isRevealed) return@detectTapGestures
+
+                        revealOrigin.value = pos
+                        val maxRadius = hypot(size.width.toDouble(), size.height.toDouble()).toFloat()
+
+                        coroutineScope.launch {
+                            revealAnim.animateTo(
+                                targetValue = maxRadius,
+                                animationSpec = tween(durationMillis = 400, easing = LinearEasing)
+                            )
+                            isRevealed = true
+                        }
+                    }
+                }
+                .drawWithContent {
+                    val radius = revealAnim.value
+                    val origin = revealOrigin.value
+
+                    val canvas = drawContext.canvas
+                    canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+
+                    drawContent()
+
+                    if (radius > 0f) {
+                        drawCircle(
+                            brush = Brush.radialGradient(
+                                0.0f to Color.Black,
+                                0.5f to Color.Black,
+                                1.0f to Color.Transparent,
+                                center = origin,
+                                radius = radius
+                            ),
+                            center = origin,
+                            radius = radius,
+                            blendMode = BlendMode.DstOut
+                        )
+                    }
+
+                    canvas.restore()
+                }
+        ) {
+            Box(
+                modifier = Modifier
+                    .matchParentSize()
+                    .blur(24.dp)
+                    .drawWithCache {
+                        onDrawWithContent {
+                            drawContent()
+                            drawRect(Color.Black.copy(0.2f))
+                        }
+                    }
+            ) {
+               content()
+            }
+
+            Canvas(modifier = Modifier.matchParentSize()) {
+                shader.setFloatUniform("particleColor", 1f, 1f, 1f, 1f)
+                shader.setFloatUniform("time", time)
+                shader.setFloatUniform("resolution", size.width, size.height)
+                drawRect(brush = brush)
             }
         }
     }
