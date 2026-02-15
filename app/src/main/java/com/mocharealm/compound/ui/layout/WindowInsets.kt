@@ -1,0 +1,566 @@
+/*
+ * Copyright 2022 The Android Open Source Project
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *      http://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+package com.mocharealm.compound.ui.layout
+
+import android.view.View
+import android.view.View.OnAttachStateChangeListener
+import androidx.compose.foundation.layout.WindowInsets
+import androidx.compose.foundation.layout.union
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.Immutable
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshots.Snapshot
+import androidx.compose.ui.R
+import androidx.compose.ui.graphics.asComposePath
+import androidx.compose.ui.platform.AbstractComposeView
+import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.LocalView
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.core.view.OnApplyWindowInsetsListener
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsAnimationCompat
+import androidx.core.view.WindowInsetsCompat
+import org.jetbrains.annotations.TestOnly
+import java.util.WeakHashMap
+import androidx.core.graphics.Insets as AndroidXInsets
+
+@Immutable
+internal class InsetsValues(val left: Int, val top: Int, val right: Int, val bottom: Int) {
+    override fun equals(other: Any?): Boolean {
+        if (this === other) {
+            return true
+        }
+        if (other !is InsetsValues) {
+            return false
+        }
+
+        return left == other.left &&
+                top == other.top &&
+                right == other.right &&
+                bottom == other.bottom
+    }
+
+    override fun hashCode(): Int {
+        var result = left
+        result = 31 * result + top
+        result = 31 * result + right
+        result = 31 * result + bottom
+        return result
+    }
+
+    override fun toString(): String =
+        "InsetsValues(left=$left, top=$top, right=$right, bottom=$bottom)"
+}
+
+@Stable
+internal class ValueInsets(insets: InsetsValues, val name: String) : WindowInsets {
+    internal var value by mutableStateOf(insets)
+
+    override fun getLeft(density: Density, layoutDirection: LayoutDirection): Int = value.left
+
+    override fun getTop(density: Density) = value.top
+
+    override fun getRight(density: Density, layoutDirection: LayoutDirection) = value.right
+
+    override fun getBottom(density: Density) = value.bottom
+
+    override fun equals(other: Any?): Boolean {
+        if (other === this) {
+            return true
+        }
+        if (other !is ValueInsets) {
+            return false
+        }
+        return value == other.value
+    }
+
+    override fun hashCode(): Int {
+        return name.hashCode()
+    }
+
+    override fun toString(): String {
+        return "$name(left=${value.left}, top=${value.top}, " +
+                "right=${value.right}, bottom=${value.bottom})"
+    }
+}
+
+internal fun AndroidXInsets.toInsetsValues(): InsetsValues =
+    InsetsValues(left, top, right, bottom)
+
+internal fun ValueInsets(insets: AndroidXInsets, name: String): ValueInsets =
+    ValueInsets(insets.toInsetsValues(), name)
+
+/**
+ * [androidx.compose.foundation.layout.WindowInsets] provided by the Android framework. These can be used in
+ * [rememberWindowInsetsConnection] to control the insets.
+ */
+@Stable
+internal class AndroidWindowInsets(internal val type: Int, private val name: String) :
+    WindowInsets {
+    internal var insets by mutableStateOf(AndroidXInsets.NONE)
+
+    /**
+     * Returns whether the insets are visible, irrespective of whether or not they intersect with
+     * the Window.
+     */
+    var isVisible by mutableStateOf(true)
+
+    override fun getLeft(density: Density, layoutDirection: LayoutDirection): Int {
+        return insets.left
+    }
+
+    override fun getTop(density: Density): Int {
+        return insets.top
+    }
+
+    override fun getRight(density: Density, layoutDirection: LayoutDirection): Int {
+        return insets.right
+    }
+
+    override fun getBottom(density: Density): Int {
+        return insets.bottom
+    }
+
+    @OptIn(_root_ide_package_.androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    internal fun update(windowInsetsCompat: WindowInsetsCompat, typeMask: Int) {
+        if (typeMask == 0 || typeMask and type != 0) {
+            insets = windowInsetsCompat.getInsets(type)
+            isVisible = windowInsetsCompat.isVisible(type)
+        }
+    }
+
+    override fun equals(other: Any?): Boolean {
+        if (this === other) return true
+        if (other !is AndroidWindowInsets) return false
+
+        return type == other.type
+    }
+
+    override fun hashCode(): Int {
+        return type
+    }
+
+    override fun toString(): String {
+        return "$name(${insets.left}, ${insets.top}, ${insets.right}, ${insets.bottom})"
+    }
+}
+
+/**
+ * Indicates whether access to [androidx.compose.foundation.layout.WindowInsets] within the [content][ComposeView.setContent] should
+ * consume the Android [android.view.WindowInsets]. The default value is `false`, meaning that
+ * access to [androidx.compose.foundation.layout.WindowInsets.Companion] will not consume all the Android WindowInsets and instead
+ * adjust the insets based on the position of child Views.
+ *
+ * This property should be set prior to first composition.
+ */
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+var AbstractComposeView.consumeWindowInsets: Boolean
+    get() = getTag(R.id.consume_window_insets_tag) as? Boolean ?: false
+    set(value) {
+        setTag(R.id.consume_window_insets_tag, value)
+    }
+
+/**
+ * Indicates whether access to [androidx.compose.foundation.layout.WindowInsets] within the [content][ComposeView.setContent] should
+ * consume the Android [android.view.WindowInsets]. The default value is `true`, meaning that access
+ * to [androidx.compose.foundation.layout.WindowInsets.Companion] will consume the Android WindowInsets.
+ *
+ * This property should be set prior to first composition.
+ */
+@Deprecated(
+    level = DeprecationLevel.HIDDEN,
+    message = "Please use AbstractComposeView.consumeWindowInsets",
+)
+@OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+var ComposeView.consumeWindowInsets: Boolean
+    get() = getTag(R.id.consume_window_insets_tag) as? Boolean ?: false
+    set(value) {
+        setTag(R.id.consume_window_insets_tag, value)
+    }
+
+/** The insets for various values in the current window. */
+internal class WindowInsetsHolder private constructor(insets: WindowInsetsCompat?, view: View) {
+    val captionBar = systemInsets(insets, WindowInsetsCompat.Type.captionBar(), "captionBar")
+    val displayCutout =
+        systemInsets(insets, WindowInsetsCompat.Type.displayCutout(), "displayCutout")
+    val ime = systemInsets(insets, WindowInsetsCompat.Type.ime(), "ime")
+    val mandatorySystemGestures =
+        systemInsets(
+            insets,
+            WindowInsetsCompat.Type.mandatorySystemGestures(),
+            "mandatorySystemGestures",
+        )
+    val navigationBars =
+        systemInsets(insets, WindowInsetsCompat.Type.navigationBars(), "navigationBars")
+    val statusBars = systemInsets(insets, WindowInsetsCompat.Type.statusBars(), "statusBars")
+    val systemBars = systemInsets(insets, WindowInsetsCompat.Type.systemBars(), "systemBars")
+    val systemGestures =
+        systemInsets(insets, WindowInsetsCompat.Type.systemGestures(), "systemGestures")
+    val tappableElement =
+        systemInsets(insets, WindowInsetsCompat.Type.tappableElement(), "tappableElement")
+    val waterfall =
+        ValueInsets(insets?.displayCutout?.waterfallInsets ?: AndroidXInsets.NONE, "waterfall")
+    var cutoutPath by mutableStateOf(insets?.displayCutout?.cutoutPath?.asComposePath())
+        private set
+
+    val safeDrawing = systemBars.union(ime).union(displayCutout)
+    val safeGestures: WindowInsets =
+        tappableElement.union(mandatorySystemGestures).union(systemGestures).union(waterfall)
+    val safeContent: WindowInsets = safeDrawing.union(safeGestures)
+
+    val captionBarIgnoringVisibility =
+        valueInsetsIgnoringVisibility(
+            insets,
+            WindowInsetsCompat.Type.captionBar(),
+            "captionBarIgnoringVisibility",
+        )
+    val navigationBarsIgnoringVisibility =
+        valueInsetsIgnoringVisibility(
+            insets,
+            WindowInsetsCompat.Type.navigationBars(),
+            "navigationBarsIgnoringVisibility",
+        )
+    val statusBarsIgnoringVisibility =
+        valueInsetsIgnoringVisibility(
+            insets,
+            WindowInsetsCompat.Type.statusBars(),
+            "statusBarsIgnoringVisibility",
+        )
+    val systemBarsIgnoringVisibility =
+        valueInsetsIgnoringVisibility(
+            insets,
+            WindowInsetsCompat.Type.systemBars(),
+            "systemBarsIgnoringVisibility",
+        )
+    val tappableElementIgnoringVisibility =
+        valueInsetsIgnoringVisibility(
+            insets,
+            WindowInsetsCompat.Type.tappableElement(),
+            "tappableElementIgnoringVisibility",
+        )
+    val imeAnimationTarget = ValueInsets(AndroidXInsets.NONE, "imeAnimationTarget")
+    val imeAnimationSource = ValueInsets(AndroidXInsets.NONE, "imeAnimationSource")
+
+    /**
+     * `true` unless the `AbstractComposeView` [AbstractComposeView.consumeWindowInsets] is set to
+     * `false`.
+     */
+    @OptIn(_root_ide_package_.androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    val consumes =
+        (view.parent as? View)?.getTag(R.id.consume_window_insets_tag) as? Boolean ?: false
+
+    /**
+     * The number of accesses to [WindowInsetsHolder]. When this reaches zero, the listeners are
+     * removed. When it increases to 1, the listeners are added.
+     */
+    private var accessCount = 0
+
+    private val insetsListener = InsetsListener(this)
+
+    init {
+        val rootWindowInsets = ViewCompat.getRootWindowInsets(view)
+        if (rootWindowInsets != null) {
+            // set the initial state of visibility
+            captionBar.isVisible = rootWindowInsets.isVisible(WindowInsetsCompat.Type.captionBar())
+            displayCutout.isVisible =
+                rootWindowInsets.isVisible(WindowInsetsCompat.Type.displayCutout())
+            ime.isVisible = rootWindowInsets.isVisible(WindowInsetsCompat.Type.ime())
+            mandatorySystemGestures.isVisible =
+                rootWindowInsets.isVisible(WindowInsetsCompat.Type.mandatorySystemGestures())
+            navigationBars.isVisible =
+                rootWindowInsets.isVisible(WindowInsetsCompat.Type.navigationBars())
+            statusBars.isVisible = rootWindowInsets.isVisible(WindowInsetsCompat.Type.statusBars())
+            systemBars.isVisible = rootWindowInsets.isVisible(WindowInsetsCompat.Type.systemBars())
+            systemGestures.isVisible =
+                rootWindowInsets.isVisible(WindowInsetsCompat.Type.systemGestures())
+            tappableElement.isVisible =
+                rootWindowInsets.isVisible(WindowInsetsCompat.Type.tappableElement())
+        }
+    }
+
+    /**
+     * A usage of [WindowInsetsHolder.current] was added. We must track so that when the first one
+     * is added, listeners are set and when the last is removed, the listeners are removed.
+     */
+    fun incrementAccessors(view: View) {
+        if (accessCount == 0) {
+            // add listeners
+            ViewCompat.setOnApplyWindowInsetsListener(view, insetsListener)
+
+            if (view.isAttachedToWindow) {
+                view.requestApplyInsets()
+            }
+            view.addOnAttachStateChangeListener(insetsListener)
+
+            ViewCompat.setWindowInsetsAnimationCallback(view, insetsListener)
+        }
+        accessCount++
+    }
+
+    /**
+     * A usage of [WindowInsetsHolder.current] was removed. We must track so that when the first one
+     * is added, listeners are set and when the last is removed, the listeners are removed.
+     */
+    fun decrementAccessors(view: View) {
+        accessCount--
+        if (accessCount == 0) {
+            // remove listeners
+            ViewCompat.setOnApplyWindowInsetsListener(view, null)
+            ViewCompat.setWindowInsetsAnimationCallback(view, null)
+            view.removeOnAttachStateChangeListener(insetsListener)
+        }
+    }
+
+    /** Updates the WindowInsets values and notifies changes. */
+    fun update(windowInsets: WindowInsetsCompat, types: Int = 0) {
+        val insets =
+            if (testInsets) {
+                // WindowInsetsCompat erases insets that aren't part of the device.
+                // For example, if there is no navigation bar because of hardware keys,
+                // the bottom navigation bar will be removed. By using the constructor
+                // that doesn't accept a View, it doesn't remove the insets that aren't
+                // possible. This is important for testing on arbitrary hardware.
+                WindowInsetsCompat.toWindowInsetsCompat(windowInsets.toWindowInsets()!!)
+            } else {
+                windowInsets
+            }
+        captionBar.update(insets, types)
+        ime.update(insets, types)
+        displayCutout.update(insets, types)
+        navigationBars.update(insets, types)
+        statusBars.update(insets, types)
+        systemBars.update(insets, types)
+        systemGestures.update(insets, types)
+        tappableElement.update(insets, types)
+        mandatorySystemGestures.update(insets, types)
+
+        if (types == 0) {
+            captionBarIgnoringVisibility.value =
+                insets
+                    .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.captionBar())
+                    .toInsetsValues()
+            navigationBarsIgnoringVisibility.value =
+                insets
+                    .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.navigationBars())
+                    .toInsetsValues()
+            statusBarsIgnoringVisibility.value =
+                insets
+                    .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.statusBars())
+                    .toInsetsValues()
+            systemBarsIgnoringVisibility.value =
+                insets
+                    .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.systemBars())
+                    .toInsetsValues()
+            tappableElementIgnoringVisibility.value =
+                insets
+                    .getInsetsIgnoringVisibility(WindowInsetsCompat.Type.tappableElement())
+                    .toInsetsValues()
+
+            val cutout = insets.displayCutout
+            waterfall.value = (cutout?.waterfallInsets ?: AndroidXInsets.NONE).toInsetsValues()
+            cutoutPath = cutout?.cutoutPath?.asComposePath()
+        }
+        Snapshot.sendApplyNotifications()
+    }
+
+    /**
+     * Updates [androidx.compose.foundation.layout.WindowInsets.Companion.imeAnimationSource]. It should be called prior to [update].
+     */
+    fun updateImeAnimationSource(windowInsets: WindowInsetsCompat) {
+        imeAnimationSource.value =
+            windowInsets.getInsets(WindowInsetsCompat.Type.ime()).toInsetsValues()
+    }
+
+    /**
+     * Updates [androidx.compose.foundation.layout.WindowInsets.Companion.imeAnimationTarget]. It should be called prior to [update].
+     */
+    fun updateImeAnimationTarget(windowInsets: WindowInsetsCompat) {
+        imeAnimationTarget.value =
+            windowInsets.getInsets(WindowInsetsCompat.Type.ime()).toInsetsValues()
+    }
+
+    companion object {
+        /**
+         * A mapping of AndroidComposeView to ComposeWindowInsets. Normally a tag is a great way to
+         * do this mapping, but off-UI thread and multithreaded composition don't allow using the
+         * tag.
+         */
+        private val viewMap = WeakHashMap<View, WindowInsetsHolder>()
+
+        private var testInsets = false
+
+        /**
+         * Testing Window Insets is difficult, so we have this to help eliminate device-specifics
+         * from the WindowInsets. This is indirect because `@TestOnly` cannot be applied to a
+         * property with a backing field.
+         */
+        @TestOnly
+        fun setUseTestInsets(testInsets: Boolean) {
+            this.testInsets = testInsets
+        }
+
+        @Composable
+        fun current(): WindowInsetsHolder {
+            val view = LocalView.current
+            val insets = getOrCreateFor(view)
+
+            DisposableEffect(insets) {
+                insets.incrementAccessors(view)
+                onDispose { insets.decrementAccessors(view) }
+            }
+            return insets
+        }
+
+        /**
+         * Returns the [WindowInsetsHolder] associated with [view] or creates one and associates it.
+         */
+        fun getOrCreateFor(view: View): WindowInsetsHolder {
+            return synchronized(viewMap) {
+                viewMap.getOrPut(view) {
+                    val insets = null
+                    WindowInsetsHolder(insets, view)
+                }
+            }
+        }
+
+        /** Creates a [androidx.compose.foundation.layout.ValueInsets] using the value from [windowInsets] if it isn't `null` */
+        private fun systemInsets(windowInsets: WindowInsetsCompat?, type: Int, name: String) =
+            AndroidWindowInsets(type, name).apply { windowInsets?.let { update(it, type) } }
+
+        /**
+         * Creates a [androidx.compose.foundation.layout.ValueInsets] using the "ignoring visibility" value from [windowInsets] if it
+         * isn't `null`
+         */
+        private fun valueInsetsIgnoringVisibility(
+            windowInsets: WindowInsetsCompat?,
+            type: Int,
+            name: String,
+        ): ValueInsets {
+            val initial = windowInsets?.getInsetsIgnoringVisibility(type) ?: AndroidXInsets.NONE
+            return ValueInsets(initial, name)
+        }
+    }
+}
+
+private class InsetsListener(val composeInsets: WindowInsetsHolder) :
+    WindowInsetsAnimationCompat.Callback(
+        if (composeInsets.consumes) DISPATCH_MODE_STOP else DISPATCH_MODE_CONTINUE_ON_SUBTREE
+    ),
+    Runnable,
+    OnApplyWindowInsetsListener,
+    OnAttachStateChangeListener {
+    /**
+     * When [android.view.WindowInsetsController.controlWindowInsetsAnimation] is called, the
+     * [onApplyWindowInsets] is called after [onPrepare] with the target size. We don't want to
+     * report the target size, we want to always report the current size, so we must ignore those
+     * calls. However, the animation may be canceled before it progresses. On R, it won't make any
+     * callbacks, so we have to figure out whether the [onApplyWindowInsets] is from a canceled
+     * animation or if it is from the controlled animation. When [prepared] is `true` on R, we post
+     * a callback to set the [onApplyWindowInsets] insets value.
+     */
+    var prepared = false
+
+    /** `true` if there is an animation in progress. */
+    var runningAnimation = false
+
+    var savedInsets: WindowInsetsCompat? = null
+
+    override fun onPrepare(animation: WindowInsetsAnimationCompat) {
+        prepared = true
+        runningAnimation = true
+        super.onPrepare(animation)
+    }
+
+    override fun onStart(
+        animation: WindowInsetsAnimationCompat,
+        bounds: WindowInsetsAnimationCompat.BoundsCompat,
+    ): WindowInsetsAnimationCompat.BoundsCompat {
+        prepared = false
+        return super.onStart(animation, bounds)
+    }
+
+    override fun onProgress(
+        insets: WindowInsetsCompat,
+        runningAnimations: MutableList<WindowInsetsAnimationCompat>,
+    ): WindowInsetsCompat {
+        composeInsets.update(insets)
+        return if (composeInsets.consumes) WindowInsetsCompat.CONSUMED else insets
+    }
+
+    override fun onEnd(animation: WindowInsetsAnimationCompat) {
+        prepared = false
+        runningAnimation = false
+        val insets = savedInsets
+        if (animation.durationMillis > 0L && insets != null) {
+            composeInsets.updateImeAnimationSource(insets)
+            composeInsets.updateImeAnimationTarget(insets)
+            composeInsets.update(insets)
+        }
+        savedInsets = null
+        super.onEnd(animation)
+    }
+
+    override fun onApplyWindowInsets(view: View, insets: WindowInsetsCompat): WindowInsetsCompat {
+        // Keep track of the most recent insets we've seen, to ensure onEnd will always use the
+        // most recently acquired insets
+        savedInsets = insets
+        composeInsets.updateImeAnimationTarget(insets)
+        if (prepared) {
+            // There may be no callback on R if the animation is canceled after onPrepare(),
+            // so we won't know if the onPrepare() was canceled or if this is an
+            // onApplyWindowInsets() after the cancelation. We'll just post the value
+            // and if it is still preparing then we just use the value.
+        } else if (!runningAnimation) {
+            // If an animation is running, rely on onProgress() to update the insets
+            // On APIs less than 30 where the IME animation is backported, this avoids reporting
+            // the final insets for a frame while the animation is running.
+            composeInsets.updateImeAnimationSource(insets)
+            composeInsets.update(insets)
+        }
+        return if (composeInsets.consumes) WindowInsetsCompat.CONSUMED else insets
+    }
+
+    /**
+     * On [R], we don't receive the [onEnd] call when an animation is canceled, so we post the value
+     * received in [onApplyWindowInsets] immediately after [onPrepare]. If [onProgress] or [onEnd]
+     * is received before the runnable executes then the value won't be used. Otherwise, the
+     * [onApplyWindowInsets] value will be used. It may have a janky frame, but it is the best we
+     * can do.
+     */
+    override fun run() {
+        if (prepared) {
+            prepared = false
+            runningAnimation = false
+            savedInsets?.let {
+                composeInsets.updateImeAnimationSource(it)
+                composeInsets.update(it)
+                savedInsets = null
+            }
+        }
+    }
+
+    override fun onViewAttachedToWindow(view: View) {
+        view.requestApplyInsets()
+    }
+
+    override fun onViewDetachedFromWindow(v: View) {}
+}

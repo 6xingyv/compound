@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
-import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -73,6 +72,8 @@ import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
+import androidx.compose.ui.focus.FocusRequester
+import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.graphics.BlendMode
@@ -120,6 +121,8 @@ import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
 import com.mocharealm.compound.ui.composable.TextField
+import com.mocharealm.compound.ui.layout.imeNestedScroll
+import com.mocharealm.compound.ui.layout.imePadding
 import com.mocharealm.compound.ui.modifier.surface
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
@@ -409,7 +412,8 @@ fun ChatScreen(
                 ) {
                     TextField(
                         modifier = Modifier
-                            .weight(1f),
+                            .weight(1f)
+                            .focusRequester(focusRequester),
                         state = viewModel.inputState,
                         outputTransformation = MarkdownTransformation,
                         lineLimits = TextFieldLineLimits.MultiLine(),
@@ -548,7 +552,7 @@ fun ChatScreen(
             modifier = Modifier
                 .layerBackdrop(glassyState)
                 .fillMaxSize()
-                .overScrollVertical()
+                .imeNestedScroll(focusRequester)
                 .scrollEndHaptic(),
             contentPadding = innerPadding,
             overscrollEffect = null,
