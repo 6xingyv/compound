@@ -85,6 +85,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                     value = state.phone,
                                     onValueChange = viewModel::onPhoneChange,
                                     label = "+86 123 4567 8901",
+                                    useLabelAsPlaceholder = true
                                 )
                             }
                         }
@@ -113,6 +114,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                     value = state.code,
                                     onValueChange = viewModel::onCodeChange,
                                     label = "12345",
+                                    useLabelAsPlaceholder = true
                                 )
                             }
                         }
@@ -141,6 +143,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                     value = state.password,
                                     onValueChange = viewModel::onPasswordChange,
                                     label = "Your password",
+                                    useLabelAsPlaceholder = true
                                 )
                             }
                         }

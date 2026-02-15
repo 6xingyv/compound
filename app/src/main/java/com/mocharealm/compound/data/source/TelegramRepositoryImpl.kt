@@ -206,6 +206,7 @@ class TelegramRepositoryImpl(
     // ── Mapping helpers (fast, no network) ─────────────────────────────
 
     private suspend fun parseAuthState(state: TdApi.Object): AuthState = when (state) {
+        is TdApi.Ok -> parseAuthState(send(TdApi.GetAuthorizationState()))
         is TdApi.AuthorizationStateWaitPhoneNumber -> AuthState.WaitingForPhoneNumber
         is TdApi.AuthorizationStateWaitCode -> AuthState.WaitingForOtp
         is TdApi.AuthorizationStateWaitPassword -> AuthState.WaitingForPassword

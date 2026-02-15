@@ -1,3 +1,4 @@
+import org.gradle.language.nativeplatform.internal.Dimensions.applicationVariants
 import java.util.Properties
 
 plugins {
@@ -22,8 +23,8 @@ android {
         applicationId = "com.mocharealm.compound"
         minSdk = 33
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = libs.versions.appVersionCode.get().toInt()
+        versionName = libs.versions.appVersionName.get()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
@@ -76,6 +77,20 @@ android {
         compose = true
         buildConfig = true
     }
+    splits {
+        abi {
+            isEnable = true
+            isUniversalApk = false
+            reset()
+            include("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
+        }
+    }
+}
+
+base {
+    archivesName.set(
+        "${rootProject.name}-${libs.versions.appVersionName.get()}"
+    )
 }
 
 dependencies {

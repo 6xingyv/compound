@@ -29,7 +29,6 @@ class BubbleContinuousShape(
         val scale = r / 20f
         val bodyHeight = h - (7f * scale)
 
-        // 1. 获取主体路径的片段（不直接 addPath，而是提取它的线段）
         val mainBox = continuity.createRoundedRectanglePathSegments(
             width = w.toDouble(),
             height = bodyHeight.toDouble(),
@@ -52,7 +51,6 @@ class BubbleContinuousShape(
                 // 绘制到尾巴起点 (w, bodyHeight - 20*scale)
                 lineTo(w, bodyHeight - (20f * scale))
 
-                // --- 尾巴曲线 ---
                 cubicTo(w, bodyHeight - (13.55f * scale), w - (3.06f * scale), bodyHeight - (7.81f * scale), w - (7.8f * scale), bodyHeight - (4.15f * scale))
                 cubicTo(w - (7.91f * scale), bodyHeight - (4.07f * scale), w - (8.01f * scale), bodyHeight - (3.99f * scale), w - (8.08f * scale), bodyHeight - (3.92f * scale))
                 cubicTo(w - (9.12f * scale), bodyHeight - (3f * scale), w - (10.44f * scale), bodyHeight - (1.62f * scale), w - (10.44f * scale), bodyHeight + (0.24f * scale))
@@ -64,20 +62,16 @@ class BubbleContinuousShape(
                 cubicTo(w - (20.58f * scale), bodyHeight + (0.31f * scale), w - (21.23f * scale), bodyHeight, w - (22.22f * scale), bodyHeight)
                 close()
             }
-            // 使用 Op.Union 强行合并
             path.op(path, tail, androidx.compose.ui.graphics.PathOperation.Union)
 
         } else {
-            // 左侧气泡：完全重新计算镜像坐标
             path.addPath(mainBox)
             path.fillType = androidx.compose.ui.graphics.PathFillType.NonZero
 
             val tail = Path().apply {
-                // 左侧衔接：从主体内部 (r, bodyHeight) 往左画
                 moveTo(r, bodyHeight)
                 lineTo(0f, bodyHeight - (20f * scale))
 
-                // 所有 x 坐标镜像： x_new = x_original
                 cubicTo(0f, bodyHeight - (13.55f * scale), (3.06f * scale), bodyHeight - (7.81f * scale), (7.8f * scale), bodyHeight - (4.15f * scale))
                 cubicTo((7.91f * scale), bodyHeight - (4.07f * scale), (8.01f * scale), bodyHeight - (3.99f * scale), (8.08f * scale), bodyHeight - (3.92f * scale))
                 cubicTo((9.12f * scale), bodyHeight - (3f * scale), (10.44f * scale), bodyHeight - (1.62f * scale), (10.44f * scale), bodyHeight + (0.24f * scale))

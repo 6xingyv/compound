@@ -12,6 +12,8 @@ koin = "4.1.1"
 miuix = "0.8.3"
 nav3 = "1.1.0-alpha04"
 media3 = "1.9.2"
+appVersionCode = "1"
+appVersionName = "flight 1"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
