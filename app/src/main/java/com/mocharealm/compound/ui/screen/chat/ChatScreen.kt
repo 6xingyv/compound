@@ -1,12 +1,11 @@
 package com.mocharealm.compound.ui.screen.chat
 
+import ChatViewModel
 import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
-import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -37,7 +36,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.Stable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
@@ -46,12 +44,10 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
@@ -80,8 +76,11 @@ import com.mocharealm.compound.domain.model.StickerFormat
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
+import com.mocharealm.compound.ui.composable.TextField
+import com.mocharealm.compound.ui.modifier.surface
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
+import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.URL_ANNOTATION_TAG
 import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousCapsule
@@ -92,7 +91,6 @@ import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.basic.TextField
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
@@ -218,16 +216,22 @@ fun ChatScreen(
             ) {
                 TextField(
                     modifier = Modifier.weight(1f),
-                    value = state.inputText,
-                    onValueChange = viewModel::onInputTextChanged,
-                    label = "Message",
-                    useLabelAsPlaceholder = true,
+                    state = viewModel.inputState,
+                    outputTransformation = MarkdownTransformation,
+                    lineLimits = androidx.compose.foundation.text.input.TextFieldLineLimits.MultiLine(maxHeightInLines = 5),
+                    padding = 12.dp,
+                    clipRadius = 24.dp,
+                    activeBackgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    inactiveBackgroundColor = MiuixTheme.colorScheme.surfaceContainer,
+                    activeBorderSize = 0.dp,
+                    inactiveBorderSize = 0.dp,
+                    textStyle = MiuixTheme.textStyles.body1
                 )
                 TextButton(
                     text = "Send",
                     onClick = viewModel::sendMessage,
                     modifier = Modifier.wrapContentWidth(),
-                    enabled = !state.loading && state.inputText.isNotBlank(),
+                    enabled = !state.loading && viewModel.inputState.text.isNotBlank(),
                 )
             }
         }
@@ -453,11 +457,9 @@ private fun MessageBubble(
                         modifier = Modifier
                             .surface(
                                 shape = shape,
-                                backgroundColor =
+                                color =
                                     if (message.isOutgoing) MiuixTheme.colorScheme.primary
                                     else MiuixTheme.colorScheme.surfaceContainer,
-                                border = null,
-                                shadowElevation = 0f,
                             )
                             .semantics(mergeDescendants = false) {
                                 isTraversalGroup = true
@@ -478,28 +480,6 @@ private fun MessageBubble(
         }
     }
 }
-
-@Stable
-private fun Modifier.surface(
-    shape: Shape,
-    backgroundColor: Color,
-    border: BorderStroke?,
-    shadowElevation: Float,
-) = this
-    .then(
-        if (shadowElevation > 0f) {
-            Modifier.graphicsLayer(
-                shadowElevation = shadowElevation,
-                shape = shape,
-                clip = false,
-            )
-        } else {
-            Modifier
-        },
-    )
-    .then(if (border != null) Modifier.border(border, shape) else Modifier)
-    .background(color = backgroundColor, shape = shape)
-    .clip(shape)
 
 @Composable
 private fun MessageContent(

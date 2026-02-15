@@ -224,15 +224,26 @@ class TelegramRepositoryImpl(
 
     // ── File download ────────────────────────────────────────────────────
 
-    override suspend fun sendMessage(chatId: Long, text: String, entities: List<TextEntity>, replyToMessageId: Long): Result<Message> {
+    override suspend fun sendMessage(
+        chatId: Long,
+        text: String,
+        entities: List<TextEntity>,
+        replyToMessageId: Long
+    ): Result<Message> {
         return try {
+            val (finalText, finalEntities) = if (entities.isEmpty()) {
+                com.mocharealm.compound.domain.util.MarkdownParser.parseForSending(text)
+            } else {
+                text to entities
+            }
+
             val content = TdApi.InputMessageText(
                 TdApi.FormattedText(
-                    text,
-                    mapToTdApiEntities(entities)
+                    finalText,
+                    mapToTdApiEntities(finalEntities)
                 ),
                 null,
-                false
+                true
             )
 
             val replyTo = if (replyToMessageId != 0L) {

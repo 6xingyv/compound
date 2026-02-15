@@ -1,6 +1,6 @@
 package com.mocharealm.compound.di
 
-import com.mocharealm.compound.ui.screen.chat.ChatViewModel
+import ChatViewModel
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel

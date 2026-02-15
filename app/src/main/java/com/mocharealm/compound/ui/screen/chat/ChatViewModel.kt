@@ -1,5 +1,5 @@
-package com.mocharealm.compound.ui.screen.chat
-
+import androidx.compose.foundation.text.input.TextFieldState
+import androidx.compose.foundation.text.input.clearText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocharealm.compound.domain.model.Message
@@ -29,7 +29,6 @@ data class ChatUiState(
     val initialLoaded: Boolean = false,
     val error: String? = null,
     val scrollToMessageId: Long? = null,
-    val inputText: String = ""
 )
 
 class ChatViewModel(
@@ -46,6 +45,8 @@ class ChatViewModel(
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState: StateFlow<ChatUiState> = _uiState
+    
+    val inputState = TextFieldState()
 
     private var currentChatId: Long = 0
 
@@ -77,12 +78,8 @@ class ChatViewModel(
         }
     }
 
-    fun onInputTextChanged(text: String) {
-        _uiState.update { it.copy(inputText = text) }
-    }
-
     fun sendMessage() {
-        val text = _uiState.value.inputText
+        val text = inputState.text.toString()
         if (text.isBlank()) return
         
         viewModelScope.launch {
@@ -93,7 +90,7 @@ class ChatViewModel(
             // The prompt didn't require advanced state, just "Implement Send Message".
             // I'll clear input on success.
             sendMessage(currentChatId, text).onSuccess {
-                 _uiState.update { it.copy(inputText = "") }
+                 inputState.clearText()
             }.onFailure { e ->
                 // Maybe show a toast or something? 
                 // For now just log or set error in state?

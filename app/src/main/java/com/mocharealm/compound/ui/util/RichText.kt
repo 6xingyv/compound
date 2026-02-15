@@ -37,58 +37,21 @@ fun buildAnnotatedString(
             val end = (entity.offset + entity.length).coerceAtMost(text.length)
             if (start >= text.length || start >= end) continue
 
+            // Apply the visual style
+            addStyle(TextEntityStyle.getStyle(entity.type, linkColor), start, end)
+
+            // Apply annotations for clickable types
             when (entity.type) {
-                is TextEntityType.Bold -> addStyle(
-                    SpanStyle(fontWeight = FontWeight.Bold), start, end
-                )
-                is TextEntityType.Italic -> addStyle(
-                    SpanStyle(fontStyle = FontStyle.Italic), start, end
-                )
-                is TextEntityType.Underline -> addStyle(
-                    SpanStyle(textDecoration = TextDecoration.Underline), start, end
-                )
-                is TextEntityType.Strikethrough -> addStyle(
-                    SpanStyle(textDecoration = TextDecoration.LineThrough), start, end
-                )
-                is TextEntityType.Code, is TextEntityType.Pre -> addStyle(
-                    SpanStyle(fontFamily = FontFamily.Monospace), start, end
-                )
-                is TextEntityType.PreCode -> addStyle(
-                    SpanStyle(fontFamily = FontFamily.Monospace), start, end
-                )
                 is TextEntityType.TextUrl -> {
-                    addStyle(
-                        SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
-                        start, end
-                    )
                     addStringAnnotation(URL_ANNOTATION_TAG, entity.type.url, start, end)
                 }
                 is TextEntityType.Url -> {
-                    addStyle(
-                        SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
-                        start, end
-                    )
                     addStringAnnotation(URL_ANNOTATION_TAG, text.substring(start, end), start, end)
                 }
                 is TextEntityType.EmailAddress -> {
-                    addStyle(
-                        SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline),
-                        start, end
-                    )
                     addStringAnnotation(URL_ANNOTATION_TAG, "mailto:${text.substring(start, end)}", start, end)
                 }
-                is TextEntityType.Mention -> addStyle(
-                    SpanStyle(color = linkColor), start, end
-                )
-                is TextEntityType.PhoneNumber -> addStyle(
-                    SpanStyle(color = linkColor), start, end
-                )
-                is TextEntityType.Spoiler -> addStyle(
-                    SpanStyle(
-                        color = Color.Transparent,
-                        background = Color.Gray,
-                    ), start, end
-                )
+                else -> {}
             }
         }
     }
