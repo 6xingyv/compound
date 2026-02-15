@@ -37,7 +37,10 @@ object MarkdownParser {
         MarkdownRule(Regex("""~~(.*?)~~"""), { _ -> TextEntityType.Strikethrough }),
 
         // Underline: <u>underline</u>
-        MarkdownRule(Regex("""<u>(.*?)</u>"""), { _ -> TextEntityType.Underline })
+        MarkdownRule(Regex("""<u>(.*?)</u>"""), { _ -> TextEntityType.Underline }),
+
+        // Spoiler: ||spoiler||
+        MarkdownRule(Regex("""\|\|(.*?)\|\|"""), { _ -> TextEntityType.Spoiler })
     )
 
     data class MarkdownMatch(

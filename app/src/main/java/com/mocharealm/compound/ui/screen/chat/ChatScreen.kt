@@ -5,8 +5,17 @@ import android.net.Uri
 import android.view.ViewGroup
 import android.widget.FrameLayout
 import androidx.annotation.OptIn
+import androidx.compose.animation.core.Animatable
+import androidx.compose.animation.core.AnimationVector1D
+import androidx.compose.animation.core.LinearEasing
+import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateFloat
+import androidx.compose.animation.core.infiniteRepeatable
+import androidx.compose.animation.core.rememberInfiniteTransition
+import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -39,20 +48,39 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableStateMapOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
+import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Paint
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathOperation
+import androidx.compose.ui.graphics.ShaderBrush
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlinx.coroutines.launch
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -81,7 +109,7 @@ import com.mocharealm.compound.ui.modifier.surface
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
-import com.mocharealm.compound.ui.util.URL_ANNOTATION_TAG
+import com.mocharealm.compound.ui.util.SpoilerShader
 import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
@@ -501,8 +529,16 @@ private fun MessageContent(
     val linkColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
     else MiuixTheme.colorScheme.primary
 
-    val richText = remember(message.content, message.entities) {
-        buildAnnotatedString(message.content, message.entities, linkColor)
+    // State for revealed spoilers
+    val revealedSpoilers = rememberSaveable(message.id) { mutableStateOf(setOf<Int>()) }
+
+    val richText = remember(message.content, message.entities, revealedSpoilers.value) {
+        buildAnnotatedString(
+            text = message.content, 
+            entities = message.entities, 
+            linkColor = linkColor,
+            revealedEntityIndices = revealedSpoilers.value
+        )
     }
 
     // Reply preview
@@ -525,10 +561,17 @@ private fun MessageContent(
                 .takeIf { it != "Photo" && it != "Video" && it.isNotBlank() }
         }
         if (caption != null) {
-            val captionRich = remember(caption) {
-                buildAnnotatedString(caption, message.entities, linkColor)
+            val captionRich = remember(caption, message.entities, revealedSpoilers.value) {
+                buildAnnotatedString(caption, message.entities, linkColor, revealedSpoilers.value)
             }
-            RichTextContent(captionRich, contentColor, textPadding, uriHandler)
+            RichTextContent(
+                text = captionRich, 
+                contentColor = contentColor, 
+                modifier = textPadding, 
+                uriHandler = uriHandler,
+                revealedEntityIndices = revealedSpoilers.value,
+                onSpoilerClick = { index -> revealedSpoilers.value += index }
+            )
         }
         return
     }
@@ -550,22 +593,28 @@ private fun MessageContent(
 
                     val caption = message.content.removePrefix("Photo: ").takeIf { it != "Photo" }
                     if (!caption.isNullOrBlank()) {
-                        val captionRich = remember(caption, message.entities) {
-                            buildAnnotatedString(caption, message.entities, linkColor)
+                        val captionRich = remember(caption, message.entities, revealedSpoilers.value) {
+                            buildAnnotatedString(caption, message.entities, linkColor, revealedSpoilers.value)
                         }
-                        androidx.compose.foundation.text.ClickableText(
+                        RichTextContent(
                             text = captionRich,
-                            style = MiuixTheme.textStyles.body1.copy(color = contentColor),
+                            contentColor = contentColor,
                             modifier = textPadding.fillMaxWidth(),
-                            onClick = { offset ->
-                                captionRich.getStringAnnotations(URL_ANNOTATION_TAG, offset, offset)
-                                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
-                            }
+                            uriHandler = uriHandler,
+                            revealedEntityIndices = revealedSpoilers.value,
+                            onSpoilerClick = { index -> revealedSpoilers.value += index }
                         )
                     }
                 }
             } else {
-                RichTextContent(richText, contentColor, textPadding, uriHandler)
+                RichTextContent(
+                    text = richText, 
+                    contentColor = contentColor, 
+                    modifier = textPadding, 
+                    uriHandler = uriHandler,
+                    revealedEntityIndices = revealedSpoilers.value,
+                    onSpoilerClick = { index -> revealedSpoilers.value += index }
+                )
             }
         }
 
@@ -592,11 +641,25 @@ private fun MessageContent(
                     )
                 }
             } else {
-                RichTextContent(richText, contentColor, textPadding, uriHandler)
+                RichTextContent(
+                    text = richText, 
+                    contentColor = contentColor, 
+                    modifier = textPadding, 
+                    uriHandler = uriHandler,
+                    revealedEntityIndices = revealedSpoilers.value,
+                    onSpoilerClick = { index -> revealedSpoilers.value += index }
+                )
             }
         }
 
-        else -> RichTextContent(richText, contentColor, textPadding, uriHandler)
+        else -> RichTextContent(
+            text = richText, 
+            contentColor = contentColor, 
+            modifier = textPadding, 
+            uriHandler = uriHandler,
+            revealedEntityIndices = revealedSpoilers.value,
+            onSpoilerClick = { index -> revealedSpoilers.value += index }
+        )
     }
 }
 
@@ -606,25 +669,185 @@ private fun RichTextContent(
     contentColor: Color,
     modifier: Modifier,
     uriHandler: androidx.compose.ui.platform.UriHandler,
+    revealedEntityIndices: Set<Int>,
+    onSpoilerClick: (Int) -> Unit
 ) {
     if (text.spanStyles.isEmpty() && text.getStringAnnotations(0, text.length).isEmpty()) {
-        // 无富文本标注，使用普通 Text 组件
-        Text(
-            text = text.text,
-            style = MiuixTheme.textStyles.body1,
-            modifier = modifier
-        )
-    } else {
-        androidx.compose.foundation.text.ClickableText(
-            text = text,
-            style = MiuixTheme.textStyles.body1.copy(color = contentColor),
-            modifier = modifier,
-            onClick = { offset ->
-                text.getStringAnnotations(URL_ANNOTATION_TAG, offset, offset)
-                    .firstOrNull()?.let { uriHandler.openUri(it.item) }
-            }
-        )
+        Text(text = text.text, color = contentColor, modifier = modifier)
+        return
     }
+
+    val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
+
+    // Shader 动画时间
+    var time by remember { mutableFloatStateOf(0f) }
+
+    LaunchedEffect(Unit) {
+        val startTime = withFrameNanos { it }
+        while (true) {
+            withFrameNanos { frameTime ->
+                time = (frameTime - startTime) / 1_000_000_00f
+            }
+        }
+    }
+
+    val shader = remember { SpoilerShader.getShader() }
+    val brush = remember(shader) { ShaderBrush(shader) }
+
+    val revealingSpoilers = remember { mutableStateMapOf<Int, Animatable<Float, AnimationVector1D>>() }
+    val revealingOrigins = remember { mutableStateMapOf<Int, Offset>() }
+    val coroutineScope = rememberCoroutineScope()
+
+    // 【性能优化】缓存所有的 Path，只在文字或布局改变时重新计算！
+    val spoilerPaths = remember(text, layoutResult.value) {
+        val layout = layoutResult.value ?: return@remember emptyMap<Int, Path>()
+        val paths = mutableMapOf<Int, Path>()
+        text.getStringAnnotations("SPOILER", 0, text.length).forEach { range ->
+            range.item.toIntOrNull()?.let { index ->
+                paths[index] = layout.multiParagraph.getPathForRange(range.start, range.end)
+            }
+        }
+        paths
+    }
+
+    Text(
+        text = text,
+        color = contentColor,
+        onTextLayout = { layoutResult.value = it },
+        modifier = modifier
+            .drawWithContent {
+                val layout = layoutResult.value ?: return@drawWithContent
+
+                // 1. 合并所有需要被遮挡的区域
+                val obscuredPath = Path()
+                var hasObscured = false
+                spoilerPaths.forEach { (index, path) ->
+                    if (index !in revealedEntityIndices) {
+                        obscuredPath.addPath(path)
+                        hasObscured = true
+                    }
+                }
+
+                if (!hasObscured) {
+                    drawContent()
+                    return@drawWithContent
+                }
+
+                // 2. 第一层：画出除了剧透框以外的所有正常文字
+                clipPath(obscuredPath, clipOp = ClipOp.Difference) {
+                    this@drawWithContent.drawContent()
+                }
+
+                val hasRipples = revealingSpoilers.isNotEmpty()
+
+                // 3. 第二层：让文字伴随着涟漪【柔和且渐变】地浮现出来！
+                if (hasRipples) {
+                    clipPath(obscuredPath) { // 先把操作限制在剧透区域内
+                        val canvas = drawContext.canvas
+                        // 开启图层缓冲，用于计算 Alpha 遮罩
+                        canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+
+                        // a. 画出所有的柔和涟漪，作为接下来文字的“隐形面具”
+                        revealingSpoilers.forEach { (index, anim) ->
+                            revealingOrigins[index]?.let { origin ->
+                                val radius = anim.value
+                                if (radius > 0f) {
+                                    drawCircle(
+                                        // 使用径向渐变，中心纯黑(完全显现)，边缘透明(柔和消失)
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(Color.Black, Color.Transparent),
+                                            center = origin,
+                                            radius = radius
+                                        ),
+                                        center = origin,
+                                        radius = radius
+                                    )
+                                }
+                            }
+                        }
+
+                        // b. 将文字画在这个面具上 (使用 SrcIn 混合模式)
+                        // SrcIn 魔法：文字只会在刚才画了涟漪的地方显示，并且完全继承涟漪的渐变透明度！
+                        canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint().apply { blendMode = BlendMode.SrcIn })
+                        this@drawWithContent.drawContent()
+                        canvas.restore() // 应用 SrcIn
+
+                        canvas.restore() // 将合成好的柔和文字画到屏幕上
+                    }
+                }
+
+                // 4. 第三层：铺上星尘粒子，并让它们随着涟漪【柔和且渐变】地消散
+                clipPath(obscuredPath) {
+                    val canvas = drawContext.canvas
+                    canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+
+                    // a. 铺满整片星尘
+                    shader.setFloatUniform("particleColor", contentColor.red, contentColor.green, contentColor.blue, contentColor.alpha)
+                    shader.setFloatUniform("time", time)
+                    shader.setFloatUniform("resolution", size.width, size.height)
+                    drawRect(brush = brush)
+
+                    // b. 伴随涟漪擦除星尘 (使用 DstOut 混合模式)
+                    // DstOut 魔法：就像一块柔和的橡皮擦，伴随径向渐变，平滑地擦出大窟窿，露出底部的文字
+                    if (hasRipples) {
+                        revealingSpoilers.forEach { (index, anim) ->
+                            revealingOrigins[index]?.let { origin ->
+                                val radius = anim.value
+                                if (radius > 0f) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            colors = listOf(Color.Black, Color.Transparent),
+                                            center = origin,
+                                            radius = radius
+                                        ),
+                                        center = origin,
+                                        radius = radius,
+                                        blendMode = BlendMode.DstOut
+                                    )
+                                }
+                            }
+                        }
+                    }
+
+                    canvas.restore()
+                }
+            }
+            .pointerInput(text, layoutResult) {
+                detectTapGestures { pos ->
+                    val layout = layoutResult.value ?: return@detectTapGestures
+                    if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
+                    val offset = layout.getOffsetForPosition(pos)
+
+                    text.getStringAnnotations("URL", offset, offset).firstOrNull()?.let {
+                        uriHandler.openUri(it.item)
+                    }
+
+                    text.getStringAnnotations("SPOILER", offset, offset).firstOrNull()?.let {
+                        val index = it.item.toIntOrNull() ?: return@let
+
+                        if (index in revealedEntityIndices || index in revealingSpoilers) return@let
+
+                        // 计算足够覆盖当前文本块的最大半径
+                        val maxRadius = kotlin.math.hypot(layout.size.width.toDouble(), layout.size.height.toDouble()).toFloat()
+
+                        val anim = Animatable(0f)
+                        revealingSpoilers[index] = anim
+                        revealingOrigins[index] = pos
+
+                        coroutineScope.launch {
+                            anim.animateTo(
+                                targetValue = maxRadius,
+                                animationSpec = tween(durationMillis = 400, easing = LinearEasing)
+                            )
+                            // 动画结束，提交通知并清理状态
+                            onSpoilerClick(index)
+                            revealingSpoilers.remove(index)
+                            revealingOrigins.remove(index)
+                        }
+                    }
+                }
+            }
+    )
 }
 
 @OptIn(UnstableApi::class)

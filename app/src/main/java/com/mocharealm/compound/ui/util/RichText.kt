@@ -3,10 +3,6 @@ package com.mocharealm.compound.ui.util
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontStyle
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextDecoration
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.TextEntityType
 
@@ -26,19 +22,27 @@ fun buildAnnotatedString(
     text: String,
     entities: List<TextEntity>,
     linkColor: Color = Color(0xFF5B9BD5),
+    revealedEntityIndices: Set<Int> = emptySet(),
 ): AnnotatedString {
     if (entities.isEmpty()) return AnnotatedString(text)
 
     return androidx.compose.ui.text.buildAnnotatedString {
         append(text)
 
-        for (entity in entities) {
+        entities.forEachIndexed { index, entity ->
             val start = entity.offset
             val end = (entity.offset + entity.length).coerceAtMost(text.length)
-            if (start >= text.length || start >= end) continue
+            if (start >= text.length || start >= end) return@forEachIndexed
 
             // Apply the visual style
-            addStyle(TextEntityStyle.getStyle(entity.type, linkColor), start, end)
+            addStyle(
+                TextEntityStyle.getStyle(
+                    type = entity.type, 
+                    linkColor = linkColor
+                ),
+                start, 
+                end
+            )
 
             // Apply annotations for clickable types
             when (entity.type) {
@@ -50,6 +54,12 @@ fun buildAnnotatedString(
                 }
                 is TextEntityType.EmailAddress -> {
                     addStringAnnotation(URL_ANNOTATION_TAG, "mailto:${text.substring(start, end)}", start, end)
+                }
+                is TextEntityType.Mention -> {
+                    addStringAnnotation("MENTION", text.substring(start, end), start, end)
+                }
+                is TextEntityType.Spoiler -> {
+                    addStringAnnotation("SPOILER", index.toString(), start, end)
                 }
                 else -> {}
             }
