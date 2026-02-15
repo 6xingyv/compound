@@ -113,6 +113,7 @@ import com.mocharealm.compound.ui.util.SpoilerShader
 import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
+import kotlinx.coroutines.delay
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -679,14 +680,19 @@ private fun RichTextContent(
 
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
 
-    // Shader 动画时间
     var time by remember { mutableFloatStateOf(0f) }
-
     LaunchedEffect(Unit) {
-        val startTime = withFrameNanos { it }
+        var lastFrameTime = withFrameNanos { it }
+        var accumulatedNanos = 0L
+        val thresholdNanos = 1_000_000_000_000L
+
         while (true) {
             withFrameNanos { frameTime ->
-                time = (frameTime - startTime) / 1_000_000_00f
+                val deltaNanos = frameTime - lastFrameTime
+                lastFrameTime = frameTime
+                accumulatedNanos += deltaNanos
+                accumulatedNanos %= thresholdNanos
+                time = (accumulatedNanos / 1_000_000_000f) * 0.65f
             }
         }
     }
@@ -698,7 +704,6 @@ private fun RichTextContent(
     val revealingOrigins = remember { mutableStateMapOf<Int, Offset>() }
     val coroutineScope = rememberCoroutineScope()
 
-    // 【性能优化】缓存所有的 Path，只在文字或布局改变时重新计算！
     val spoilerPaths = remember(text, layoutResult.value) {
         val layout = layoutResult.value ?: return@remember emptyMap<Int, Path>()
         val paths = mutableMapOf<Int, Path>()
@@ -722,7 +727,7 @@ private fun RichTextContent(
                 val obscuredPath = Path()
                 var hasObscured = false
                 spoilerPaths.forEach { (index, path) ->
-                    if (index !in revealedEntityIndices) {
+                    if (index !in revealedEntityIndices || index in revealingSpoilers) {
                         obscuredPath.addPath(path)
                         hasObscured = true
                     }
@@ -839,8 +844,11 @@ private fun RichTextContent(
                                 targetValue = maxRadius,
                                 animationSpec = tween(durationMillis = 400, easing = LinearEasing)
                             )
-                            // 动画结束，提交通知并清理状态
+
                             onSpoilerClick(index)
+
+                            delay(100)
+
                             revealingSpoilers.remove(index)
                             revealingOrigins.remove(index)
                         }
