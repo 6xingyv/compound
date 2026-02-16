@@ -1,6 +1,7 @@
 package com.mocharealm.compound.ui.screen.chat
 
 import android.net.Uri
+import android.view.TextureView
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -19,8 +20,6 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
-import androidx.compose.foundation.Indication
-import androidx.compose.foundation.IndicationNodeFactory
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
@@ -28,7 +27,6 @@ import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
-import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -92,7 +90,6 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -105,13 +102,13 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
+import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
+import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.compose.PlayerSurface
-import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.airbnb.lottie.compose.LottieAnimation
@@ -1204,7 +1201,7 @@ private fun RichTextContent(
 @Composable
 private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val exoPlayer = remember(filePath) {
+    val exoPlayer = remember(filePath, ) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.fromFile(java.io.File(filePath))))
             repeatMode = Player.REPEAT_MODE_ALL
@@ -1220,7 +1217,20 @@ private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier)
         }
     }
 
-    PlayerSurface(exoPlayer, modifier, surfaceType = SURFACE_TYPE_TEXTURE_VIEW)
+    AndroidView(
+        factory = { ctx ->
+            TextureView(ctx).apply {
+                isOpaque = false
+            }
+        },
+        modifier = modifier,
+        update = { textureView ->
+            exoPlayer.setVideoTextureView(textureView)
+        },
+        onRelease = {
+            exoPlayer.clearVideoTextureView(it)
+        }
+    )
 }
 
 @Composable
