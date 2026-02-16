@@ -1,8 +1,6 @@
 package com.mocharealm.compound.ui.screen.chat
 
 import android.net.Uri
-import android.view.ViewGroup
-import android.widget.FrameLayout
 import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -99,14 +97,13 @@ import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.lerp
-import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
-import androidx.media3.ui.AspectRatioFrameLayout
-import androidx.media3.ui.PlayerView
+import androidx.media3.ui.compose.PlayerSurface
+import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.airbnb.lottie.compose.LottieAnimation
@@ -1133,21 +1130,7 @@ private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier)
         }
     }
 
-    AndroidView(
-        factory = {
-            PlayerView(it).apply {
-                player = exoPlayer
-                useController = false
-                resizeMode = AspectRatioFrameLayout.RESIZE_MODE_FIT
-                layoutParams = FrameLayout.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-                setBackgroundColor(android.graphics.Color.TRANSPARENT)
-            }
-        },
-        modifier = modifier
-    )
+    PlayerSurface(exoPlayer, modifier, surfaceType = SURFACE_TYPE_TEXTURE_VIEW)
 }
 
 @Composable
