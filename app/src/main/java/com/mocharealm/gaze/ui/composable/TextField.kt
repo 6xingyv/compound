@@ -1,8 +1,9 @@
-package com.mocharealm.compound.ui.composable
+package com.mocharealm.gaze.ui.composable
 
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.ScrollState
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsFocusedAsState
@@ -29,7 +30,7 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.unit.Density
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
-import com.mocharealm.compound.ui.modifier.surface
+import com.mocharealm.gaze.ui.modifier.surface
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 
@@ -74,7 +75,7 @@ fun TextField(
             .surface(
                 shape = if (clipRadius > 0.dp) ContinuousRoundedRectangle(clipRadius) else RectangleShape,
                 color = backgroundColor,
-                border = if (borderSize > 0.dp) androidx.compose.foundation.BorderStroke(
+                border = if (borderSize > 0.dp) BorderStroke(
                     borderSize,
                     borderColor
                 ) else null,

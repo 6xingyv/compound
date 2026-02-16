@@ -10,21 +10,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
-import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.IconButton
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Back
-import top.yukonga.miuix.kmp.theme.MiuixTheme.colorScheme
 
 @SuppressLint("ModifierParameter")
 @Composable
@@ -50,28 +42,7 @@ fun Avatar(
                 .background(Color(0xFFE0E0E0)),
             contentAlignment = Alignment.Center
         ) {
-            Text(text = initials, fontWeight = FontWeight.Bold)
+            Text(text = initials, Modifier.align(Alignment.Center), fontWeight = FontWeight.Bold)
         }
-    }
-}
-
-@Composable
-fun BackNavigationIcon(
-    onClick: () -> Unit,
-    modifier: Modifier = Modifier,
-) {
-    val layoutDirection = LocalLayoutDirection.current
-    IconButton(
-        modifier = modifier,
-        onClick = onClick,
-    ) {
-        Icon(
-            modifier = Modifier.graphicsLayer {
-                if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
-            },
-            imageVector = MiuixIcons.Back,
-            contentDescription = null,
-            tint = colorScheme.onBackground,
-        )
     }
 }

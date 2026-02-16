@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.mocharealm.compound.ui.layout
+package com.mocharealm.gaze.ui.layout
 
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.union

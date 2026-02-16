@@ -1,4 +1,4 @@
-package com.mocharealm.compound.ui.modifier
+package com.mocharealm.gaze.ui.modifier
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background

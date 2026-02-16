@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.mocharealm.compound.ui.layout
+package com.mocharealm.gaze.ui.layout
 
 import android.view.View
 import android.view.View.OnAttachStateChangeListener

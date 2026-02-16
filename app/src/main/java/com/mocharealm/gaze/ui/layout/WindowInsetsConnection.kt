@@ -14,7 +14,7 @@
  * limitations under the License.
  */
 
-package com.mocharealm.compound.ui.layout
+package com.mocharealm.gaze.ui.layout
 
 import android.graphics.Insets
 import android.os.Build
@@ -49,7 +49,6 @@ import androidx.compose.ui.util.fastRoundToInt
 import androidx.compose.ui.util.packFloats
 import androidx.compose.ui.util.unpackFloat1
 import androidx.compose.ui.util.unpackFloat2
-import androidx.core.view.WindowInsetsCompat
 import kotlinx.coroutines.CancellableContinuation
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.ExperimentalCoroutinesApi
