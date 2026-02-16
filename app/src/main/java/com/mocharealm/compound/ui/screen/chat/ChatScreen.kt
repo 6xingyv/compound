@@ -68,7 +68,6 @@ import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
-import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
@@ -139,9 +138,14 @@ import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
+import top.yukonga.miuix.kmp.icon.MiuixIcons
+import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Mic
+import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -319,7 +323,7 @@ fun ChatScreen(
                             glassyState, shape = { CircleShape },
                             effects = {
                                 vibrancy()
-                                blur(4.dp.toPx())
+                                blur(1.dp.toPx())
                                 lens(16.dp.toPx(), 32.dp.toPx())
                             },
                             onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.6f)) },
@@ -356,8 +360,10 @@ fun ChatScreen(
                                 }
                             }
                         }
-                        .size(45.dp)
-                )
+                        .size(48.dp)
+                ) {
+                    Icon(MiuixIcons.Add, null, Modifier.align(Alignment.Center))
+                }
                 Spacer(Modifier.width(16.dp))
                 Row(
                     Modifier
@@ -367,10 +373,10 @@ fun ChatScreen(
                             shape = { ContinuousRoundedRectangle(24.dp) },
                             effects = {
                                 vibrancy()
-                                blur(4.dp.toPx())
-                                lens(10.dp.toPx(), 20.dp.toPx())
+                                blur(2.dp.toPx())
+                                lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
                             },
-                            onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
+                            onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.2f)) },
                             shadow = {
                                 Shadow(
                                     radius = 24f.dp,
@@ -404,31 +410,76 @@ fun ChatScreen(
                                 }
                             }
                         }
-                        .padding(12.dp)
+                        .padding(start = 12.dp)
+                        .padding(vertical = 12.dp),
+                    verticalAlignment = Alignment.CenterVertically
                 ) {
-                    TextField(
-                        modifier = Modifier
-                            .weight(1f)
-                            .focusRequester(focusRequester),
-                        state = viewModel.inputState,
-                        outputTransformation = MarkdownTransformation,
-                        lineLimits = TextFieldLineLimits.MultiLine(),
-                        padding = 0.dp,
-                        clipRadius = 0.dp,
-                        activeBackgroundColor = Color.Transparent,
-                        inactiveBackgroundColor = Color.Transparent,
-                        activeBorderSize = 0.dp,
-                        inactiveBorderSize = 0.dp,
-                        textStyle = MiuixTheme.textStyles.body1
-                    )
+                    var inAudioMode by remember { mutableStateOf(false) }
+                    AnimatedVisibility(
+                        !inAudioMode,
+                        Modifier.weight(1f),
+                        enter = fadeIn()
+                                + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) -it else it }
+                                + expandHorizontally(),
+                        exit = fadeOut()
+                                + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) -it else it }
+                                + shrinkHorizontally()
+                    ) {
+                        TextField(
+                            modifier = Modifier
+                                .focusRequester(focusRequester),
+                            state = viewModel.inputState,
+                            outputTransformation = MarkdownTransformation,
+                            lineLimits = TextFieldLineLimits.MultiLine(),
+                            padding = 0.dp,
+                            clipRadius = 0.dp,
+                            activeBackgroundColor = Color.Transparent,
+                            inactiveBackgroundColor = Color.Transparent,
+                            activeBorderSize = 0.dp,
+                            inactiveBorderSize = 0.dp,
+                            textStyle = MiuixTheme.textStyles.body1
+                        )
+                    }
+                    Spacer(Modifier.width(12.dp))
+                    AnimatedVisibility(
+                        !state.loading && viewModel.inputState.text.lines().size <= 1,
+                        Modifier.then(if (inAudioMode) Modifier.weight(1f) else Modifier),
+                        enter = fadeIn()
+                                + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
+                                + expandHorizontally(),
+                        exit = fadeOut()
+                                + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
+                                + shrinkHorizontally()
+                    ) {
+                        Row {
+                            Icon(
+                                MiuixIcons.Mic,
+                                null,
+                                Modifier
+                                    .padding(end = 12.dp)
+                                    .clickable { inAudioMode = true })
+                            AnimatedVisibility(
+                                inAudioMode,
+                                Modifier.weight(1f),
+                                enter = fadeIn()
+                                        + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
+                                        + expandHorizontally(),
+                                exit = fadeOut()
+                                        + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
+                                        + shrinkHorizontally()
+                            ) {
+                                Text(
+                                    text = "Say something...",
+                                    style = MiuixTheme.textStyles.body1
+                                )
+                            }
+                        }
+                    }
                 }
                 Spacer(Modifier.width(16.dp))
                 AnimatedVisibility(
                     !state.loading && viewModel.inputState.text.isNotBlank(),
-                    Modifier.dropShadow(ContinuousCapsule) {
-                        color = Color.Black.copy(alpha = 0.1f)
-                        radius = 16f.dp.toPx()
-                    },
+                    Modifier,
                     enter = fadeIn()
                             + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
                             + expandHorizontally(),
@@ -452,9 +503,8 @@ fun ChatScreen(
                                 },
                                 shadow = {
                                     Shadow(
-                                        radius = 0.dp,
+                                        radius = 16.dp,
                                         offset = DpOffset(0.dp, 0.dp),
-                                        color = Color.Transparent,
                                         alpha = 1f,
                                         blendMode = DrawScope.DefaultBlendMode
                                     )
@@ -486,11 +536,12 @@ fun ChatScreen(
                             }
                             .padding(12.dp)
                     ) {
-                        Text(
-                            "Send",
-                            style = MiuixTheme.textStyles.body1,
-                            color = Color.White,
-                            fontWeight = FontWeight.Bold
+                        // TODO: Wait miuix fix alignment
+                        Icon(
+                            MiuixIcons.Send,
+                            null,
+                            Modifier.align(Alignment.Center),
+                            Color.White
                         )
                     }
                 }
@@ -1068,7 +1119,11 @@ private fun RichTextContent(
                     canvas.restore()
                 }
             }
-            .pointerInput(text, layoutResult, revealedEntityIndices) { // 关键：将 revealedEntityIndices 加入 key
+            .pointerInput(
+                text,
+                layoutResult,
+                revealedEntityIndices
+            ) { // 关键：将 revealedEntityIndices 加入 key
                 detectTapGestures { pos ->
                     val layout = layoutResult.value ?: return@detectTapGestures
                     if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures

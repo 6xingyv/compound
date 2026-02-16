@@ -66,10 +66,12 @@ class ChatViewModel(
                                 downloadMissingFiles(listOf(event.message))
                             }
                         }
+
                         is MessageUpdateEvent.MessageUpdated -> {
                             if (event.message.chatId == chatId) {
                                 _uiState.update { state ->
-                                    val index = state.messages.indexOfFirst { it.id == event.message.id }
+                                    val index =
+                                        state.messages.indexOfFirst { it.id == event.message.id }
                                     if (index != -1) {
                                         val updated = state.messages.toMutableList()
                                         updated[index] = event.message
@@ -81,10 +83,12 @@ class ChatViewModel(
                                 downloadMissingFiles(listOf(event.message))
                             }
                         }
+
                         is MessageUpdateEvent.MessageSendSucceeded -> {
                             if (event.message.chatId == chatId) {
                                 _uiState.update { state ->
-                                    val oldIndex = state.messages.indexOfFirst { it.id == event.oldMessageId }
+                                    val oldIndex =
+                                        state.messages.indexOfFirst { it.id == event.oldMessageId }
                                     if (oldIndex != -1) {
                                         val updated = state.messages.toMutableList()
                                         updated[oldIndex] = event.message
@@ -100,8 +104,15 @@ class ChatViewModel(
                                 downloadMissingFiles(listOf(event.message))
                             }
                         }
+
                         is MessageUpdateEvent.MessageDeleted -> {
-                            // Ignore for now
+                            if (event.chatId == chatId) {
+                                _uiState.update { state ->
+                                    val updated =
+                                        state.messages.filterNot { it.id == event.messageId }
+                                    state.copy(messages = updated)
+                                }
+                            }
                         }
                     }
                 }

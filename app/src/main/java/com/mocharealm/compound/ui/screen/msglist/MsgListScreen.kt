@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mocharealm.compound.ui.composable.Avatar
-import com.mocharealm.compound.ui.util.formatMessageTime
+import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -159,7 +159,7 @@ fun MsgListScreen(
                                 modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = chat.lastMessageDate.formatMessageTime(),
+                                text = chat.lastMessageDate.formatMessageTimestamp(),
                                 style = MiuixTheme.textStyles.body1,
                                 maxLines = 1,
                                 overflow = TextOverflow.Ellipsis,
