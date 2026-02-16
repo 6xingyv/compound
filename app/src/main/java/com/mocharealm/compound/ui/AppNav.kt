@@ -1,28 +1,22 @@
 package com.mocharealm.compound.ui
 
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.HorizontalPager
 import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
-import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
-import com.mocharealm.compound.ui.screen.contact.ContactScreen
-import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
 import kotlinx.coroutines.launch
 import kotlinx.serialization.Serializable
@@ -44,8 +38,10 @@ import top.yukonga.miuix.kmp.icon.extended.Settings
 sealed interface Screen : NavKey {
     @Serializable
     data object Home : Screen
+
     @Serializable
     data class Chat(val chatId: Long) : Screen
+
     @Serializable
     data object SignIn : Screen
 }
@@ -68,9 +64,8 @@ val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator f
 
 private object AppConstants {
     const val MESSAGES_PAGE = 0
-    const val CONTACTS_PAGE = 1
-    const val PROFILE_PAGE = 2
-    const val PAGE_COUNT = 3
+    const val PROFILE_PAGE = 1
+    const val PAGE_COUNT = 2
 
     val PAGE_TITLES = listOf("Messages", "Contacts", "Profile")
 }
@@ -110,7 +105,6 @@ internal fun HomeScreen() {
     val topAppBarScrollBehavior = MiuixScrollBehavior()
     var msgListRefreshSignal by remember { mutableIntStateOf(0) }
 
-    // 监听 backStack 变化，当从 Chat 返回时（stack 缩小到只剩 Home）触发刷新
     val backStackSize = navigator.backStack.size
     LaunchedEffect(backStackSize) {
         if (backStackSize == 1 && msgListRefreshSignal >= 0) {
@@ -129,10 +123,10 @@ internal fun HomeScreen() {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = AppConstants.PAGE_TITLES[pagerState.currentPage],
-                scrollBehavior = topAppBarScrollBehavior,
-            )
+//            TopAppBar(
+//                title = AppConstants.PAGE_TITLES[pagerState.currentPage],
+//                scrollBehavior = topAppBarScrollBehavior,
+//            )
         },
         bottomBar = {
             NavigationBar {
@@ -152,32 +146,12 @@ internal fun HomeScreen() {
         },
         popupHost = {},
     ) { innerPadding ->
-        HorizontalPager(
-            state = pagerState,
-            modifier = Modifier
-                .nestedScroll(topAppBarScrollBehavior.nestedScrollConnection),
-            verticalAlignment = Alignment.Top,
-            beyondViewportPageCount = 1,
-            overscrollEffect = null,
-            pageContent = { page ->
-                when (page) {
-                    AppConstants.MESSAGES_PAGE -> MsgListScreen(
-                        padding = innerPadding,
-                        onChatClick = { chatId ->
-                            navigator.push(Screen.Chat(chatId))
-                        },
-                        refreshSignal = msgListRefreshSignal,
-                    )
-
-                    AppConstants.CONTACTS_PAGE -> ContactScreen(
-                        padding = innerPadding,
-                    )
-
-                    AppConstants.PROFILE_PAGE -> MeScreen(
-                        padding = innerPadding,
-                    )
-                }
+        MsgListScreen(
+            padding = innerPadding,
+            onChatClick = { chatId ->
+                navigator.push(Screen.Chat(chatId))
             },
+            refreshSignal = msgListRefreshSignal,
         )
     }
 }
