@@ -1357,7 +1357,7 @@ private fun SpoilerImage(
                 shader.setFloatUniform("particleColor", 1f, 1f, 1f, 1f)
                 shader.setFloatUniform("time", time)
                 shader.setFloatUniform("resolution", size.width, size.height)
-                drawRect(brush = brush)
+                drawRect(brush = brush, blendMode = BlendMode.Plus)
             }
         }
     }
