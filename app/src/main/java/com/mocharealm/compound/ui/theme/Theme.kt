@@ -13,10 +13,13 @@ fun CompoundTheme(
 ) {
     val dark = isSystemInDarkTheme()
     val colorScheme =
-        if (dark) darkColorScheme()
+        if (dark) darkColorScheme(
+            primary = Color(0xFF1388F5)
+        )
         else lightColorScheme(
             surface = Color.White,
-            surfaceContainer = Color(0xFFE9E9EA)
+            surfaceContainer = Color(0xFFE9E9EA),
+            primary = Color(0xFF0087FD)
         )
 
     return MiuixTheme(
