@@ -2,6 +2,7 @@ package com.mocharealm.compound.ui.screen.chat
 
 import android.net.Uri
 import androidx.annotation.OptIn
+import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
@@ -11,16 +12,23 @@ import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
 import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.Indication
+import androidx.compose.foundation.IndicationNodeFactory
+import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.gestures.waitForUpOrCancellation
+import androidx.compose.foundation.interaction.InteractionSource
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -84,6 +92,7 @@ import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.node.DelegatableNode
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -112,6 +121,7 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.StickerFormat
+import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
@@ -144,6 +154,7 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.icon.MiuixIcons
 import top.yukonga.miuix.kmp.icon.extended.Add
+import top.yukonga.miuix.kmp.icon.extended.Close
 import top.yukonga.miuix.kmp.icon.extended.Mic
 import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.theme.LocalContentColor
@@ -365,113 +376,137 @@ fun ChatScreen(
                     Icon(MiuixIcons.Add, null, Modifier.align(Alignment.Center))
                 }
                 Spacer(Modifier.width(16.dp))
-                Row(
-                    Modifier
-                        .weight(1f)
-                        .drawBackdrop(
-                            glassyState,
-                            shape = { ContinuousRoundedRectangle(24.dp) },
-                            effects = {
-                                vibrancy()
-                                blur(2.dp.toPx())
-                                lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
-                            },
-                            onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.2f)) },
-                            shadow = {
-                                Shadow(
-                                    radius = 24f.dp,
-                                    offset = DpOffset(0.dp, 0.dp),
-                                    color = Color.Black.copy(alpha = 0.1f),
-                                    alpha = 1f,
-                                    blendMode = DrawScope.DefaultBlendMode
-                                )
-                            },
-                            layerBlock = {
-                                val progress = inputScale.value
-                                val maxScale = (size.width + 16f.dp.toPx()) / size.width
-                                val scale = lerp(1f, maxScale, progress)
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                        )
-                        .pointerInput(scope) {
-                            val animationSpec = spring(0.5f, 300f, 0.001f)
-                            awaitEachGesture {
-                                // press
-                                awaitFirstDown()
-                                scope.launch {
-                                    inputScale.animateTo(1f, animationSpec)
+                CompositionLocalProvider(
+                    LocalIndication provides EmptyIndication
+                ) {
+                    Row(
+                        Modifier
+                            .weight(1f)
+                            .drawBackdrop(
+                                glassyState,
+                                shape = { ContinuousRoundedRectangle(24.dp) },
+                                effects = {
+                                    vibrancy()
+                                    blur(2.dp.toPx())
+                                    lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
+                                },
+                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.2f)) },
+                                shadow = {
+                                    Shadow(
+                                        radius = 24f.dp,
+                                        offset = DpOffset(0.dp, 0.dp),
+                                        color = Color.Black.copy(alpha = 0.1f),
+                                        alpha = 1f,
+                                        blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                },
+                                layerBlock = {
+                                    val progress = inputScale.value
+                                    val maxScale = (size.width + 16f.dp.toPx()) / size.width
+                                    val scale = lerp(1f, maxScale, progress)
+                                    scaleX = scale
+                                    scaleY = scale
                                 }
+                            )
+                            .pointerInput(scope) {
+                                val animationSpec = spring(0.5f, 300f, 0.001f)
+                                awaitEachGesture {
+                                    // press
+                                    awaitFirstDown()
+                                    scope.launch {
+                                        inputScale.animateTo(1f, animationSpec)
+                                    }
 
-                                // release
-                                waitForUpOrCancellation()
-                                scope.launch {
-                                    inputScale.animateTo(0f, animationSpec)
+                                    // release
+                                    waitForUpOrCancellation()
+                                    scope.launch {
+                                        inputScale.animateTo(0f, animationSpec)
+                                    }
                                 }
+                            }
+                            .padding(start = 12.dp)
+                            .padding(vertical = 12.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        var inAudioMode by remember { mutableStateOf(false) }
+                        Box(
+                            modifier = Modifier
+                                .weight(1f)
+                                .heightIn(min = 24.dp),
+                            contentAlignment = Alignment.CenterStart
+                        ) {
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = inAudioMode,
+                                enter = fadeIn() + slideInHorizontally { it },
+                                exit = fadeOut() + slideOutHorizontally { it }
+                            ) {
+                                Row(verticalAlignment = Alignment.CenterVertically) {
+                                    Icon(
+                                        MiuixIcons.Mic,
+                                        null,
+                                        modifier = Modifier.clickable {
+                                        }
+                                    )
+                                    Spacer(Modifier.width(8.dp))
+                                    Text(
+                                        text = "Say something...",
+                                        Modifier.weight(1f),
+                                        style = MiuixTheme.textStyles.body1,
+                                        maxLines = 1,
+                                        softWrap = false,
+                                    )
+                                }
+                            }
+
+                            androidx.compose.animation.AnimatedVisibility(
+                                visible = !inAudioMode,
+                                enter = fadeIn() + slideInHorizontally { -it },
+                                exit = fadeOut() + slideOutHorizontally { -it }
+                            ) {
+                                TextField(
+                                    modifier = Modifier
+                                        .fillMaxWidth()
+                                        .focusRequester(focusRequester),
+                                    state = viewModel.inputState,
+                                    outputTransformation = MarkdownTransformation,
+                                    lineLimits = TextFieldLineLimits.MultiLine(),
+                                    padding = 0.dp,
+                                    clipRadius = 0.dp,
+                                    activeBackgroundColor = Color.Transparent,
+                                    inactiveBackgroundColor = Color.Transparent,
+                                    activeBorderSize = 0.dp,
+                                    inactiveBorderSize = 0.dp,
+                                    textStyle = MiuixTheme.textStyles.body1
+                                )
                             }
                         }
-                        .padding(start = 12.dp)
-                        .padding(vertical = 12.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    var inAudioMode by remember { mutableStateOf(false) }
-                    AnimatedVisibility(
-                        !inAudioMode,
-                        Modifier.weight(1f),
-                        enter = fadeIn()
-                                + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) -it else it }
-                                + expandHorizontally(),
-                        exit = fadeOut()
-                                + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) -it else it }
-                                + shrinkHorizontally()
-                    ) {
-                        TextField(
-                            modifier = Modifier
-                                .focusRequester(focusRequester),
-                            state = viewModel.inputState,
-                            outputTransformation = MarkdownTransformation,
-                            lineLimits = TextFieldLineLimits.MultiLine(),
-                            padding = 0.dp,
-                            clipRadius = 0.dp,
-                            activeBackgroundColor = Color.Transparent,
-                            inactiveBackgroundColor = Color.Transparent,
-                            activeBorderSize = 0.dp,
-                            inactiveBorderSize = 0.dp,
-                            textStyle = MiuixTheme.textStyles.body1
-                        )
-                    }
-                    Spacer(Modifier.width(12.dp))
-                    AnimatedVisibility(
-                        !state.loading && viewModel.inputState.text.lines().size <= 1,
-                        Modifier.then(if (inAudioMode) Modifier.weight(1f) else Modifier),
-                        enter = fadeIn()
-                                + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                                + expandHorizontally(),
-                        exit = fadeOut()
-                                + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                                + shrinkHorizontally()
-                    ) {
-                        Row {
-                            Icon(
-                                MiuixIcons.Mic,
-                                null,
-                                Modifier
-                                    .padding(end = 12.dp)
-                                    .clickable { inAudioMode = true })
-                            AnimatedVisibility(
-                                inAudioMode,
-                                Modifier.weight(1f),
-                                enter = fadeIn()
-                                        + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                                        + expandHorizontally(),
-                                exit = fadeOut()
-                                        + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                                        + shrinkHorizontally()
+
+                        AnimatedVisibility(
+                            visible = (viewModel.inputState.text.lines().size <= 1 || inAudioMode) && !state.loading,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .clickable {
+                                        inAudioMode = !inAudioMode
+                                    }
                             ) {
-                                Text(
-                                    text = "Say something...",
-                                    style = MiuixTheme.textStyles.body1
-                                )
+                                // 使用 AnimatedContent 平滑切换 Mic 和 Close 图标
+                                AnimatedContent(
+                                    targetState = inAudioMode,
+                                    transitionSpec = {
+                                        (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
+                                    },
+                                    label = "IconSwitch"
+                                ) { isAudio ->
+                                    if (isAudio) {
+                                        Icon(MiuixIcons.Close, contentDescription = "Close Audio")
+                                    } else {
+                                        Icon(MiuixIcons.Mic, contentDescription = "Open Audio")
+                                    }
+                                }
                             }
                         }
                     }
