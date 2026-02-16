@@ -1,39 +1,54 @@
 package com.mocharealm.compound.ui
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.captionBarPadding
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.pager.rememberPagerState
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.navigationBarsPadding
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.drawWithCache
+import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.dp
+import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
+import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.screen.chat.ChatScreen
+import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
-import kotlinx.coroutines.launch
+import com.mocharealm.compound.ui.screen.signin.SignInScreen
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
+import com.mocharealm.gaze.icons.SFIcons
+import com.mocharealm.gaze.ui.composable.BottomTab
+import com.mocharealm.gaze.ui.composable.BottomTabs
+import com.mocharealm.gaze.ui.composable.Button
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
 import org.koin.core.annotation.KoinExperimentalAPI
-import top.yukonga.miuix.kmp.basic.MiuixScrollBehavior
-import top.yukonga.miuix.kmp.basic.NavigationBar
-import top.yukonga.miuix.kmp.basic.NavigationBarItem
-import top.yukonga.miuix.kmp.basic.NavigationItem
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
-import top.yukonga.miuix.kmp.basic.TopAppBar
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Contacts
-import top.yukonga.miuix.kmp.icon.extended.HorizontalSplit
-import top.yukonga.miuix.kmp.icon.extended.Settings
+import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+@Immutable
 @Serializable
 sealed interface Screen : NavKey {
     @Serializable
@@ -44,13 +59,11 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data object SignIn : Screen
+
 }
 
-class Navigator(val backStack: MutableList<NavKey>) {
-    fun push(key: NavKey) {
-        backStack.add(key)
-    }
-
+class Navigator(private val backStack: MutableList<NavKey>) {
+    fun push(key: NavKey) = backStack.add(key)
     fun pop() {
         if (backStack.size > 1) backStack.removeLastOrNull()
     }
@@ -62,19 +75,17 @@ class Navigator(val backStack: MutableList<NavKey>) {
 
 val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator found!") }
 
-private object AppConstants {
-    const val MESSAGES_PAGE = 0
-    const val PROFILE_PAGE = 1
-    const val PAGE_COUNT = 2
-
-    val PAGE_TITLES = listOf("Messages", "Contacts", "Profile")
-}
+private data class TopLevelNav(
+    val title: String,
+    val icon: @Composable () -> Unit
+)
 
 @OptIn(KoinExperimentalAPI::class)
 @Composable
 fun AppNav() {
     val backStack = rememberNavBackStack(Screen.Home)
-    val navigator = remember(backStack) { Navigator(backStack) }
+
+    val navigator = remember { Navigator(backStack) }
     val getAuthState: GetAuthenticationStateUseCase = koinInject()
 
     LaunchedEffect(Unit) {
@@ -99,59 +110,112 @@ fun AppNav() {
 
 @Composable
 internal fun HomeScreen() {
-    val pagerState = rememberPagerState(pageCount = { AppConstants.PAGE_COUNT })
-    val coroutineScope = rememberCoroutineScope()
-    val navigator = LocalNavigator.current
-    val topAppBarScrollBehavior = MiuixScrollBehavior()
-    var msgListRefreshSignal by remember { mutableIntStateOf(0) }
+    val surfaceColor = MiuixTheme.colorScheme.surface
 
-    val backStackSize = navigator.backStack.size
-    LaunchedEffect(backStackSize) {
-        if (backStackSize == 1 && msgListRefreshSignal >= 0) {
-            msgListRefreshSignal++
-        }
+    val layerBackdrop = rememberLayerBackdrop {
+        drawRect(surfaceColor)
+        drawContent()
     }
 
     val navigationItems = remember {
         listOf(
-            NavigationItem(AppConstants.PAGE_TITLES[0], MiuixIcons.HorizontalSplit),
-            NavigationItem(AppConstants.PAGE_TITLES[1], MiuixIcons.Contacts),
-            NavigationItem(AppConstants.PAGE_TITLES[2], MiuixIcons.Settings),
+            TopLevelNav(
+                "Messages",
+                {
+                    Icon(SFIcons.Message, null)
+                },
+            ),
+            TopLevelNav(
+                "Me",
+                {
+                    Avatar("ME", Modifier.size(24.dp))
+                }
+            )
         )
     }
+    val selectedIndex = remember { mutableIntStateOf(0) }
+
+    val navigator = LocalNavigator.current
 
     Scaffold(
         modifier = Modifier.fillMaxSize(),
-        topBar = {
-//            TopAppBar(
-//                title = AppConstants.PAGE_TITLES[pagerState.currentPage],
-//                scrollBehavior = topAppBarScrollBehavior,
-//            )
-        },
+        topBar = {},
         bottomBar = {
-            NavigationBar {
-                navigationItems.forEachIndexed { index, navigationItem ->
-                    NavigationBarItem(
-                        pagerState.currentPage == index,
-                        {
-                            coroutineScope.launch {
-                                pagerState.scrollToPage(index)
+            Row(
+                Modifier
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(0f),
+                                    1f to surfaceColor.copy(1f)
+                                )
+                            )
+                        }
+                    }
+                    .navigationBarsPadding()
+                    .captionBarPadding()
+                    .padding(16.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                BottomTabs(
+                    { selectedIndex.intValue },
+                    { selectedIndex.intValue = it },
+                    layerBackdrop,
+                    navigationItems.size
+                ) {
+                    navigationItems.forEachIndexed { index, item ->
+                        BottomTab({ selectedIndex.intValue = index }) {
+                            Column(
+                                Modifier
+                                    .padding(horizontal = 24.dp)
+                                    .align(Alignment.Center),
+                                verticalArrangement = Arrangement.Center,
+                                horizontalAlignment = Alignment.CenterHorizontally
+                            ) {
+                                item.icon()
+                                Text(item.title, style = MiuixTheme.textStyles.footnote1)
                             }
-                        },
-                        navigationItem.icon,
-                        navigationItem.label
+                        }
+                    }
+                }
+                Button(
+                    {},
+                    layerBackdrop,
+                    Modifier
+                        .size(64.dp)
+                ) {
+                    Icon(
+                        SFIcons.Magnifyingglass,
+                        null,
+                        Modifier
+                            .size(32.dp)
+                            .align(Alignment.Center)
                     )
                 }
             }
         },
         popupHost = {},
     ) { innerPadding ->
-        MsgListScreen(
-            padding = innerPadding,
-            onChatClick = { chatId ->
-                navigator.push(Screen.Chat(chatId))
-            },
-            refreshSignal = msgListRefreshSignal,
-        )
+        AnimatedContent(selectedIndex.intValue, Modifier.layerBackdrop(layerBackdrop)) { index ->
+            when (index) {
+                0 -> {
+                    MsgListScreen(
+                        padding = innerPadding,
+                        onChatClick = { chatId ->
+                            navigator.push(Screen.Chat(chatId))
+                        },
+                        //TODO: Use flow
+                        refreshSignal = 0,
+                    )
+                }
+
+                1 -> {
+                    MeScreen(padding = innerPadding)
+                }
+            }
+        }
     }
 }

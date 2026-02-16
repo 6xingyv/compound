@@ -8,7 +8,6 @@ import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
@@ -23,10 +22,7 @@ import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.awaitEachGesture
-import androidx.compose.foundation.gestures.awaitFirstDown
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.waitForUpOrCancellation
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -101,13 +97,11 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.util.lerp
 import androidx.compose.ui.viewinterop.AndroidView
 import androidx.compose.ui.zIndex
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
-import androidx.media3.exoplayer.DefaultRenderersFactory
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -122,10 +116,6 @@ import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
-import com.mocharealm.compound.ui.composable.TextField
-import com.mocharealm.compound.ui.layout.imeNestedScroll
-import com.mocharealm.compound.ui.layout.imePadding
-import com.mocharealm.compound.ui.modifier.surface
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
@@ -140,6 +130,12 @@ import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
+import com.mocharealm.gaze.icons.SFIcons
+import com.mocharealm.gaze.ui.composable.LiquidSurface
+import com.mocharealm.gaze.ui.composable.TextField
+import com.mocharealm.gaze.ui.layout.imeNestedScroll
+import com.mocharealm.gaze.ui.layout.imePadding
+import com.mocharealm.gaze.ui.modifier.surface
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
@@ -149,11 +145,6 @@ import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.icon.MiuixIcons
-import top.yukonga.miuix.kmp.icon.extended.Add
-import top.yukonga.miuix.kmp.icon.extended.Close
-import top.yukonga.miuix.kmp.icon.extended.Mic
-import top.yukonga.miuix.kmp.icon.extended.Send
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -162,8 +153,7 @@ import kotlin.math.hypot
 private enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
 
 private data class DisplayItem(
-    val messages: List<Message>,
-    val isAlbum: Boolean
+    val messages: List<Message>, val isAlbum: Boolean
 )
 
 @kotlin.OptIn(ExperimentalLayoutApi::class)
@@ -187,17 +177,12 @@ fun ChatScreen(
     val surfaceContainerColor = MiuixTheme.colorScheme.surfaceContainer
     val primaryColor = MiuixTheme.colorScheme.primary
 
-    val glassyState = rememberLayerBackdrop {
+    val layerBackdrop = rememberLayerBackdrop {
         drawRect(surfaceColor)
         drawContent()
     }
 
     val scope = rememberCoroutineScope()
-
-    val backScale = remember { Animatable(0f) }
-    val moreScale = remember { Animatable(0f) }
-    val inputScale = remember { Animatable(0f) }
-    val sendScale = remember { Animatable(0f) }
 
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
@@ -205,226 +190,158 @@ fun ChatScreen(
 
     val focusRequester = remember { FocusRequester() }
 
+    val menuOpened = remember { mutableStateOf(false) }
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore && !state.loading && state.hasMore) {
             viewModel.loadOlderMessages()
         }
     }
 
-    Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        popupHost = {},
-        topBar = {
-            Box(
-                Modifier
-                    .drawWithCache {
-                        onDrawBehind {
-                            drawRect(
-                                Brush.verticalGradient(
-                                    0f to surfaceColor.copy(0.4f),
-                                    1f to surfaceColor.copy(0f),
-                                    startY = statusBarHeightPx.toFloat()
-                                )
+    Scaffold(modifier = Modifier.fillMaxSize(), popupHost = {}, topBar = {
+        Box(
+            Modifier
+                .drawWithCache {
+                    onDrawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                0f to surfaceColor.copy(0.4f),
+                                1f to surfaceColor.copy(0f),
+                                startY = statusBarHeightPx.toFloat()
                             )
-                        }
-                    }
-                    .statusBarsPadding()) {
-                Row(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .fillMaxWidth()
-                ) {
-                    BackNavigationIcon(
-                        modifier = Modifier
-                            .padding(start = 16.dp)
-                            .drawBackdrop(
-                                glassyState, shape = { CircleShape },
-                                effects = {
-                                    vibrancy()
-                                    blur(4.dp.toPx())
-                                    lens(16.dp.toPx(), 32.dp.toPx())
-                                },
-                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.6f)) },
-                                layerBlock = {
-                                    val progress = backScale.value
-                                    val maxScale = (size.width + 16f.dp.toPx()) / size.width
-                                    val scale = lerp(1f, maxScale, progress)
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                            )
-                            .pointerInput(scope) {
-                                val animationSpec = spring(0.5f, 300f, 0.001f)
-                                awaitEachGesture {
-                                    // press
-                                    awaitFirstDown()
-                                    scope.launch {
-                                        backScale.animateTo(1f, animationSpec)
-                                    }
-
-                                    // release
-                                    waitForUpOrCancellation()
-                                    scope.launch {
-                                        backScale.animateTo(0f, animationSpec)
-                                    }
-                                }
-                            },
-                        onClick = { navigator.pop() },
-                    )
-                }
-                state.chatInfo?.let { chatInfo ->
-                    Column(
-                        Modifier.align(Alignment.Center),
-                        verticalArrangement = Arrangement.spacedBy(-4.dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Avatar(
-                            chatInfo.title.take(2),
-                            modifier = Modifier
-                                .size(48.dp)
-                                .zIndex(20f),
-                            photoPath = chatInfo.photoUrl
-                        )
-                        Text(
-                            chatInfo.title,
-                            style = MiuixTheme.textStyles.footnote1,
-                            modifier = Modifier
-                                .drawBackdrop(
-                                    glassyState, shape = { ContinuousCapsule },
-                                    effects = {
-                                        vibrancy()
-                                        blur(4.dp.toPx())
-                                        lens(8.dp.toPx(), 16.dp.toPx())
-                                    },
-                                    onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
-                                )
-                                .padding(8.dp, 4.dp)
                         )
                     }
                 }
-            }
-        },
-        bottomBar = {
+                .statusBarsPadding()) {
             Row(
                 Modifier
-                    .imePadding()
-                    .drawWithCache {
-                        onDrawBehind {
-                            drawRect(
-                                Brush.verticalGradient(
-                                    0f to surfaceColor.copy(0f),
-                                    1f to surfaceColor.copy(1f)
-                                )
-                            )
-                        }
-                    }
-                    .navigationBarsPadding()
-                    .captionBarPadding()
-                    .padding(bottom = 16.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
+                    .align(Alignment.CenterStart)
+                    .fillMaxWidth()
             ) {
-                Spacer(Modifier.width(16.dp))
-                Box(
-                    Modifier
+                BackNavigationIcon(
+                    modifier = Modifier
+                        .padding(start = 16.dp)
                         .drawBackdrop(
-                            glassyState, shape = { CircleShape },
+                            layerBackdrop, shape = { CircleShape },
                             effects = {
                                 vibrancy()
-                                blur(1.dp.toPx())
+                                blur(4.dp.toPx())
                                 lens(16.dp.toPx(), 32.dp.toPx())
                             },
                             onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.6f)) },
-                            shadow = {
-                                Shadow(
-                                    radius = 24f.dp,
-                                    offset = DpOffset(0.dp, 0.dp),
-                                    color = Color.Black.copy(alpha = 0.1f),
-                                    alpha = 1f,
-                                    blendMode = DrawScope.DefaultBlendMode
-                                )
-                            },
-                            layerBlock = {
-                                val progress = moreScale.value
-                                val maxScale = (size.width + 16f.dp.toPx()) / size.width
-                                val scale = lerp(1f, maxScale, progress)
-                                scaleX = scale
-                                scaleY = scale
-                            }
-                        )
-                        .pointerInput(scope) {
-                            val animationSpec = spring(0.5f, 300f, 0.001f)
-                            awaitEachGesture {
-                                // press
-                                awaitFirstDown()
-                                scope.launch {
-                                    moreScale.animateTo(1f, animationSpec)
-                                }
-
-                                // release
-                                waitForUpOrCancellation()
-                                scope.launch {
-                                    moreScale.animateTo(0f, animationSpec)
-                                }
-                            }
-                        }
-                        .size(48.dp)
+                        ),
+                    onClick = { navigator.pop() },
+                )
+            }
+            state.chatInfo?.let { chatInfo ->
+                Column(
+                    Modifier.align(Alignment.Center),
+                    verticalArrangement = Arrangement.spacedBy(-4.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Icon(MiuixIcons.Add, null, Modifier.align(Alignment.Center))
+                    Avatar(
+                        chatInfo.title.take(2),
+                        modifier = Modifier
+                            .size(48.dp)
+                            .zIndex(20f),
+                        photoPath = chatInfo.photoUrl
+                    )
+                    Text(
+                        chatInfo.title,
+                        style = MiuixTheme.textStyles.footnote1,
+                        modifier = Modifier
+                            .drawBackdrop(
+                                layerBackdrop, shape = { ContinuousCapsule },
+                                effects = {
+                                    vibrancy()
+                                    blur(4.dp.toPx())
+                                    lens(8.dp.toPx(), 16.dp.toPx())
+                                },
+                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
+                            )
+                            .padding(8.dp, 4.dp)
+                    )
                 }
-                Spacer(Modifier.width(16.dp))
-                CompositionLocalProvider(
-                    LocalIndication provides EmptyIndication
+            }
+        }
+    }, bottomBar = {
+        Row(
+            Modifier
+                .imePadding()
+                .drawWithCache {
+                    onDrawBehind {
+                        drawRect(
+                            Brush.verticalGradient(
+                                0f to surfaceColor.copy(0f), 1f to surfaceColor.copy(1f)
+                            )
+                        )
+                    }
+                }
+                .navigationBarsPadding()
+                .captionBarPadding()
+                .padding(bottom = 16.dp)
+                .fillMaxWidth(),
+            verticalAlignment = Alignment.Bottom) {
+            Spacer(Modifier.width(16.dp))
+            Box(
+                Modifier.size(48.dp)
+            ) {
+                androidx.compose.animation.AnimatedVisibility(
+                    !menuOpened.value, enter = fadeIn(), exit = fadeOut()
+                ) {
+                    LiquidSurface(
+                        layerBackdrop, Modifier.fillMaxSize(), Modifier.clickable {
+                            menuOpened.value = true
+                        }, effects = {
+                            vibrancy()
+                            blur(1.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx())
+                        }, shadow = {
+                            Shadow(
+                                radius = 24f.dp,
+                                offset = DpOffset(0.dp, 0.dp),
+                                color = Color.Black.copy(alpha = 0.1f),
+                                alpha = 1f,
+                                blendMode = DrawScope.DefaultBlendMode
+                            )
+                        }, surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
+                    ) {
+                        Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center))
+                    }
+                }
+            }
+
+            Spacer(Modifier.width(16.dp))
+            CompositionLocalProvider(
+                LocalIndication provides EmptyIndication
+            ) {
+                LiquidSurface(
+                    layerBackdrop,
+                    Modifier
+                        .weight(1f),
+                    shape = { ContinuousRoundedRectangle(24.dp) },
+                    effects = {
+                        vibrancy()
+                        blur(2.dp.toPx())
+                        lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
+                    },
+                    surfaceColor = surfaceContainerColor.copy(alpha = 0.2f),
+                    shadow = {
+                        Shadow(
+                            radius = 24f.dp,
+                            offset = DpOffset(0.dp, 0.dp),
+                            color = Color.Black.copy(alpha = 0.1f),
+                            alpha = 1f,
+                            blendMode = DrawScope.DefaultBlendMode
+                        )
+                    }
                 ) {
                     Row(
                         Modifier
-                            .weight(1f)
-                            .drawBackdrop(
-                                glassyState,
-                                shape = { ContinuousRoundedRectangle(24.dp) },
-                                effects = {
-                                    vibrancy()
-                                    blur(2.dp.toPx())
-                                    lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
-                                },
-                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.2f)) },
-                                shadow = {
-                                    Shadow(
-                                        radius = 24f.dp,
-                                        offset = DpOffset(0.dp, 0.dp),
-                                        color = Color.Black.copy(alpha = 0.1f),
-                                        alpha = 1f,
-                                        blendMode = DrawScope.DefaultBlendMode
-                                    )
-                                },
-                                layerBlock = {
-                                    val progress = inputScale.value
-                                    val maxScale = (size.width + 16f.dp.toPx()) / size.width
-                                    val scale = lerp(1f, maxScale, progress)
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                            )
-                            .pointerInput(scope) {
-                                val animationSpec = spring(0.5f, 300f, 0.001f)
-                                awaitEachGesture {
-                                    // press
-                                    awaitFirstDown()
-                                    scope.launch {
-                                        inputScale.animateTo(1f, animationSpec)
-                                    }
-
-                                    // release
-                                    waitForUpOrCancellation()
-                                    scope.launch {
-                                        inputScale.animateTo(0f, animationSpec)
-                                    }
-                                }
-                            }
                             .padding(start = 12.dp)
                             .padding(vertical = 12.dp),
                         verticalAlignment = Alignment.CenterVertically
-                    ) {
+                    )
+                    {
                         var inAudioMode by remember { mutableStateOf(false) }
                         Box(
                             modifier = Modifier
@@ -435,15 +352,10 @@ fun ChatScreen(
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = inAudioMode,
                                 enter = fadeIn() + slideInHorizontally { it },
-                                exit = fadeOut() + slideOutHorizontally { it }
-                            ) {
+                                exit = fadeOut() + slideOutHorizontally { it }) {
                                 Row(verticalAlignment = Alignment.CenterVertically) {
                                     Icon(
-                                        MiuixIcons.Mic,
-                                        null,
-                                        modifier = Modifier.clickable {
-                                        }
-                                    )
+                                        SFIcons.Microphone, null, modifier = Modifier.clickable {})
                                     Spacer(Modifier.width(8.dp))
                                     Text(
                                         text = "Say something...",
@@ -458,8 +370,7 @@ fun ChatScreen(
                             androidx.compose.animation.AnimatedVisibility(
                                 visible = !inAudioMode,
                                 enter = fadeIn() + slideInHorizontally { -it },
-                                exit = fadeOut() + slideOutHorizontally { -it }
-                            ) {
+                                exit = fadeOut() + slideOutHorizontally { -it }) {
                                 TextField(
                                     modifier = Modifier
                                         .fillMaxWidth()
@@ -488,98 +399,58 @@ fun ChatScreen(
                                     .padding(horizontal = 12.dp)
                                     .clickable {
                                         inAudioMode = !inAudioMode
-                                    }
-                            ) {
+                                    }) {
                                 // 使用 AnimatedContent 平滑切换 Mic 和 Close 图标
                                 AnimatedContent(
-                                    targetState = inAudioMode,
-                                    transitionSpec = {
+                                    targetState = inAudioMode, transitionSpec = {
                                         (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
-                                    },
-                                    label = "IconSwitch"
+                                    }, label = "IconSwitch"
                                 ) { isAudio ->
                                     if (isAudio) {
-                                        Icon(MiuixIcons.Close, contentDescription = "Close Audio")
+                                        Icon(SFIcons.Xmark, contentDescription = "Close Audio")
                                     } else {
-                                        Icon(MiuixIcons.Mic, contentDescription = "Open Audio")
+                                        Icon(SFIcons.Microphone, contentDescription = "Open Audio")
                                     }
                                 }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.width(16.dp))
-                AnimatedVisibility(
-                    !state.loading && viewModel.inputState.text.isNotBlank(),
-                    Modifier,
-                    enter = fadeIn()
-                            + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                            + expandHorizontally(),
-                    exit = fadeOut()
-                            + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it }
-                            + shrinkHorizontally()
-                ) {
-                    Box(
-                        Modifier
-                            .padding(end = 16.dp)
-                            .drawBackdrop(
-                                glassyState, shape = { ContinuousCapsule },
-                                effects = {
-                                    vibrancy()
-                                    blur(4.dp.toPx())
-                                    lens(16.dp.toPx(), 32.dp.toPx())
-                                },
-                                onDrawSurface = {
-                                    drawRect(primaryColor, blendMode = BlendMode.Hue)
-                                    drawRect(primaryColor.copy(alpha = 0.75f))
-                                },
-                                shadow = {
-                                    Shadow(
-                                        radius = 16.dp,
-                                        offset = DpOffset(0.dp, 0.dp),
-                                        alpha = 1f,
-                                        blendMode = DrawScope.DefaultBlendMode
-                                    )
-                                },
-                                layerBlock = {
-                                    val progress = sendScale.value
-                                    val maxScale = (size.width + 16f.dp.toPx()) / size.width
-                                    val scale = lerp(1f, maxScale, progress)
-                                    scaleX = scale
-                                    scaleY = scale
-                                }
-                            )
-                            .clickable(onClick = viewModel::sendMessage)
-                            .pointerInput(scope) {
-                                val animationSpec = spring(0.5f, 300f, 0.001f)
-                                awaitEachGesture {
-                                    // press
-                                    awaitFirstDown()
-                                    scope.launch {
-                                        sendScale.animateTo(1f, animationSpec)
-                                    }
-
-                                    // release
-                                    waitForUpOrCancellation()
-                                    scope.launch {
-                                        sendScale.animateTo(0f, animationSpec)
-                                    }
-                                }
-                            }
-                            .padding(12.dp)
-                    ) {
-                        // TODO: Wait miuix fix alignment
-                        Icon(
-                            MiuixIcons.Send,
-                            null,
-                            Modifier.align(Alignment.Center),
-                            Color.White
+            }
+            Spacer(Modifier.width(16.dp))
+            AnimatedVisibility(
+                !state.loading && viewModel.inputState.text.isNotBlank(),
+                Modifier,
+                enter = fadeIn() + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + expandHorizontally(),
+                exit = fadeOut() + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + shrinkHorizontally()) {
+                LiquidSurface(
+                    layerBackdrop,
+                    Modifier
+                        .padding(end = 16.dp)
+                        .size(48.dp),
+                    Modifier.clickable(onClick = viewModel::sendMessage),
+                    effects = {
+                        vibrancy()
+                        blur(4.dp.toPx())
+                        lens(16.dp.toPx(), 32.dp.toPx())
+                    },
+                    tint = primaryColor,
+                    shadow = {
+                        Shadow(
+                            radius = 16.dp,
+                            offset = DpOffset(0.dp, 0.dp),
+                            alpha = 1f,
+                            blendMode = DrawScope.DefaultBlendMode
                         )
-                    }
+                    },
+                ) {
+                    Icon(
+                        SFIcons.Paperplane, null, Modifier.align(Alignment.Center), Color.White
+                    )
                 }
             }
         }
-    ) { innerPadding ->
+    }) { innerPadding ->
         val displayMessages = state.messages.reversed()
 
         val displayItems = remember(displayMessages) {
@@ -587,16 +458,12 @@ fun ChatScreen(
             var i = 0
             while (i < displayMessages.size) {
                 val msg = displayMessages[i]
-                val isMediaAlbumType = msg.messageType == MessageType.PHOTO ||
-                        msg.messageType == MessageType.VIDEO
+                val isMediaAlbumType =
+                    msg.messageType == MessageType.PHOTO || msg.messageType == MessageType.VIDEO
                 if (msg.mediaAlbumId != 0L && isMediaAlbumType) {
                     val albumId = msg.mediaAlbumId
                     val albumMessages = mutableListOf(msg)
-                    while (i + 1 < displayMessages.size &&
-                        displayMessages[i + 1].mediaAlbumId == albumId &&
-                        (displayMessages[i + 1].messageType == MessageType.PHOTO ||
-                                displayMessages[i + 1].messageType == MessageType.VIDEO)
-                    ) {
+                    while (i + 1 < displayMessages.size && displayMessages[i + 1].mediaAlbumId == albumId && (displayMessages[i + 1].messageType == MessageType.PHOTO || displayMessages[i + 1].messageType == MessageType.VIDEO)) {
                         i++
                         albumMessages.add(displayMessages[i])
                     }
@@ -629,7 +496,7 @@ fun ChatScreen(
             state = listState,
             reverseLayout = true,
             modifier = Modifier
-                .layerBackdrop(glassyState)
+                .layerBackdrop(layerBackdrop)
                 .fillMaxSize()
                 .imeNestedScroll(focusRequester)
                 .scrollEndHaptic(),
@@ -639,8 +506,7 @@ fun ChatScreen(
             if (state.loading && state.messages.isEmpty()) {
                 item {
                     Card(
-                        modifier = Modifier
-                            .padding(12.dp)
+                        modifier = Modifier.padding(12.dp)
                     ) {
                         BasicComponent(title = "Loading messages...")
                     }
@@ -648,8 +514,7 @@ fun ChatScreen(
             } else if (state.error != null && state.messages.isEmpty()) {
                 item {
                     Card(
-                        modifier = Modifier
-                            .padding(12.dp)
+                        modifier = Modifier.padding(12.dp)
                     ) {
                         BasicComponent(
                             title = "Error",
@@ -665,25 +530,20 @@ fun ChatScreen(
             } else if (state.messages.isEmpty() && state.initialLoaded) {
                 item {
                     Card(
-                        modifier = Modifier
-                            .padding(12.dp)
+                        modifier = Modifier.padding(12.dp)
                     ) {
                         BasicComponent(title = "No messages in this chat")
                     }
                 }
             } else {
                 items(
-                    displayItems.size,
-                    key = { displayItems[it].messages.first().id }
-                ) { index ->
+                    displayItems.size, key = { displayItems[it].messages.first().id }) { index ->
                     val item = displayItems[index]
                     val primaryMessage = item.messages.first()
 
                     // Group position based on the primary message's senderId
-                    val prevSender =
-                        displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
-                    val nextSender =
-                        displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
+                    val prevSender = displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
+                    val nextSender = displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
                     val sameBelow = prevSender == primaryMessage.senderId
                     val sameAbove = nextSender == primaryMessage.senderId
                     val groupPosition = when {
@@ -771,8 +631,7 @@ private fun MessageBubble(
         val shape: Shape = remember(isLast) {
             if (isLast) {
                 BubbleContinuousShape(
-                    if (message.isOutgoing) BubbleSide.Right else BubbleSide.Left,
-                    CornerSize(20.dp)
+                    if (message.isOutgoing) BubbleSide.Right else BubbleSide.Left, CornerSize(20.dp)
                 )
             } else {
                 ContinuousRoundedRectangle(20.dp)
@@ -780,8 +639,7 @@ private fun MessageBubble(
         }
 
         Column(
-            Modifier.weight(1f, fill = false),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            Modifier.weight(1f, fill = false), verticalArrangement = Arrangement.spacedBy(4.dp)
         ) {
             // 发送者名字仅在第一条 / 单条消息时显示
             if (!message.isOutgoing && isFirst) {
@@ -798,9 +656,8 @@ private fun MessageBubble(
             }
             val isSticker = message.messageType == MessageType.STICKER
             CompositionLocalProvider(
-                LocalContentColor provides
-                        if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
-                        else MiuixTheme.colorScheme.onSurfaceContainer,
+                LocalContentColor provides if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
+                else MiuixTheme.colorScheme.onSurfaceContainer,
             ) {
                 if (isSticker) {
                     // 贴纸：透明背景，不使用 shape clip
@@ -810,9 +667,8 @@ private fun MessageBubble(
                         modifier = Modifier
                             .surface(
                                 shape = shape,
-                                color =
-                                    if (message.isOutgoing) MiuixTheme.colorScheme.primary
-                                    else MiuixTheme.colorScheme.surfaceContainer,
+                                color = if (message.isOutgoing) MiuixTheme.colorScheme.primary
+                                else MiuixTheme.colorScheme.surfaceContainer,
                             )
                             .semantics(mergeDescendants = false) {
                                 isTraversalGroup = true
@@ -895,8 +751,7 @@ private fun MessageContent(
                 modifier = textPadding,
                 uriHandler = uriHandler,
                 revealedEntityIndices = revealedSpoilers.value,
-                onSpoilerClick = { index -> revealedSpoilers.value += index }
-            )
+                onSpoilerClick = { index -> revealedSpoilers.value += index })
         }
         return
     }
@@ -906,13 +761,11 @@ private fun MessageContent(
             if (!message.fileUrl.isNullOrEmpty()) {
                 Column(modifier = Modifier.width(IntrinsicSize.Min)) {
                     SpoilerImage(
-                        hasSpoiler = message.hasSpoiler,
-                        modifier = Modifier.wrapContentWidth()
+                        hasSpoiler = message.hasSpoiler, modifier = Modifier.wrapContentWidth()
                     ) {
                         AsyncImage(
                             model = ImageRequest.Builder(LocalContext.current)
-                                .data(java.io.File(message.fileUrl))
-                                .build(),
+                                .data(java.io.File(message.fileUrl)).build(),
                             contentDescription = "Photo",
                             modifier = Modifier
                                 .heightIn(max = 300.dp)
@@ -926,10 +779,7 @@ private fun MessageContent(
                         val captionRich =
                             remember(caption, message.entities, revealedSpoilers.value) {
                                 buildAnnotatedString(
-                                    caption,
-                                    message.entities,
-                                    linkColor,
-                                    revealedSpoilers.value
+                                    caption, message.entities, linkColor, revealedSpoilers.value
                                 )
                             }
                         RichTextContent(
@@ -938,8 +788,7 @@ private fun MessageContent(
                             modifier = textPadding.fillMaxWidth(),
                             uriHandler = uriHandler,
                             revealedEntityIndices = revealedSpoilers.value,
-                            onSpoilerClick = { index -> revealedSpoilers.value += index }
-                        )
+                            onSpoilerClick = { index -> revealedSpoilers.value += index })
                     }
                 }
             } else {
@@ -949,8 +798,7 @@ private fun MessageContent(
                     modifier = textPadding,
                     uriHandler = uriHandler,
                     revealedEntityIndices = revealedSpoilers.value,
-                    onSpoilerClick = { index -> revealedSpoilers.value += index }
-                )
+                    onSpoilerClick = { index -> revealedSpoilers.value += index })
             }
         }
 
@@ -958,19 +806,16 @@ private fun MessageContent(
             if (!message.fileUrl.isNullOrEmpty()) {
                 when (message.stickerFormat) {
                     StickerFormat.WEBM -> LoopingVideoSticker(
-                        filePath = message.fileUrl,
-                        modifier = Modifier.size(120.dp)
+                        filePath = message.fileUrl, modifier = Modifier.size(120.dp)
                     )
 
                     StickerFormat.TGS -> LottieSticker(
-                        filePath = message.fileUrl,
-                        modifier = Modifier.size(120.dp)
+                        filePath = message.fileUrl, modifier = Modifier.size(120.dp)
                     )
 
                     else -> AsyncImage(
                         model = ImageRequest.Builder(LocalContext.current)
-                            .data(java.io.File(message.fileUrl))
-                            .build(),
+                            .data(java.io.File(message.fileUrl)).build(),
                         contentDescription = "Sticker",
                         modifier = Modifier.size(120.dp),
                         contentScale = ContentScale.Fit
@@ -983,8 +828,7 @@ private fun MessageContent(
                     modifier = textPadding,
                     uriHandler = uriHandler,
                     revealedEntityIndices = revealedSpoilers.value,
-                    onSpoilerClick = { index -> revealedSpoilers.value += index }
-                )
+                    onSpoilerClick = { index -> revealedSpoilers.value += index })
             }
         }
 
@@ -994,8 +838,7 @@ private fun MessageContent(
             modifier = textPadding,
             uriHandler = uriHandler,
             revealedEntityIndices = revealedSpoilers.value,
-            onSpoilerClick = { index -> revealedSpoilers.value += index }
-        )
+            onSpoilerClick = { index -> revealedSpoilers.value += index })
     }
 }
 
@@ -1093,9 +936,7 @@ private fun RichTextContent(
                                             1.0f to Color.Transparent,
                                             center = origin,
                                             radius = radius
-                                        ),
-                                        center = origin,
-                                        radius = radius
+                                        ), center = origin, radius = radius
                                     )
                                 }
                             }
@@ -1152,9 +993,7 @@ private fun RichTextContent(
                 }
             }
             .pointerInput(
-                text,
-                layoutResult,
-                revealedEntityIndices
+                text, layoutResult, revealedEntityIndices
             ) { // 关键：将 revealedEntityIndices 加入 key
                 detectTapGestures { pos ->
                     val layout = layoutResult.value ?: return@detectTapGestures
@@ -1173,8 +1012,7 @@ private fun RichTextContent(
                         }
 
                         val maxRadius = hypot(
-                            layout.size.width.toDouble(),
-                            layout.size.height.toDouble()
+                            layout.size.width.toDouble(), layout.size.height.toDouble()
                         ).toFloat()
 
                         val anim = Animatable(0f)
@@ -1193,15 +1031,14 @@ private fun RichTextContent(
                         }
                     }
                 }
-            }
-    )
+            })
 }
 
 @OptIn(UnstableApi::class)
 @Composable
 private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
-    val exoPlayer = remember(filePath, ) {
+    val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.fromFile(java.io.File(filePath))))
             repeatMode = Player.REPEAT_MODE_ALL
@@ -1217,20 +1054,15 @@ private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier)
         }
     }
 
-    AndroidView(
-        factory = { ctx ->
-            TextureView(ctx).apply {
-                isOpaque = false
-            }
-        },
-        modifier = modifier,
-        update = { textureView ->
-            exoPlayer.setVideoTextureView(textureView)
-        },
-        onRelease = {
-            exoPlayer.clearVideoTextureView(it)
+    AndroidView(factory = { ctx ->
+        TextureView(ctx).apply {
+            isOpaque = false
         }
-    )
+    }, modifier = modifier, update = { textureView ->
+        exoPlayer.setVideoTextureView(textureView)
+    }, onRelease = {
+        exoPlayer.clearVideoTextureView(it)
+    })
 }
 
 @Composable
@@ -1273,8 +1105,7 @@ private fun ReplyPreview(
                 .width(3.dp)
                 .height(36.dp)
                 .background(
-                    color = accentColor,
-                    shape = ContinuousRoundedRectangle(2.dp)
+                    color = accentColor, shape = ContinuousRoundedRectangle(2.dp)
                 )
         )
         Column(
@@ -1318,13 +1149,11 @@ private fun MediaAlbumGrid(messages: List<Message>) {
                                 modifier = Modifier
                                     .weight(1f)
                                     .heightIn(min = 80.dp, max = 200.dp)
-                                    .padding(1.dp),
-                                hasSpoiler = msg.hasSpoiler
+                                    .padding(1.dp), hasSpoiler = msg.hasSpoiler
                             ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current)
-                                        .data(java.io.File(fileUrl))
-                                        .build(),
+                                        .data(java.io.File(fileUrl)).build(),
                                     contentDescription = "Album photo",
                                     modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
@@ -1350,9 +1179,7 @@ private fun MediaAlbumGrid(messages: List<Message>) {
 
 @Composable
 private fun SpoilerImage(
-    modifier: Modifier = Modifier,
-    hasSpoiler: Boolean,
-    content: @Composable () -> Unit
+    modifier: Modifier = Modifier, hasSpoiler: Boolean, content: @Composable () -> Unit
 ) {
     if (!hasSpoiler) {
         content()
@@ -1429,16 +1256,12 @@ private fun SpoilerImage(
                                 1.0f to Color.Transparent,
                                 center = origin,
                                 radius = radius
-                            ),
-                            center = origin,
-                            radius = radius,
-                            blendMode = BlendMode.DstOut
+                            ), center = origin, radius = radius, blendMode = BlendMode.DstOut
                         )
                     }
 
                     canvas.restore()
-                }
-        ) {
+                }) {
             Box(
                 modifier = Modifier
                     .matchParentSize()
@@ -1448,8 +1271,7 @@ private fun SpoilerImage(
                             drawContent()
                             drawRect(Color.Black.copy(0.2f))
                         }
-                    }
-            ) {
+                    }) {
                 content()
             }
 
