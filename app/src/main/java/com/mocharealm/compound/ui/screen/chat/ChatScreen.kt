@@ -89,10 +89,12 @@ import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
+import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
@@ -184,6 +186,8 @@ fun ChatScreen(
 
     val scope = rememberCoroutineScope()
 
+    val containerWidth = LocalWindowInfo.current.containerDpSize.width
+
     val layoutDirection = LocalLayoutDirection.current
     val density = LocalDensity.current
     val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
@@ -220,6 +224,7 @@ fun ChatScreen(
                 BackNavigationIcon(
                     modifier = Modifier
                         .padding(start = 16.dp)
+                        .size(48.dp)
                         .drawBackdrop(
                             layerBackdrop, shape = { CircleShape },
                             effects = {
@@ -245,10 +250,9 @@ fun ChatScreen(
                             .zIndex(20f),
                         photoPath = chatInfo.photoUrl
                     )
-                    Text(
-                        chatInfo.title,
-                        style = MiuixTheme.textStyles.footnote1,
-                        modifier = Modifier
+                    Row(
+                        Modifier
+                            .widthIn(max = (containerWidth - 160.dp).coerceAtLeast(0.dp))
                             .drawBackdrop(
                                 layerBackdrop, shape = { ContinuousCapsule },
                                 effects = {
@@ -258,8 +262,18 @@ fun ChatScreen(
                                 },
                                 onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
                             )
-                            .padding(8.dp, 4.dp)
-                    )
+                            .padding(8.dp, 4.dp),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        Text(
+                            chatInfo.title,
+                            style = MiuixTheme.textStyles.footnote1,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
             }
         }
