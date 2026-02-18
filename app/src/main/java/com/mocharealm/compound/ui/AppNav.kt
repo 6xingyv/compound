@@ -14,25 +14,25 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.Stable
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
-import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
 import com.mocharealm.compound.ui.composable.Avatar
-import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
-import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.icons.SFIcons
@@ -62,6 +62,7 @@ sealed interface Screen : NavKey {
 
 }
 
+@Stable
 class Navigator(private val backStack: MutableList<NavKey>) {
     fun push(key: NavKey) = backStack.add(key)
     fun pop() {
@@ -99,11 +100,19 @@ fun AppNav() {
         }
     }
 
+    val onBack = remember(navigator) { { navigator.pop() } }
+
+    val rawEntryProvider = koinEntryProvider<NavKey>()
+    val currentEntryProvider by rememberUpdatedState(rawEntryProvider)
+    val entryProvider = remember {
+        { key: NavKey -> currentEntryProvider(key) }
+    }
+
     CompositionLocalProvider(LocalNavigator provides navigator) {
         NavDisplay(
             backStack = backStack,
-            onBack = { navigator.pop() },
-            entryProvider = koinEntryProvider<NavKey>(),
+            onBack = onBack,
+            entryProvider = entryProvider,
         )
     }
 }
