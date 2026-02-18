@@ -52,7 +52,7 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
-miuix-nav3 = ["miuix-nav3-adaptive"]
+miuix-nav3 = ["miuix-nav3-ui","miuix-nav3-adaptive"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }

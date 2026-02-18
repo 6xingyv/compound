@@ -156,6 +156,7 @@ data class MessageDto(
                 is TdApi.MessageChatDeleteMember,
                 is TdApi.MessageChatChangeTitle,
                 is TdApi.MessageChatChangePhoto,
+                is TdApi.MessagePinMessage,
                 is TdApi.MessageChatUpgradeTo -> ParsedContent(
                     "System message",
                     MessageType.SYSTEM,

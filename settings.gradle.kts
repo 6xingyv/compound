@@ -21,6 +21,7 @@ dependencyResolutionManagement {
             url = uri("file:///E:/maven")
             mavenContent {
                 includeGroupAndSubgroups("com.mocharealm")
+                includeGroupAndSubgroups("top.yukonga.miuix.kmp")
             }
         }
         google()
