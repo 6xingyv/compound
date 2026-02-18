@@ -22,6 +22,7 @@ import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
+import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -69,7 +70,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
             item {
                 when (state.authState) {
                     AuthState.WaitingForPhoneNumber -> {
-                        SmallTitle(text = "Phone Number")
+                        SmallTitle(text = tdString("PhoneNumber"))
                         Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
@@ -89,7 +90,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             TextButton(
-                                text = if (state.loading) "Sending..." else "Send code",
+                                text = if (state.loading) tdString("Loading") else tdString("Continue"),
                                 onClick = viewModel::submitPhone,
                                 modifier = Modifier.weight(1f),
                                 enabled = !state.loading && state.phone.isNotBlank(),
@@ -98,7 +99,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                     }
 
                     AuthState.WaitingForOtp -> {
-                        SmallTitle(text = "Verification Code")
+                        SmallTitle(text = tdString("VerificationCode"))
                         Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
@@ -108,7 +109,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                     modifier = Modifier.fillMaxWidth(),
                                     value = state.code,
                                     onValueChange = viewModel::onCodeChange,
-                                    label = "12345",
+                                    label = "123456",
                                     useLabelAsPlaceholder = true
                                 )
                             }
@@ -118,7 +119,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             TextButton(
-                                text = if (state.loading) "Verifying..." else "Verify",
+                                text = if (state.loading) tdString("Loading") else tdString("Continue"),
                                 onClick = viewModel::submitCode,
                                 modifier = Modifier.weight(1f),
                                 enabled = !state.loading && state.code.isNotBlank(),
@@ -127,7 +128,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                     }
 
                     AuthState.WaitingForPassword -> {
-                        SmallTitle(text = "Password")
+                        SmallTitle(text = tdString("YourPassword"))
                         Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                             Column(
                                 modifier = Modifier.padding(12.dp),
@@ -137,7 +138,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                     modifier = Modifier.fillMaxWidth(),
                                     value = state.password,
                                     onValueChange = viewModel::onPasswordChange,
-                                    label = "Your password",
+                                    label = tdString("YourPassword"),
                                     useLabelAsPlaceholder = true
                                 )
                             }
@@ -147,7 +148,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             TextButton(
-                                text = if (state.loading) "Signing in..." else "Sign in",
+                                text = if (state.loading) tdString("Loading") else tdString("Continue"),
                                 onClick = viewModel::submitPassword,
                                 modifier = Modifier.weight(1f),
                                 enabled = !state.loading && state.password.isNotBlank(),
@@ -157,7 +158,6 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
 
                     is AuthState.Ready -> {
                         val user = (state.authState as AuthState.Ready).user
-                        SmallTitle(text = "Signed In")
                         Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                             BasicComponent(
                                 title = "${user.firstName} ${user.lastName}".trim(),
@@ -173,23 +173,12 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                                 },
                             )
                         }
-                        Row(
-                            modifier = Modifier.padding(12.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                        ) {
-                            TextButton(
-                                text = "Refresh state",
-                                onClick = viewModel::refreshAuthState,
-                                modifier = Modifier.weight(1f),
-                            )
-                        }
                     }
 
                     is AuthState.Error -> {
-                        SmallTitle(text = "Error")
                         Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                             BasicComponent(
-                                title = "Authentication Error",
+                                title = tdString("ErrorOccurred"),
                                 summary = (state.authState as AuthState.Error).message,
                             )
                         }
@@ -198,7 +187,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                             horizontalArrangement = Arrangement.spacedBy(12.dp),
                         ) {
                             TextButton(
-                                text = "Retry",
+                                text = tdString("Retry"),
                                 onClick = viewModel::refreshAuthState,
                                 modifier = Modifier.weight(1f),
                             )
@@ -215,7 +204,7 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
                             .padding(top = 12.dp),
                     ) {
                         BasicComponent(
-                            title = "Error",
+                            title = tdString("ErrorOccurred"),
                             summary = errorMsg,
                         )
                     }

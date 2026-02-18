@@ -26,15 +26,12 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.IntrinsicSize
-import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.captionBarPadding
-import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -127,10 +124,8 @@ import com.mocharealm.compound.ui.composable.BackNavigationIcon
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
-import com.mocharealm.compound.ui.util.PaddingValuesSide
 import com.mocharealm.compound.ui.util.SpoilerShader
 import com.mocharealm.compound.ui.util.buildAnnotatedString
-import com.mocharealm.compound.ui.util.takeExcept
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
@@ -357,11 +352,12 @@ fun ChatScreen(
                         verticalArrangement = Arrangement.spacedBy(16.dp)
                     ) {
                         val list = listOf(
-                            "Sticker" to SFIcons.Face_Smiling,
-                            "File" to SFIcons.Document,
-                            "Position" to SFIcons.Rectangle_Dashed
+                            tdString("AttachSticker") to SFIcons.Face_Smiling,
+                            tdString("ChatGallery") to SFIcons.Photo_On_Rectangle_Angled,
+                            tdString("ChatDocument") to SFIcons.Document,
+                            tdString("ChatLocation") to SFIcons.Mappin
                         )
-                        list.forEach { item->
+                        list.forEach { item ->
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(12.dp)
@@ -468,7 +464,7 @@ fun ChatScreen(
                                             Box {
                                                 innerTextField()
                                                 Text(
-                                                    tdString("TypeMessage","default"),
+                                                    tdString("TypeMessage", "default"),
                                                     color = LocalContentColor.current.copy(0.4f),
                                                     style = MiuixTheme.textStyles.body1,
                                                 )
@@ -598,7 +594,7 @@ fun ChatScreen(
                     Card(
                         modifier = Modifier.padding(12.dp)
                     ) {
-                        BasicComponent(title = "Loading messages...")
+                        BasicComponent(title = tdString("Loading"))
                     }
                 }
             } else if (state.error != null && state.messages.isEmpty()) {
@@ -607,22 +603,14 @@ fun ChatScreen(
                         modifier = Modifier.padding(12.dp)
                     ) {
                         BasicComponent(
-                            title = "Error",
+                            title = tdString("ErrorOccurred"),
                             summary = state.error,
                         )
                         TextButton(
-                            text = "Retry",
+                            text = tdString("Retry"),
                             onClick = { viewModel.loadMessages() },
                             modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         )
-                    }
-                }
-            } else if (state.messages.isEmpty() && state.initialLoaded) {
-                item {
-                    Card(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        BasicComponent(title = "No messages in this chat")
                     }
                 }
             } else {
@@ -668,7 +656,7 @@ fun ChatScreen(
                             horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = "Loading more...",
+                                text = tdString("Loading"),
                                 color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                             )
                         }
@@ -1192,13 +1180,15 @@ private fun ReplyPreview(
             .clickable(onClick = onClick)
             .drawWithCache {
                 onDrawBehind {
-                    drawRect(accentColor,size= Size(4.dp.toPx(),size.height))
+                    drawRect(accentColor, size = Size(4.dp.toPx(), size.height))
                 }
             },
         verticalAlignment = Alignment.CenterVertically
     ) {
         Column(
-            modifier = Modifier.padding(start = 4.dp).padding(8.dp)
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .padding(8.dp)
         ) {
             Text(
                 text = senderName,

@@ -11,6 +11,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -36,18 +37,18 @@ fun MeScreen(
         if (state.loading) {
             item {
                 Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(title = "Loading...")
+                    BasicComponent(title = tdString("Loading"))
                 }
             }
         } else if (state.error != null) {
             item {
                 Card(modifier = Modifier.padding(12.dp)) {
                     BasicComponent(
-                        title = "Error",
+                        title = tdString("ErrorOccurred"),
                         summary = state.error,
                     )
                     TextButton(
-                        text = "Retry",
+                        text = tdString("Retry"),
                         onClick = viewModel::loadUser,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
@@ -56,7 +57,6 @@ fun MeScreen(
         } else if (state.user != null) {
             val user = state.user!!
             item {
-                SmallTitle(text = "Account")
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     BasicComponent(
                         title = "${user.firstName} ${user.lastName}".trim(),
@@ -74,19 +74,15 @@ fun MeScreen(
                 }
             }
             item {
-                SmallTitle(text = "Info")
+                SmallTitle(text = tdString("Account"))
                 Card(modifier = Modifier.padding(horizontal = 12.dp)) {
                     BasicComponent(
-                        title = "User ID",
+                        title = "ID",
                         summary = user.id.toString(),
                     )
                     BasicComponent(
-                        title = "Phone",
+                        title = tdString("Phone"),
                         summary = user.phoneNumber,
-                    )
-                    BasicComponent(
-                        title = "Account Status",
-                        summary = "Active",
                     )
                 }
             }
@@ -97,22 +93,13 @@ fun MeScreen(
                         .padding(top = 12.dp),
                 ) {
                     SuperArrow(
-                        title = "Log out",
+                        title = tdString("LogOut"),
                         onClick = viewModel::logoutUser,
                     )
                 }
             }
         } else {
-            item {
-                Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(title = "No user data")
-                    TextButton(
-                        text = "Load Profile",
-                        onClick = viewModel::loadUser,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
+
         }
     }
 }

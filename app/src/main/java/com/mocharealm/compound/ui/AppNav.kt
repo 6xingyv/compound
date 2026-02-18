@@ -149,7 +149,7 @@ internal fun HomeScreen() {
     val navigationItems = remember {
         listOf(
             TopLevelNav(
-                "Messages",
+                "Compound",
                 {
                     Icon(SFIcons.Message_Fill, null)
                 },

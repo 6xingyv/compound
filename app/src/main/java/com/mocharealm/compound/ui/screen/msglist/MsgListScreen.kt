@@ -31,6 +31,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
+import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -93,18 +94,18 @@ fun MsgListScreen(
         if (state.loading && state.chats.isEmpty()) {
             item {
                 Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(title = "Loading chats...")
+                    BasicComponent(title = tdString("Loading"))
                 }
             }
         } else if (state.error != null && state.chats.isEmpty()) {
             item {
                 Card(modifier = Modifier.padding(12.dp)) {
                     BasicComponent(
-                        title = "Error",
+                        title = tdString("ErrorOccurred"),
                         summary = state.error,
                     )
                     TextButton(
-                        text = "Retry",
+                        text = tdString("Retry"),
                         onClick = viewModel::loadChats,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
@@ -115,7 +116,7 @@ fun MsgListScreen(
                 Card(modifier = Modifier.padding(12.dp)) {
                     BasicComponent(title = "No chats found")
                     TextButton(
-                        text = "Refresh",
+                        text = tdString("Refresh"),
                         onClick = viewModel::loadChats,
                         modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
@@ -188,7 +189,7 @@ fun MsgListScreen(
                         horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = "Loading more...",
+                            text = tdString("Loading"),
                             color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                         )
                     }
