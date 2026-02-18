@@ -16,6 +16,7 @@ import androidx.compose.ui.util.lerp
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.glassy.liquid.effect.Backdrop
 import com.mocharealm.gaze.glassy.liquid.effect.BackdropEffectScope
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.drawBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
@@ -36,13 +37,14 @@ fun LiquidSurface(
     isInteractive: Boolean = true,
     tint: Color = Color.Unspecified,
     surfaceColor: Color = Color.Unspecified,
-    shape:() -> Shape = { ContinuousCapsule },
+    shape: () -> Shape = { ContinuousCapsule },
     effects: BackdropEffectScope.() -> Unit = {
         vibrancy()
         blur(2f.dp.toPx())
         lens(12f.dp.toPx(), 24f.dp.toPx())
     },
     shadow: (() -> Shadow?)? = { Shadow.Default },
+    exportedBackdrop: LayerBackdrop? = null,
     content: @Composable BoxScope.() -> Unit
 ) {
     val animationScope = rememberCoroutineScope()
@@ -96,7 +98,8 @@ fun LiquidSurface(
                     if (surfaceColor.isSpecified) {
                         drawRect(surfaceColor)
                     }
-                }
+                },
+                exportedBackdrop = exportedBackdrop
             )
             .then(afterModifier)
             .then(
