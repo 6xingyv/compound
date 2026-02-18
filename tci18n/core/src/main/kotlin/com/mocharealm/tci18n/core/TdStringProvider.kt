@@ -14,19 +14,19 @@ import kotlinx.coroutines.sync.withLock
  * and released via [release] (called on navigation pop).
  *
  * @param fetchStrings A suspend function that fetches localized strings from TDLib.
- *   Receives a list of keys and returns a map of key -> localized value.
+ *   Receives a list of keys and returns a map of key -> [TdStringValue].
  */
 class TdStringProvider(
-    private val fetchStrings: suspend (keys: List<String>) -> Map<String, String>,
+    private val fetchStrings: suspend (keys: List<String>) -> Map<String, TdStringValue>,
 ) {
     // pageId -> (key -> reactive state)
-    private val pageStrings = mutableMapOf<String, MutableMap<String, MutableState<String>>>()
+    private val pageStrings = mutableMapOf<String, MutableMap<String, MutableState<TdStringValue>>>()
 
     // Reference counting: multiple pages may use the same key
     private val keyRefCount = mutableMapOf<String, Int>()
 
     // Global cache of all loaded strings (key -> value)
-    private val globalCache = mutableMapOf<String, String>()
+    private val globalCache = mutableMapOf<String, TdStringValue>()
 
     private val mutex = Mutex()
 
@@ -40,8 +40,7 @@ class TdStringProvider(
         mutex.withLock {
             if (pageStrings.containsKey(pageId)) return // Already loaded
 
-            val pageMap = mutableMapOf<String, MutableState<String>>()
-            val keysToFetch = mutableListOf<String>()
+            val pageMap = mutableMapOf<String, MutableState<TdStringValue>>()
 
             for (key in keys) {
                 val refCount = keyRefCount.getOrDefault(key, 0)
@@ -49,12 +48,7 @@ class TdStringProvider(
 
                 // Create the reactive state — use cached value if available
                 val cachedValue = globalCache[key]
-                pageMap[key] = mutableStateOf(cachedValue ?: "")
-
-                // Only fetch if not already in global cache
-                if (cachedValue == null) {
-                    keysToFetch.add(key)
-                }
+                pageMap[key] = mutableStateOf(cachedValue ?: TdStringValue.Empty)
             }
 
             pageStrings[pageId] = pageMap
@@ -62,7 +56,6 @@ class TdStringProvider(
 
         // Fetch uncached keys outside the lock
         val keysToFetch = mutex.withLock {
-            val pageMap = pageStrings[pageId] ?: return
             keys.filter { !globalCache.containsKey(it) }
         }
 
@@ -112,7 +105,7 @@ class TdStringProvider(
      * This looks up across all loaded pages. If the key is not loaded,
      * it is added to a "dynamic discovery" set and returns the default.
      */
-    fun getString(key: String, default: String): State<String> {
+    fun getStringValue(key: String): State<TdStringValue> {
         // Fast path: find in any loaded page
         for ((_, pageMap) in pageStrings) {
             val state = pageMap[key]
@@ -121,7 +114,7 @@ class TdStringProvider(
 
         // Fallback: dynamic key not found in any manifest.
         // Create an orphan state that can be updated later.
-        val orphanState = mutableStateOf(globalCache[key] ?: default)
+        val orphanState = mutableStateOf(globalCache[key] ?: TdStringValue.Empty)
         // Store in a special "dynamic" page
         val dynamicPage = pageStrings.getOrPut("__dynamic__") { mutableMapOf() }
         dynamicPage[key] = orphanState

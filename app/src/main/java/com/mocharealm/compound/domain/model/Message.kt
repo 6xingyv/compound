@@ -26,7 +26,19 @@ enum class MessageType {
     DOCUMENT,
     AUDIO,
     VOICE,
-    STICKER
+    STICKER,
+    SYSTEM
+}
+
+// TODO: Support all types
+enum class SystemActionType {
+    MEMBER_JOINED,         // un1 (who added), un2 (who was added)
+    MEMBER_JOINED_BY_LINK, // un1 (who joined)
+    MEMBER_LEFT,           // un1 (who left/was removed)
+    CHAT_CHANGED_TITLE,    // un1 (who changed), title (new title)
+    CHAT_CHANGED_PHOTO,    // un1 (who changed)
+    CHAT_UPGRADED_TO,      // supergroupId
+    PIN_MESSAGE
 }
 
 enum class StickerFormat {

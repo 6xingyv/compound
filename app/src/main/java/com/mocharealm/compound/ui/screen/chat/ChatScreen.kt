@@ -117,6 +117,7 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.StickerFormat
+import com.mocharealm.compound.domain.model.SystemActionType
 import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
@@ -620,10 +621,19 @@ fun ChatScreen(
                     val primaryMessage = item.messages.first()
 
                     // Group position based on the primary message's senderId
-                    val prevSender = displayItems.getOrNull(index - 1)?.messages?.first()?.senderId
-                    val nextSender = displayItems.getOrNull(index + 1)?.messages?.first()?.senderId
-                    val sameBelow = prevSender == primaryMessage.senderId
-                    val sameAbove = nextSender == primaryMessage.senderId
+                    val prevMsg = displayItems.getOrNull(index - 1)?.messages?.first()
+                    val nextMsg = displayItems.getOrNull(index + 1)?.messages?.first()
+
+                    val prevSender = prevMsg?.senderId
+                    val nextSender = nextMsg?.senderId
+
+                    val sameBelow = prevSender == primaryMessage.senderId &&
+                            primaryMessage.messageType != MessageType.SYSTEM &&
+                            prevMsg?.messageType != MessageType.SYSTEM
+                    val sameAbove = nextSender == primaryMessage.senderId &&
+                            primaryMessage.messageType != MessageType.SYSTEM &&
+                            nextMsg?.messageType != MessageType.SYSTEM
+
                     val groupPosition = when {
                         !sameAbove && !sameBelow -> GroupPosition.SINGLE
                         !sameAbove -> GroupPosition.FIRST
@@ -631,7 +641,9 @@ fun ChatScreen(
                         else -> GroupPosition.MIDDLE
                     }
 
-                    if (item.isAlbum) {
+                    if (primaryMessage.messageType == MessageType.SYSTEM) {
+                        SystemMessage(primaryMessage)
+                    } else if (item.isAlbum) {
                         MessageBubble(
                             message = primaryMessage,
                             groupPosition = groupPosition,
@@ -664,6 +676,84 @@ fun ChatScreen(
                 }
             }
         }
+    }
+}
+
+@Composable
+private fun SystemMessage(message: Message) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .padding(12.dp),
+        horizontalArrangement = Arrangement.Center
+    ) {
+        val parts = remember(message.content) { message.content.split("|") }
+        val typeIdx = parts.getOrNull(0)?.toIntOrNull() ?: -1
+        val type = SystemActionType.entries.getOrNull(typeIdx)
+
+        val text = when (type) {
+            SystemActionType.MEMBER_JOINED -> {
+                tdString(
+                    "NotificationGroupAddMember",
+                    "un1" to (parts.getOrNull(1) ?: ""),
+                    "un2" to (parts.getOrNull(2) ?: "")
+                )
+            }
+
+            SystemActionType.MEMBER_JOINED_BY_LINK -> {
+                tdString(
+                    "ActionInviteUser",
+                    "un1" to (parts.getOrNull(1) ?: "")
+                )
+                // Channel 用 EventLogChannelJoined
+            }
+
+            SystemActionType.MEMBER_LEFT -> {
+                tdString(
+                    "EventLogLeftGroup",
+                    "un1" to (parts.getOrNull(1) ?: "")
+                )
+                // Channel 用 EventLogLeftChannel
+            }
+
+            SystemActionType.CHAT_CHANGED_TITLE -> {
+                tdString(
+                    "ActionChatEditTitle",
+                    "un1" to (parts.getOrNull(1) ?: ""),
+                    "title" to (parts.getOrNull(2) ?: "")
+                )
+            }
+
+            SystemActionType.CHAT_CHANGED_PHOTO -> {
+                tdString(
+                    "ActionChatEditPhoto",
+                    "un1" to (parts.getOrNull(1) ?: "")
+                )
+            }
+
+            SystemActionType.CHAT_UPGRADED_TO -> {
+                tdString(
+                    "ActionChatUpgradeTo",
+                    "supergroupId" to (parts.getOrNull(1) ?: "")
+                )
+            }
+
+            SystemActionType.PIN_MESSAGE -> {
+                tdString(
+                    "ActionPinnedText",
+                    "un1" to (parts.getOrNull(1) ?: "")
+                )
+            }
+
+            null -> message.content
+        }
+
+        Text(
+            text = text,
+            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+            textAlign = TextAlign.Center,
+            style = MiuixTheme.textStyles.footnote1
+        )
     }
 }
 

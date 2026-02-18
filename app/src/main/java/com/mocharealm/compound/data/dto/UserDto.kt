@@ -19,4 +19,17 @@ data class UserDto(
         phoneNumber = phoneNumber,
         profilePhotoUrl = profilePhotoUrl
     )
+
+    companion object {
+        fun fromTdApi(user: TdApi.User, photoPath: String?): UserDto {
+            return UserDto(
+                id = user.id,
+                firstName = user.firstName,
+                lastName = user.lastName,
+                username = user.usernames?.activeUsernames?.lastOrNull() ?: "",
+                phoneNumber = user.phoneNumber,
+                profilePhotoUrl = photoPath
+            )
+        }
+    }
 }

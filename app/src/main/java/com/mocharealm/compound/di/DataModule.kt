@@ -57,12 +57,25 @@ val dataModule = module {
                     { result: Object? ->
                         when (result) {
                             is TdApi.LanguagePackStrings -> {
-                                val map = mutableMapOf<String, String>()
+                                val map = mutableMapOf<String, com.mocharealm.tci18n.core.TdStringValue>()
                                 for (str in result.strings) {
-                                    val value = str.value
-                                    if (value is TdApi.LanguagePackStringValueOrdinary) {
-                                        map[str.key] = value.value
+                                    val value = when (val v = str.value) {
+                                        is TdApi.LanguagePackStringValueOrdinary -> {
+                                            com.mocharealm.tci18n.core.TdStringValue.Ordinary(v.value)
+                                        }
+                                        is TdApi.LanguagePackStringValuePluralized -> {
+                                            com.mocharealm.tci18n.core.TdStringValue.Pluralized(
+                                                zero = v.zeroValue,
+                                                one = v.oneValue,
+                                                two = v.twoValue,
+                                                few = v.fewValue,
+                                                many = v.manyValue,
+                                                other = v.otherValue
+                                            )
+                                        }
+                                        else -> null
                                     }
+                                    if (value != null) map[str.key] = value
                                 }
                                 cont.resume(map)
                             }

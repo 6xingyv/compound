@@ -12,9 +12,8 @@ import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ReplyInfo
-import com.mocharealm.compound.domain.model.StickerFormat
+import com.mocharealm.compound.domain.model.SystemActionType
 import com.mocharealm.compound.domain.model.TextEntity
-import com.mocharealm.compound.domain.model.TextEntityType
 import com.mocharealm.compound.domain.model.User
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.tdLangPackId
@@ -193,7 +192,7 @@ class TelegramRepositoryImpl(
         for (id in chatIds) {
             val chat = runCatching { send(TdApi.GetChat(id)) }.getOrNull()
             if (chat is TdApi.Chat) {
-                chats.add(mapChatFast(chat))
+                chats.add(ChatDto.fromTdApi(chat).toDomain())
             }
         }
         chats
@@ -248,7 +247,7 @@ class TelegramRepositoryImpl(
             val content = TdApi.InputMessageText(
                 TdApi.FormattedText(
                     finalText,
-                    mapToTdApiEntities(finalEntities)
+                    MessageDto.mapToTdApiEntities(finalEntities)
                 ),
                 null,
                 true
@@ -290,7 +289,7 @@ class TelegramRepositoryImpl(
     override suspend fun getChat(chatId: Long): Result<Chat> = runCatching {
         val chat = send(TdApi.GetChat(chatId))
         if (chat !is TdApi.Chat) error("Invalid chat response")
-        mapChatFast(chat)
+        ChatDto.fromTdApi(chat).toDomain()
     }
 
     override val messageUpdates: Flow<MessageUpdateEvent> = updates
@@ -327,53 +326,15 @@ class TelegramRepositoryImpl(
         }
     }
 
-    // ── Object mappers ───────────────────────────────────────────────────
-
     private suspend fun mapUser(user: TdApi.User): User {
         val photoPath = user.profilePhoto?.small?.let { getLocalFileOrDownload(it)?.path }
-        return UserDto(
-            id = user.id,
-            firstName = user.firstName,
-            lastName = user.lastName,
-            username = user.usernames?.activeUsernames?.lastOrNull() ?: "",
-            phoneNumber = user.phoneNumber,
-            profilePhotoUrl = photoPath
-        ).toDomain()
+        return UserDto.fromTdApi(user, photoPath).toDomain()
     }
 
-    /** Fast mapper — uses already-downloaded local path only, never blocks on download. */
-    private fun mapChatFast(chat: TdApi.Chat): Chat {
-        val lastMessageText = when (chat.lastMessage?.content) {
-            is TdApi.MessageText -> (chat.lastMessage!!.content as TdApi.MessageText).text.text
-            is TdApi.MessagePhoto -> "Photo"
-            is TdApi.MessageVideo -> "Video"
-            is TdApi.MessageDocument -> "Document"
-            is TdApi.MessageAudio -> "Audio"
-            is TdApi.MessageVoiceNote -> "Voice message"
-            else -> "Message"
-        }
-        val small = chat.photo?.small
-        val localPath = small?.local?.takeIf { it.isDownloadingCompleted }?.path
-        return ChatDto(
-            id = chat.id,
-            title = chat.title,
-            lastMessage = lastMessageText,
-            lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
-            unreadCount = chat.unreadCount,
-            isChannel = chat.type is TdApi.ChatTypeSupergroup &&
-                    (chat.type as TdApi.ChatTypeSupergroup).isChannel,
-            isGroup = chat.type is TdApi.ChatTypeBasicGroup ||
-                    (chat.type is TdApi.ChatTypeSupergroup &&
-                            !(chat.type as TdApi.ChatTypeSupergroup).isChannel),
-            photoUrl = localPath,
-            photoFileId = small?.id
-        ).toDomain()
-    }
+
 
     /** Suspend mapper — resolves real sender name and avatar via TDLib. */
     private suspend fun mapMessageFast(msg: TdApi.Message): Message {
-        val parsed = parseMessageContent(msg.content)
-
         val senderId: Long
         val senderName: String
         val avatarPath: String?
@@ -413,26 +374,59 @@ class TelegramRepositoryImpl(
             }
         }
 
-        // ── Reply info ──────────────────────────────────────────────────
         val replyInfo = resolveReplyInfo(msg)
-
-        return MessageDto(
-            id = msg.id,
-            chatId = msg.chatId,
+        val domainMsg = MessageDto.fromTdApi(
+            msg = msg,
             senderId = senderId,
             senderName = senderName,
-            content = parsed.text,
-            timestamp = msg.date.toLong(),
-            isOutgoing = msg.isOutgoing,
-            messageType = parsed.type,
-            fileId = parsed.fileId,
-            avatarUrl = avatarPath,
-            stickerFormat = parsed.stickerFormat,
-            entities = parsed.entities,
-            replyTo = replyInfo,
-            mediaAlbumId = msg.mediaAlbumId,
-            hasSpoiler = parsed.hasSpoiler
+            avatarPath = avatarPath,
+            replyInfo = replyInfo
         ).toDomain()
+
+        if (domainMsg.messageType == MessageType.SYSTEM) {
+            val encodedContent = when (val systemContent = msg.content) {
+                is TdApi.MessageChatAddMembers -> {
+                    val adderName = senderName
+                    val addedNames = systemContent.memberUserIds.map { userId ->
+                        val u = sendSafe(TdApi.GetUser(userId)).getOrNull()
+                        u?.let { "${it.firstName} ${it.lastName}".trim() } ?: "$userId"
+                    }
+                    if (addedNames.size == 1 && addedNames[0] == adderName) {
+                        "${SystemActionType.MEMBER_JOINED_BY_LINK.ordinal}|$adderName"
+                    } else {
+                        "${SystemActionType.MEMBER_JOINED.ordinal}|$adderName|${addedNames.joinToString(", ")}"
+                    }
+                }
+                is TdApi.MessageChatJoinByLink -> {
+                    "${SystemActionType.MEMBER_JOINED_BY_LINK.ordinal}|$senderName"
+                }
+                is TdApi.MessageChatDeleteMember -> {
+                    val deletedName = if (systemContent.userId == senderId) {
+                        senderName
+                    } else {
+                        val u = sendSafe(TdApi.GetUser(systemContent.userId)).getOrNull()
+                        u?.let { "${it.firstName} ${it.lastName}".trim() } ?: "${systemContent.userId}"
+                    }
+                    "${SystemActionType.MEMBER_LEFT.ordinal}|$deletedName"
+                }
+                is TdApi.MessageChatChangeTitle -> {
+                    "${SystemActionType.CHAT_CHANGED_TITLE.ordinal}|$senderName|${systemContent.title}"
+                }
+                is TdApi.MessageChatChangePhoto -> {
+                    "${SystemActionType.CHAT_CHANGED_PHOTO.ordinal}|$senderName"
+                }
+                is TdApi.MessageChatUpgradeTo -> {
+                    "${SystemActionType.CHAT_UPGRADED_TO.ordinal}|${systemContent.supergroupId}"
+                }
+                is TdApi.MessagePinMessage -> {
+                    "${SystemActionType.PIN_MESSAGE.ordinal}|${senderName}|${systemContent.messageId}"
+                }
+                else -> domainMsg.content
+            }
+            return domainMsg.copy(content = encodedContent)
+        }
+
+        return domainMsg
     }
 
     private suspend fun resolveReplyInfo(msg: TdApi.Message): ReplyInfo? {
@@ -489,10 +483,10 @@ class TelegramRepositoryImpl(
         // Preview text: prefer quote text, then original message content summary
         val previewText = reply.quote?.text?.text
             ?: if (originalMsg != null) {
-                val p = parseMessageContent(originalMsg.content)
+                val p = MessageDto.parseMessageContent(originalMsg.content)
                 p.text
             } else {
-                reply.content?.let { parseMessageContent(it).text } ?: ""
+                reply.content?.let { MessageDto.parseMessageContent(it).text } ?: ""
             }
 
         return ReplyInfo(
@@ -502,105 +496,5 @@ class TelegramRepositoryImpl(
         )
     }
 
-    private data class ParsedContent(
-        val text: String,
-        val type: MessageType,
-        val fileId: Int?,
-        val stickerFormat: StickerFormat? = null,
-        val entities: List<TextEntity> = emptyList(),
-        val hasSpoiler: Boolean = false
-    )
 
-    private fun parseMessageContent(content: TdApi.MessageContent): ParsedContent =
-        when (content) {
-            is TdApi.MessageText -> ParsedContent(
-                content.text.text,
-                MessageType.TEXT,
-                null,
-                entities = mapFormattedTextEntities(content.text)
-            )
-            is TdApi.MessagePhoto -> {
-                val caption = content.caption.text
-                val photoFileId = content.photo.sizes.lastOrNull()?.photo?.id
-                ParsedContent(
-                    if (caption.isNotEmpty()) "Photo: $caption" else "Photo",
-                    MessageType.PHOTO,
-                    photoFileId,
-                    entities = if (caption.isNotEmpty()) mapFormattedTextEntities(content.caption) else emptyList(),
-                    hasSpoiler = content.hasSpoiler
-                )
-            }
-            is TdApi.MessageSticker -> {
-                val format = when (content.sticker.format) {
-                    is TdApi.StickerFormatWebp -> StickerFormat.WEBP
-                    is TdApi.StickerFormatTgs -> StickerFormat.TGS
-                    is TdApi.StickerFormatWebm -> StickerFormat.WEBM
-                    else -> StickerFormat.WEBP
-                }
-                ParsedContent("Sticker", MessageType.STICKER, content.sticker.sticker.id, format)
-            }
-            is TdApi.MessageVideo -> {
-                val caption = content.caption.text
-                ParsedContent(
-                    if (caption.isNotEmpty()) "Video: $caption" else "Video", 
-                    MessageType.VIDEO, 
-                    null,
-                    hasSpoiler = content.hasSpoiler
-                )
-            }
-            is TdApi.MessageDocument -> ParsedContent("Document: ${content.document.fileName}", MessageType.DOCUMENT, null)
-            is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
-            is TdApi.MessageVoiceNote -> ParsedContent("Voice message", MessageType.VOICE, null)
-            else -> ParsedContent("Message", MessageType.TEXT, null)
-        }
-
-    private fun mapFormattedTextEntities(formattedText: TdApi.FormattedText): List<TextEntity> {
-        if (formattedText.entities.isNullOrEmpty()) return emptyList()
-        return formattedText.entities.mapNotNull { entity ->
-            val type = when (entity.type) {
-                is TdApi.TextEntityTypeBold -> TextEntityType.Bold
-                is TdApi.TextEntityTypeItalic -> TextEntityType.Italic
-                is TdApi.TextEntityTypeUnderline -> TextEntityType.Underline
-                is TdApi.TextEntityTypeStrikethrough -> TextEntityType.Strikethrough
-                is TdApi.TextEntityTypeCode -> TextEntityType.Code
-                is TdApi.TextEntityTypePre -> TextEntityType.Pre
-                is TdApi.TextEntityTypePreCode -> TextEntityType.PreCode(
-                    (entity.type as TdApi.TextEntityTypePreCode).language
-                )
-                is TdApi.TextEntityTypeTextUrl -> TextEntityType.TextUrl(
-                    (entity.type as TdApi.TextEntityTypeTextUrl).url
-                )
-                is TdApi.TextEntityTypeUrl -> TextEntityType.Url
-                is TdApi.TextEntityTypeMention -> TextEntityType.Mention
-                is TdApi.TextEntityTypeMentionName -> TextEntityType.Mention
-                is TdApi.TextEntityTypeSpoiler -> TextEntityType.Spoiler
-                is TdApi.TextEntityTypeEmailAddress -> TextEntityType.EmailAddress
-                is TdApi.TextEntityTypePhoneNumber -> TextEntityType.PhoneNumber
-                else -> null
-            } ?: return@mapNotNull null
-            TextEntity(offset = entity.offset, length = entity.length, type = type)
-            TextEntity(offset = entity.offset, length = entity.length, type = type)
-        }
-    }
-
-    private fun mapToTdApiEntities(entities: List<TextEntity>): Array<TdApi.TextEntity> {
-        return entities.map { entity ->
-            val type = when (entity.type) {
-                is TextEntityType.Bold -> TdApi.TextEntityTypeBold()
-                is TextEntityType.Italic -> TdApi.TextEntityTypeItalic()
-                is TextEntityType.Underline -> TdApi.TextEntityTypeUnderline()
-                is TextEntityType.Strikethrough -> TdApi.TextEntityTypeStrikethrough()
-                is TextEntityType.Code -> TdApi.TextEntityTypeCode()
-                is TextEntityType.Pre -> TdApi.TextEntityTypePre()
-                is TextEntityType.PreCode -> TdApi.TextEntityTypePreCode(entity.type.language)
-                is TextEntityType.TextUrl -> TdApi.TextEntityTypeTextUrl(entity.type.url)
-                is TextEntityType.Url -> TdApi.TextEntityTypeUrl()
-                is TextEntityType.Mention -> TdApi.TextEntityTypeMention()
-                is TextEntityType.Spoiler -> TdApi.TextEntityTypeSpoiler()
-                is TextEntityType.EmailAddress -> TdApi.TextEntityTypeEmailAddress()
-                is TextEntityType.PhoneNumber -> TdApi.TextEntityTypePhoneNumber()
-            }
-            TdApi.TextEntity(entity.offset, entity.length, type)
-        }.toTypedArray()
-    }
 }

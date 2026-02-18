@@ -1,6 +1,7 @@
 package com.mocharealm.compound.data.dto
 
 import com.mocharealm.compound.domain.model.Chat
+import org.drinkless.tdlib.TdApi
 
 data class ChatDto(
     val id: Long,
@@ -24,4 +25,34 @@ data class ChatDto(
         photoUrl = photoUrl,
         photoFileId = photoFileId
     )
+
+    companion object {
+        fun fromTdApi(chat: TdApi.Chat): ChatDto {
+            val lastMessageText = when (chat.lastMessage?.content) {
+                is TdApi.MessageText -> (chat.lastMessage!!.content as TdApi.MessageText).text.text
+                is TdApi.MessagePhoto -> "Photo"
+                is TdApi.MessageVideo -> "Video"
+                is TdApi.MessageDocument -> "Document"
+                is TdApi.MessageAudio -> "Audio"
+                is TdApi.MessageVoiceNote -> "Voice message"
+                else -> "Message $chat"
+            }
+            val small = chat.photo?.small
+            val localPath = small?.local?.takeIf { it.isDownloadingCompleted }?.path
+            return ChatDto(
+                id = chat.id,
+                title = chat.title,
+                lastMessage = lastMessageText,
+                lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
+                unreadCount = chat.unreadCount,
+                isChannel = chat.type is TdApi.ChatTypeSupergroup &&
+                        (chat.type as TdApi.ChatTypeSupergroup).isChannel,
+                isGroup = chat.type is TdApi.ChatTypeBasicGroup ||
+                        (chat.type is TdApi.ChatTypeSupergroup &&
+                                !(chat.type as TdApi.ChatTypeSupergroup).isChannel),
+                photoUrl = localPath,
+                photoFileId = small?.id
+            )
+        }
+    }
 }
