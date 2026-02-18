@@ -1,24 +1,273 @@
 package com.mocharealm.gaze.icons
 
-import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.SolidColor
-import androidx.compose.ui.graphics.vector.ImageVector
-import androidx.compose.ui.graphics.vector.PathBuilder
-import androidx.compose.ui.graphics.vector.path
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.vector.*
 import androidx.compose.ui.unit.dp
 import java.util.concurrent.ConcurrentHashMap
 
 object SFIcons {
     private val cache = ConcurrentHashMap<String, ImageVector>()
 
+    private val shardMap: Map<String, () -> Map<String, String>> = mapOf(
+        "Figure_S" to { SFIconsData_Figure_S.data },
+        "Figure_A" to { SFIconsData_Figure_A.data },
+        "Figure_2" to { SFIconsData_Figure_2.data },
+        "Figure__" to { SFIconsData_Figure__.data },
+        "Figure_W" to { SFIconsData_Figure_W.data },
+        "Figure_F" to { SFIconsData_Figure_F.data },
+        "Figure_R" to { SFIconsData_Figure_R.data },
+        "Figure_B" to { SFIconsData_Figure_B.data },
+        "Figure_C" to { SFIconsData_Figure_C.data },
+        "Figure_D" to { SFIconsData_Figure_D.data },
+        "Figure_E" to { SFIconsData_Figure_E.data },
+        "Figure_G" to { SFIconsData_Figure_G.data },
+        "Figure_H" to { SFIconsData_Figure_H.data },
+        "Figure_I" to { SFIconsData_Figure_I.data },
+        "Figure_J" to { SFIconsData_Figure_J.data },
+        "Figure_K" to { SFIconsData_Figure_K.data },
+        "Figure_L" to { SFIconsData_Figure_L.data },
+        "Figure_M" to { SFIconsData_Figure_M.data },
+        "Figure_O" to { SFIconsData_Figure_O.data },
+        "Figure_P" to { SFIconsData_Figure_P.data },
+        "Figure_T" to { SFIconsData_Figure_T.data },
+        "Figure_V" to { SFIconsData_Figure_V.data },
+        "Figure_Y" to { SFIconsData_Figure_Y.data },
+        "Arrow_U" to { SFIconsData_Arrow_U.data },
+        "Arrow_F" to { SFIconsData_Arrow_F.data },
+        "Arrow_D" to { SFIconsData_Arrow_D.data },
+        "Arrow_R" to { SFIconsData_Arrow_R.data },
+        "Arrow_T" to { SFIconsData_Arrow_T.data },
+        "Arrow_L" to { SFIconsData_Arrow_L.data },
+        "Arrow_B" to { SFIconsData_Arrow_B.data },
+        "Arrow_C" to { SFIconsData_Arrow_C.data },
+        "Arrow_2" to { SFIconsData_Arrow_2.data },
+        "Arrow_3" to { SFIconsData_Arrow_3.data },
+        "Arrows" to { SFIconsData_Arrows.data },
+        "Arrowt" to { SFIconsData_Arrowt.data },
+        "Arrowk" to { SFIconsData_Arrowk.data },
+        "Cart" to { SFIconsData_Cart.data },
+        "Carb" to { SFIconsData_Carb.data },
+        "Car_" to { SFIconsData_Car_.data },
+        "Cars" to { SFIconsData_Cars.data },
+        "Carr" to { SFIconsData_Carr.data },
+        "Pen" to { SFIconsData_Pen.data },
+        "Per" to { SFIconsData_Per.data },
+        "Pea" to { SFIconsData_Pea.data },
+        "Pes" to { SFIconsData_Pes.data },
+        "Pet" to { SFIconsData_Pet.data },
+        "Ped" to { SFIconsData_Ped.data },
+        "Arc" to { SFIconsData_Arc.data },
+        "Ark" to { SFIconsData_Ark.data },
+        "Fil" to { SFIconsData_Fil.data },
+        "Fir" to { SFIconsData_Fir.data },
+        "Fie" to { SFIconsData_Fie.data },
+        "Fin" to { SFIconsData_Fin.data },
+        "Fis" to { SFIconsData_Fis.data },
+        "Fib" to { SFIconsData_Fib.data },
+        "Cal" to { SFIconsData_Cal.data },
+        "Cap" to { SFIconsData_Cap.data },
+        "Cam" to { SFIconsData_Cam.data },
+        "Cas" to { SFIconsData_Cas.data },
+        "Cab" to { SFIconsData_Cab.data },
+        "Can" to { SFIconsData_Can.data },
+        "Cat" to { SFIconsData_Cat.data },
+        "Sq" to { SFIconsData_Sq.data },
+        "Sc" to { SFIconsData_Sc.data },
+        "Sp" to { SFIconsData_Sp.data },
+        "St" to { SFIconsData_St.data },
+        "Sh" to { SFIconsData_Sh.data },
+        "So" to { SFIconsData_So.data },
+        "Sk" to { SFIconsData_Sk.data },
+        "Sn" to { SFIconsData_Sn.data },
+        "Su" to { SFIconsData_Su.data },
+        "Sl" to { SFIconsData_Sl.data },
+        "Sm" to { SFIconsData_Sm.data },
+        "Si" to { SFIconsData_Si.data },
+        "Sw" to { SFIconsData_Sw.data },
+        "Se" to { SFIconsData_Se.data },
+        "Sa" to { SFIconsData_Sa.data },
+        "Sy" to { SFIconsData_Sy.data },
+        "Sd" to { SFIconsData_Sd.data },
+        "S_" to { SFIconsData_S_.data },
+        "Re" to { SFIconsData_Re.data },
+        "Ri" to { SFIconsData_Ri.data },
+        "Ru" to { SFIconsData_Ru.data },
+        "Ro" to { SFIconsData_Ro.data },
+        "Ra" to { SFIconsData_Ra.data },
+        "R_" to { SFIconsData_R_.data },
+        "Rh" to { SFIconsData_Rh.data },
+        "R1" to { SFIconsData_R1.data },
+        "Rb" to { SFIconsData_Rb.data },
+        "R2" to { SFIconsData_R2.data },
+        "Rt" to { SFIconsData_Rt.data },
+        "R4" to { SFIconsData_R4.data },
+        "Rm" to { SFIconsData_Rm.data },
+        "R3" to { SFIconsData_R3.data },
+        "Rs" to { SFIconsData_Rs.data },
+        "Pl" to { SFIconsData_Pl.data },
+        "Pa" to { SFIconsData_Pa.data },
+        "Ph" to { SFIconsData_Ph.data },
+        "Pr" to { SFIconsData_Pr.data },
+        "Po" to { SFIconsData_Po.data },
+        "Pi" to { SFIconsData_Pi.data },
+        "Pu" to { SFIconsData_Pu.data },
+        "Pc" to { SFIconsData_Pc.data },
+        "Py" to { SFIconsData_Py.data },
+        "P1" to { SFIconsData_P1.data },
+        "P2" to { SFIconsData_P2.data },
+        "P3" to { SFIconsData_P3.data },
+        "P4" to { SFIconsData_P4.data },
+        "P_" to { SFIconsData_P_.data },
+        "Er" to { SFIconsData_Er.data },
+        "Ex" to { SFIconsData_Ex.data },
+        "El" to { SFIconsData_El.data },
+        "Es" to { SFIconsData_Es.data },
+        "Ej" to { SFIconsData_Ej.data },
+        "Eu" to { SFIconsData_Eu.data },
+        "En" to { SFIconsData_En.data },
+        "Ey" to { SFIconsData_Ey.data },
+        "Ea" to { SFIconsData_Ea.data },
+        "Ev" to { SFIconsData_Ev.data },
+        "Eq" to { SFIconsData_Eq.data },
+        "E_" to { SFIconsData_E_.data },
+        "Hi" to { SFIconsData_Hi.data },
+        "He" to { SFIconsData_He.data },
+        "Ho" to { SFIconsData_Ho.data },
+        "Hu" to { SFIconsData_Hu.data },
+        "Hr" to { SFIconsData_Hr.data },
+        "Ha" to { SFIconsData_Ha.data },
+        "H_" to { SFIconsData_H_.data },
+        "Hy" to { SFIconsData_Hy.data },
+        "La" to { SFIconsData_La.data },
+        "Lo" to { SFIconsData_Lo.data },
+        "Li" to { SFIconsData_Li.data },
+        "Le" to { SFIconsData_Le.data },
+        "Lu" to { SFIconsData_Lu.data },
+        "L_" to { SFIconsData_L_.data },
+        "L1" to { SFIconsData_L1.data },
+        "Lb" to { SFIconsData_Lb.data },
+        "L2" to { SFIconsData_L2.data },
+        "Lt" to { SFIconsData_Lt.data },
+        "L4" to { SFIconsData_L4.data },
+        "Lm" to { SFIconsData_Lm.data },
+        "L3" to { SFIconsData_L3.data },
+        "Ls" to { SFIconsData_Ls.data },
+        "Tr" to { SFIconsData_Tr.data },
+        "Te" to { SFIconsData_Te.data },
+        "To" to { SFIconsData_To.data },
+        "Ti" to { SFIconsData_Ti.data },
+        "Th" to { SFIconsData_Th.data },
+        "Tu" to { SFIconsData_Tu.data },
+        "Ta" to { SFIconsData_Ta.data },
+        "Tv" to { SFIconsData_Tv.data },
+        "Ts" to { SFIconsData_Ts.data },
+        "T_" to { SFIconsData_T_.data },
+        "Ap" to { SFIconsData_Ap.data },
+        "Ac" to { SFIconsData_Ac.data },
+        "Am" to { SFIconsData_Am.data },
+        "Au" to { SFIconsData_Au.data },
+        "Al" to { SFIconsData_Al.data },
+        "Aq" to { SFIconsData_Aq.data },
+        "Ai" to { SFIconsData_Ai.data },
+        "Av" to { SFIconsData_Av.data },
+        "An" to { SFIconsData_An.data },
+        "Ab" to { SFIconsData_Ab.data },
+        "Ax" to { SFIconsData_Ax.data },
+        "At" to { SFIconsData_At.data },
+        "As" to { SFIconsData_As.data },
+        "A_" to { SFIconsData_A_.data },
+        "Fo" to { SFIconsData_Fo.data },
+        "Fn" to { SFIconsData_Fn.data },
+        "Fl" to { SFIconsData_Fl.data },
+        "Fr" to { SFIconsData_Fr.data },
+        "Fa" to { SFIconsData_Fa.data },
+        "Fe" to { SFIconsData_Fe.data },
+        "Fu" to { SFIconsData_Fu.data },
+        "F_" to { SFIconsData_F_.data },
+        "Fx" to { SFIconsData_Fx.data },
+        "In" to { SFIconsData_In.data },
+        "Ic" to { SFIconsData_Ic.data },
+        "Ip" to { SFIconsData_Ip.data },
+        "Iv" to { SFIconsData_Iv.data },
+        "It" to { SFIconsData_It.data },
+        "I_" to { SFIconsData_I_.data },
+        "Do" to { SFIconsData_Do.data },
+        "Du" to { SFIconsData_Du.data },
+        "Di" to { SFIconsData_Di.data },
+        "De" to { SFIconsData_De.data },
+        "Dr" to { SFIconsData_Dr.data },
+        "Da" to { SFIconsData_Da.data },
+        "Dp" to { SFIconsData_Dp.data },
+        "D_" to { SFIconsData_D_.data },
+        "Cl" to { SFIconsData_Cl.data },
+        "Ch" to { SFIconsData_Ch.data },
+        "Cr" to { SFIconsData_Cr.data },
+        "Co" to { SFIconsData_Co.data },
+        "Ce" to { SFIconsData_Ce.data },
+        "Ci" to { SFIconsData_Ci.data },
+        "Cu" to { SFIconsData_Cu.data },
+        "Cp" to { SFIconsData_Cp.data },
+        "Cy" to { SFIconsData_Cy.data },
+        "C_" to { SFIconsData_C_.data },
+        "Bo" to { SFIconsData_Bo.data },
+        "Ba" to { SFIconsData_Ba.data },
+        "Be" to { SFIconsData_Be.data },
+        "Bi" to { SFIconsData_Bi.data },
+        "Br" to { SFIconsData_Br.data },
+        "Bu" to { SFIconsData_Bu.data },
+        "Bl" to { SFIconsData_Bl.data },
+        "B_" to { SFIconsData_B_.data },
+        "Mu" to { SFIconsData_Mu.data },
+        "Me" to { SFIconsData_Me.data },
+        "Ma" to { SFIconsData_Ma.data },
+        "Mo" to { SFIconsData_Mo.data },
+        "Mi" to { SFIconsData_Mi.data },
+        "Mp" to { SFIconsData_Mp.data },
+        "M1" to { SFIconsData_M1.data },
+        "M2" to { SFIconsData_M2.data },
+        "M3" to { SFIconsData_M3.data },
+        "M4" to { SFIconsData_M4.data },
+        "M_" to { SFIconsData_M_.data },
+        "Q" to { SFIconsData_Q.data },
+        "O" to { SFIconsData_O.data },
+        "X" to { SFIconsData_X.data },
+        "Z" to { SFIconsData_Z.data },
+        "W" to { SFIconsData_W.data },
+        "1" to { SFIconsData_1.data },
+        "2" to { SFIconsData_2.data },
+        "3" to { SFIconsData_3.data },
+        "4" to { SFIconsData_4.data },
+        "5" to { SFIconsData_5.data },
+        "6" to { SFIconsData_6.data },
+        "7" to { SFIconsData_7.data },
+        "8" to { SFIconsData_8.data },
+        "9" to { SFIconsData_9.data },
+        "G" to { SFIconsData_G.data },
+        "N" to { SFIconsData_N.data },
+        "V" to { SFIconsData_V.data },
+        "K" to { SFIconsData_K.data },
+        "U" to { SFIconsData_U.data },
+        "Y" to { SFIconsData_Y.data },
+        "J" to { SFIconsData_J.data },
+        "0" to { SFIconsData_0.data }
+    )
+
     fun getIcon(name: String): ImageVector {
         return cache.getOrPut(name) {
-            val pathData = SFIconsData.allPaths[name] ?: ""
-            buildVector(name, pathData)
+            val rawData = findRawData(name) ?: ""
+            val parts = rawData.split('|')
+            val pathData = parts.getOrNull(0) ?: ""
+            val fillType = if (parts.getOrNull(1) == "1") PathFillType.EvenOdd else PathFillType.NonZero
+            buildVector(name, pathData, fillType)
         }
     }
 
-    private fun buildVector(name: String, pathData: String): ImageVector {
+    private fun findRawData(name: String): String? {
+        val entry = shardMap.entries.find { name.startsWith(it.key) }
+        return entry?.value?.invoke()?.get(name)
+    }
+
+    private fun buildVector(name: String, pathData: String, fillType: PathFillType): ImageVector {
         return ImageVector.Builder(
             name = name,
             defaultWidth = 24.dp,
@@ -26,39 +275,48 @@ object SFIcons {
             viewportWidth = 1024.0f,
             viewportHeight = 1024.0f
         ).apply {
-            path(fill = SolidColor(Color.Black)) {
+            path(fill = SolidColor(Color.Black), pathFillType = fillType) {
                 parsePathData(pathData)
             }
         }.build()
     }
 
     private fun PathBuilder.parsePathData(data: String) {
-        val tokens = "([A-Za-z])|(-?[0-9.]+)".toRegex().findAll(data)
-        var currentCmd = ""
-        val args = mutableListOf<Float>()
-        for (token in tokens) {
-            val s = token.value
-            if (s[0].isLetter()) {
-                execute(currentCmd, args)
-                currentCmd = s
-                args.clear()
-            } else {
-                args.add(s.toFloat())
-            }
+        val regex = "([A-Za-z])|(-?\\d*\\.?\\d+)".toRegex()
+        val matches = regex.findAll(data).toList()
+        var i = 0
+        while (i < matches.size) {
+            val cmd = matches[i].value
+            if (cmd[0].isLetter()) {
+                val isRelative = cmd[0].isLowerCase()
+                val command = cmd.uppercase()
+                i++
+                val args = mutableListOf<Float>()
+                while (i < matches.size && (matches[i].value[0].isDigit() || matches[i].value[0] == '-')) {
+                    args.add(matches[i].value.toFloat())
+                    i++
+                }
+                execute(command, isRelative, args)
+            } else { i++ }
         }
-        execute(currentCmd, args)
     }
 
-    private fun PathBuilder.execute(cmd: String, args: List<Float>) {
-        if (cmd == "") return
-        try {
-            when (cmd) {
-                "M" -> for (i in args.indices step 2) moveTo(args[i], args[i+1])
-                "L" -> for (i in args.indices step 2) lineTo(args[i], args[i+1])
-                "Q" -> for (i in args.indices step 4) quadTo(args[i], args[i+1], args[i+2], args[i+3])
-                "Z" -> close()
+    private fun PathBuilder.execute(cmd: String, isRelative: Boolean, args: List<Float>) {
+        when (cmd) {
+            "M" -> for (j in args.indices step 2) if (isRelative) moveToRelative(args[j], args[j+1]) else moveTo(args[j], args[j+1])
+            "L" -> for (j in args.indices step 2) if (isRelative) lineToRelative(args[j], args[j+1]) else lineTo(args[j], args[j+1])
+            "H" -> for (j in args.indices) if (isRelative) horizontalLineToRelative(args[j]) else horizontalLineTo(args[j])
+            "V" -> for (j in args.indices) if (isRelative) verticalLineToRelative(args[j]) else verticalLineTo(args[j])
+            "C" -> for (j in args.indices step 6) if (isRelative) curveToRelative(args[j], args[j+1], args[j+2], args[j+3], args[j+4], args[j+5]) else curveTo(args[j], args[j+1], args[j+2], args[j+3], args[j+4], args[j+5])
+            "S" -> for (j in args.indices step 4) if (isRelative) reflectiveCurveToRelative(args[j], args[j+1], args[j+2], args[j+3]) else reflectiveCurveTo(args[j], args[j+1], args[j+2], args[j+3])
+            "Q" -> for (j in args.indices step 4) if (isRelative) quadToRelative(args[j], args[j+1], args[j+2], args[j+3]) else quadTo(args[j], args[j+1], args[j+2], args[j+3])
+            "T" -> for (j in args.indices step 2) if (isRelative) reflectiveQuadToRelative(args[j], args[j+1]) else reflectiveQuadTo(args[j], args[j+1])
+            "A" -> for (j in args.indices step 7) {
+                if (isRelative) arcToRelative(args[j], args[j+1], args[j+2], args[j+3]!=0f, args[j+4]!=0f, args[j+5], args[j+6])
+                else arcTo(args[j], args[j+1], args[j+2], args[j+3]!=0f, args[j+4]!=0f, args[j+5], args[j+6])
             }
-        } catch (e: Exception) { }
+            "Z" -> close()
+        }
     }
 
     val `Square_And_Arrow_Up`: ImageVector get() = getIcon("Square_And_Arrow_Up")
