@@ -5,6 +5,7 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
+    alias(libs.plugins.ksp)
 }
 
 val localProperties = Properties().apply {
@@ -130,6 +131,9 @@ dependencies {
     implementation(libs.media3.ui)
 
     implementation(libs.kotlinx.serialization.core)
+
+    implementation(project(":tci18n:core"))
+    ksp(project(":tci18n:processor"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)

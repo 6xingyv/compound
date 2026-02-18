@@ -2,24 +2,18 @@ package com.mocharealm.compound.di
 
 import com.mocharealm.compound.data.source.TelegramRepositoryImpl
 import com.mocharealm.compound.domain.repository.TelegramRepository
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationCodeUseCase
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationPasswordUseCase
-import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
-import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
-import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
-import com.mocharealm.compound.domain.usecase.GetChatUseCase
-import com.mocharealm.compound.domain.usecase.GetChatsUseCase
-import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
-import com.mocharealm.compound.domain.usecase.LogoutUseCase
-import com.mocharealm.compound.domain.usecase.SendMessageUseCase
-import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
-import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
+import com.mocharealm.tci18n.core.TdStringProvider
+import com.mocharealm.tci18n.core.tdLangPackId
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.suspendCancellableCoroutine
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
 import org.drinkless.tdlib.TdApi.Object
 import org.koin.dsl.module
+import java.util.Locale
+import kotlin.coroutines.resume
+import kotlin.coroutines.resumeWithException
 
 val dataModule = module {
     single { MutableSharedFlow<TdApi.UpdateFile>(extraBufferCapacity = 64) }
@@ -42,5 +36,45 @@ val dataModule = module {
     }
     single<TelegramRepository> {
         TelegramRepositoryImpl(get(), get(), get(), get())
+    }
+    single {
+        val client: Client = get()
+        TdStringProvider { keys ->
+            val langPackId = tdLangPackId(Locale.getDefault())
+            suspendCancellableCoroutine { syncCont ->
+                client.send(
+                    TdApi.SynchronizeLanguagePack(langPackId),
+                    { result: Object? ->
+                        syncCont.resume(Unit) // continue regardless of sync result
+                    },
+                    { _: Throwable? -> syncCont.resume(Unit) }
+                )
+            }
+            // Now fetch the strings
+            suspendCancellableCoroutine { cont ->
+                client.send(
+                    TdApi.GetLanguagePackStrings(langPackId, keys.toTypedArray()),
+                    { result: Object? ->
+                        when (result) {
+                            is TdApi.LanguagePackStrings -> {
+                                val map = mutableMapOf<String, String>()
+                                for (str in result.strings) {
+                                    val value = str.value
+                                    if (value is TdApi.LanguagePackStringValueOrdinary) {
+                                        map[str.key] = value.value
+                                    }
+                                }
+                                cont.resume(map)
+                            }
+                            is TdApi.Error -> cont.resumeWithException(Exception(result.message))
+                            else -> cont.resume(emptyMap())
+                        }
+                    },
+                    { e: Throwable? ->
+                        cont.resumeWithException(e ?: Exception("Unknown error"))
+                    }
+                )
+            }
+        }
     }
 }

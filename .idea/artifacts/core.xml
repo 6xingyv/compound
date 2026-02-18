@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="core">
+    <output-path>$PROJECT_DIR$/tci18n/core/build/libs</output-path>
+    <root id="archive" name="core.jar">
+      <element id="module-output" name="Compound.tci18n.core.androidMain" />
+    </root>
+  </artifact>
+</component>

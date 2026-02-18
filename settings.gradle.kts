@@ -30,4 +30,4 @@ dependencyResolutionManagement {
 
 rootProject.name = "Compound"
 include(":app")
- 
+include(":tci18n:core",":tci18n:processor")

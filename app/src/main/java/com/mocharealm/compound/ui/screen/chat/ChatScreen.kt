@@ -148,6 +148,7 @@ import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.gaze.ui.modifier.surface
+import com.mocharealm.tci18n.core.tdString
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
@@ -435,7 +436,7 @@ fun ChatScreen(
                                         SFIcons.Microphone, null, modifier = Modifier.clickable {})
                                     Spacer(Modifier.width(8.dp))
                                     Text(
-                                        text = "Say something...",
+                                        text = tdString("AccDescrVoiceMessage"),
                                         Modifier.weight(1f),
                                         style = MiuixTheme.textStyles.body1,
                                         maxLines = 1,
@@ -461,7 +462,19 @@ fun ChatScreen(
                                     inactiveBackgroundColor = Color.Transparent,
                                     activeBorderSize = 0.dp,
                                     inactiveBorderSize = 0.dp,
-                                    textStyle = MiuixTheme.textStyles.body1
+                                    textStyle = MiuixTheme.textStyles.body1,
+                                    decorator = { innerTextField ->
+                                        if (viewModel.inputState.text.isEmpty()) {
+                                            Box {
+                                                innerTextField()
+                                                Text(
+                                                    tdString("TypeMessage","default"),
+                                                    color = LocalContentColor.current.copy(0.4f),
+                                                    style = MiuixTheme.textStyles.body1,
+                                                )
+                                            }
+                                        } else innerTextField()
+                                    }
                                 )
                             }
                         }

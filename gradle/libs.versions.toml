@@ -1,4 +1,6 @@
 [versions]
+appVersionCode = "5"
+appVersionName = "flight 5"
 agp = "9.0.1"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -12,8 +14,8 @@ koin = "4.2.0-RC1"
 miuix = "0.8.3"
 nav3 = "1.1.0-alpha04"
 media3 = "1.9.2"
-appVersionCode = "5"
-appVersionName = "flight 5"
+ksp="2.3.6"
+kotlinpoet = "2.2.0"
 
 [libraries]
 androidx-core-ktx = { group = "androidx.core", name = "core-ktx", version.ref = "coreKtx" }
@@ -44,12 +46,19 @@ gaze-capsule = { module = "com.mocharealm.gaze:capsule", version = "2.1.1-patch2
 gaze-glassy-liquid-effect = { module = "com.mocharealm.gaze:glassy-liquid-effect", version = "2.0.0" }
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version = "6.7.1" }
 kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version = "1.10.0"}
+ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
+kotlinpoet-core = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
+kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
-miuix-nav3 = ["miuix-nav3-ui", "miuix-nav3-adaptive"]
+miuix-nav3 = ["miuix-nav3-adaptive"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref="kotlin" }
+kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
+kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
+kotlin-androidlib = {id="com.android.kotlin.multiplatform.library",version.ref="agp"}
+ksp= {id="com.google.devtools.ksp",version.ref="ksp"}

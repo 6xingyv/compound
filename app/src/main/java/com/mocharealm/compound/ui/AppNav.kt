@@ -27,6 +27,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
+import androidx.navigation3.runtime.rememberSaveableStateHolderNavEntryDecorator
 import androidx.navigation3.ui.NavDisplay
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
@@ -39,6 +40,10 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.BottomTab
 import com.mocharealm.gaze.ui.composable.BottomTabs
 import com.mocharealm.gaze.ui.composable.Button
+import com.mocharealm.tci18n.core.LocalTdStringProvider
+import com.mocharealm.tci18n.core.TdStringProvider
+import com.mocharealm.tci18n.core.tdI18nNavEntryDecorator
+import com.mocharealm.tci18n.generated.TdManifest
 import kotlinx.serialization.Serializable
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
@@ -108,10 +113,25 @@ fun AppNav() {
         { key: NavKey -> currentEntryProvider(key) }
     }
 
-    CompositionLocalProvider(LocalNavigator provides navigator) {
+    val tdStringProvider: TdStringProvider = koinInject()
+    val i18nDecorator = remember(tdStringProvider) {
+        tdI18nNavEntryDecorator<NavKey>(
+            provider = tdStringProvider,
+            getKeys = { pageId -> TdManifest.getKeys(pageId) }
+        )
+    }
+
+    CompositionLocalProvider(
+        LocalNavigator provides navigator,
+        LocalTdStringProvider provides tdStringProvider,
+    ) {
         NavDisplay(
             backStack = backStack,
             onBack = onBack,
+            entryDecorators = listOf(
+                rememberSaveableStateHolderNavEntryDecorator(),
+                i18nDecorator,
+            ),
             entryProvider = entryProvider,
         )
     }
@@ -131,7 +151,7 @@ internal fun HomeScreen() {
             TopLevelNav(
                 "Messages",
                 {
-                    Icon(SFIcons.Message, null)
+                    Icon(SFIcons.Message_Fill, null)
                 },
             ),
             TopLevelNav(
