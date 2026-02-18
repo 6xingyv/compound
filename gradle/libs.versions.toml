@@ -1,6 +1,6 @@
 [versions]
-appVersionCode = "5"
-appVersionName = "flight 5"
+appVersionCode = "6"
+appVersionName = "flight 6"
 agp = "9.0.1"
 coreKtx = "1.17.0"
 junit = "4.13.2"

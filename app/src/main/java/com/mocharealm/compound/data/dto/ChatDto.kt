@@ -35,6 +35,8 @@ data class ChatDto(
                 is TdApi.MessageDocument -> "Document"
                 is TdApi.MessageAudio -> "Audio"
                 is TdApi.MessageVoiceNote -> "Voice message"
+                is TdApi.MessageAnimatedEmoji -> (chat.lastMessage!!.content as TdApi.MessageAnimatedEmoji).emoji
+                is TdApi.MessageSticker -> "Sticker: ${(chat.lastMessage!!.content as TdApi.MessageSticker).sticker.emoji}"
                 else -> "Message $chat"
             }
             val small = chat.photo?.small

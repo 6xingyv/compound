@@ -89,6 +89,7 @@ data class MessageDto(
                     null,
                     entities = mapFormattedTextEntities(content.text)
                 )
+
                 is TdApi.MessagePhoto -> {
                     val caption = content.caption.text
                     val photoFileId = content.photo.sizes.lastOrNull()?.photo?.id
@@ -100,6 +101,23 @@ data class MessageDto(
                         hasSpoiler = content.hasSpoiler
                     )
                 }
+
+                is TdApi.MessageAnimatedEmoji -> {
+                    val sticker = content.animatedEmoji.sticker
+                    val format = when (sticker?.format) {
+                        is TdApi.StickerFormatWebp -> StickerFormat.WEBP
+                        is TdApi.StickerFormatTgs -> StickerFormat.TGS
+                        is TdApi.StickerFormatWebm -> StickerFormat.WEBM
+                        else -> StickerFormat.WEBP
+                    }
+                    ParsedContent(
+                        content.emoji,
+                        MessageType.STICKER,
+                        sticker?.sticker?.id,
+                        format
+                    )
+                }
+
                 is TdApi.MessageSticker -> {
                     val format = when (content.sticker.format) {
                         is TdApi.StickerFormatWebp -> StickerFormat.WEBP
@@ -107,8 +125,14 @@ data class MessageDto(
                         is TdApi.StickerFormatWebm -> StickerFormat.WEBM
                         else -> StickerFormat.WEBP
                     }
-                    ParsedContent("Sticker", MessageType.STICKER, content.sticker.sticker.id, format)
+                    ParsedContent(
+                        "Sticker",
+                        MessageType.STICKER,
+                        content.sticker.sticker.id,
+                        format
+                    )
                 }
+
                 is TdApi.MessageVideo -> {
                     val caption = content.caption.text
                     ParsedContent(
@@ -118,7 +142,13 @@ data class MessageDto(
                         hasSpoiler = content.hasSpoiler
                     )
                 }
-                is TdApi.MessageDocument -> ParsedContent("Document: ${content.document.fileName}", MessageType.DOCUMENT, null)
+
+                is TdApi.MessageDocument -> ParsedContent(
+                    "Document: ${content.document.fileName}",
+                    MessageType.DOCUMENT,
+                    null
+                )
+
                 is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
                 is TdApi.MessageVoiceNote -> ParsedContent("Voice message", MessageType.VOICE, null)
                 is TdApi.MessageChatAddMembers,
@@ -126,7 +156,12 @@ data class MessageDto(
                 is TdApi.MessageChatDeleteMember,
                 is TdApi.MessageChatChangeTitle,
                 is TdApi.MessageChatChangePhoto,
-                is TdApi.MessageChatUpgradeTo -> ParsedContent("System message", MessageType.SYSTEM, null)
+                is TdApi.MessageChatUpgradeTo -> ParsedContent(
+                    "System message",
+                    MessageType.SYSTEM,
+                    null
+                )
+
                 else -> ParsedContent("Message $content", MessageType.TEXT, null)
             }
 
@@ -143,9 +178,11 @@ data class MessageDto(
                     is TdApi.TextEntityTypePreCode -> TextEntityType.PreCode(
                         (entity.type as TdApi.TextEntityTypePreCode).language
                     )
+
                     is TdApi.TextEntityTypeTextUrl -> TextEntityType.TextUrl(
                         (entity.type as TdApi.TextEntityTypeTextUrl).url
                     )
+
                     is TdApi.TextEntityTypeUrl -> TextEntityType.Url
                     is TdApi.TextEntityTypeMention -> TextEntityType.Mention
                     is TdApi.TextEntityTypeMentionName -> TextEntityType.Mention
