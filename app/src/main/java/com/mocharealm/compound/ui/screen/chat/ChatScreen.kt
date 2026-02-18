@@ -26,12 +26,15 @@ import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.IntrinsicSize
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.captionBarPadding
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -68,12 +71,15 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.blur
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.drawWithContent
+import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.ClipOp
@@ -121,8 +127,10 @@ import com.mocharealm.compound.ui.composable.BackNavigationIcon
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
+import com.mocharealm.compound.ui.util.PaddingValuesSide
 import com.mocharealm.compound.ui.util.SpoilerShader
 import com.mocharealm.compound.ui.util.buildAnnotatedString
+import com.mocharealm.compound.ui.util.takeExcept
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
@@ -134,6 +142,8 @@ import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.LiquidSurface
+import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
+import com.mocharealm.gaze.ui.composable.PopupMenu
 import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
@@ -144,6 +154,7 @@ import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
+import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
@@ -201,7 +212,7 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize(), popupHost = {}, topBar = {
+    Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
         Box(
             Modifier
                 .drawWithCache {
@@ -300,7 +311,11 @@ fun ChatScreen(
                 Modifier.size(48.dp)
             ) {
                 androidx.compose.animation.AnimatedVisibility(
-                    !menuOpened.value, enter = fadeIn(), exit = fadeOut()
+                    !menuOpened.value, Modifier.dropShadow(CircleShape) {
+                        radius = 24f.dp.toPx()
+                        offset = Offset(0.dp.toPx(), 0.dp.toPx())
+                        color = Color.Black.copy(alpha = 0.1f)
+                    }, enter = fadeIn(), exit = fadeOut()
                 ) {
                     LiquidSurface(
                         layerBackdrop, Modifier.fillMaxSize(), Modifier.clickable {
@@ -311,15 +326,63 @@ fun ChatScreen(
                             lens(16.dp.toPx(), 32.dp.toPx())
                         }, shadow = {
                             Shadow(
-                                radius = 24f.dp,
+                                radius = 0.dp,
                                 offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Black.copy(alpha = 0.1f),
+                                color = Color.Transparent,
                                 alpha = 1f,
                                 blendMode = DrawScope.DefaultBlendMode
                             )
                         }, surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
                     ) {
                         Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center))
+                    }
+                }
+                PopupMenu(
+                    menuOpened,
+                    layerBackdrop,
+                    popupPositionProvider = OverlayPositionProvider,
+                    alignment = PopupPositionProvider.Align.BottomStart,
+                    surfaceColor = surfaceContainerColor.copy(0.4f),
+                    onDismissRequest = {
+                        menuOpened.value = false
+                    },
+                    effects = {
+                        blur(8.dp.toPx())
+                        lens(16.dp.toPx(), 32.dp.toPx())
+                    }
+                ) {
+                    Column(
+                        Modifier.padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                    ) {
+                        val list = listOf(
+                            "Sticker" to SFIcons.Face_Smiling,
+                            "File" to SFIcons.Document,
+                            "Position" to SFIcons.Rectangle_Dashed
+                        )
+                        list.forEach { item->
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(12.dp)
+                            ) {
+                                Icon(
+                                    item.second,
+                                    null,
+                                    Modifier
+                                        .clip(CircleShape)
+                                        .background(
+                                            Brush.verticalGradient(
+                                                0f to Color.Gray,
+                                                1f to Color.DarkGray
+                                            )
+                                        )
+                                        .padding(8.dp)
+                                        .size(20.dp),
+                                    tint = Color.White
+                                )
+                                Text(item.first)
+                            }
+                        }
                     }
                 }
             }
@@ -674,7 +737,6 @@ private fun MessageBubble(
                 else MiuixTheme.colorScheme.onSurfaceContainer,
             ) {
                 if (isSticker) {
-                    // 贴纸：透明背景，不使用 shape clip
                     MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
                 } else {
                     Box(
@@ -1068,6 +1130,7 @@ private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier)
         }
     }
 
+    // TODO: fix transparent background
     AndroidView(factory = { ctx ->
         TextureView(ctx).apply {
             isOpaque = false
@@ -1109,23 +1172,20 @@ private fun ReplyPreview(
 ) {
     Row(
         modifier = Modifier
+            .padding(start = 12.dp, end = 12.dp, top = 12.dp)
+            .fillMaxWidth()
+            .clip(ContinuousRoundedRectangle(8.dp))
+            .background(MiuixTheme.colorScheme.onSurfaceContainer.copy(0.1f))
             .clickable(onClick = onClick)
-            .padding(start = 12.dp, end = 12.dp, top = 8.dp)
-            .fillMaxWidth(),
+            .drawWithCache {
+                onDrawBehind {
+                    drawRect(accentColor,size= Size(4.dp.toPx(),size.height))
+                }
+            },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Box(
-            modifier = Modifier
-                .width(3.dp)
-                .height(36.dp)
-                .background(
-                    color = accentColor, shape = ContinuousRoundedRectangle(2.dp)
-                )
-        )
         Column(
-            modifier = Modifier
-                .padding(start = 8.dp)
-                .weight(1f)
+            modifier = Modifier.padding(start = 4.dp).padding(8.dp)
         ) {
             Text(
                 text = senderName,
