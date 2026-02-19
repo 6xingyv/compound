@@ -3,8 +3,12 @@ package com.mocharealm.compound.ui.screen.msglist
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocharealm.compound.domain.model.Chat
+import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
+import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
+import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
@@ -24,7 +28,9 @@ data class MsgListUiState(
 
 class MsgListViewModel(
     private val getChats: GetChatsUseCase,
-    private val downloadFile: DownloadFileUseCase
+    private val downloadFile: DownloadFileUseCase,
+    private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
+    private val getChat: GetChatUseCase
 ) : ViewModel() {
 
     companion object {
@@ -36,6 +42,41 @@ class MsgListViewModel(
 
     init {
         loadChats()
+        viewModelScope.launch {
+            subscribeToMessageUpdates().collect { event ->
+                when (event) {
+                    is MessageUpdateEvent.NewMessage -> {
+                        val message = event.message
+                        val chats = _uiState.value.chats.toMutableList()
+                        val index = chats.indexOfFirst { it.id == message.chatId }
+                        if (index != -1) {
+                            val chat = chats[index]
+                            chats.removeAt(index)
+                            chats.add(0, chat.copy(
+                                lastMessage = message.content,
+                                lastMessageDate = message.timestamp,
+                                unreadCount = if (message.isOutgoing) chat.unreadCount else chat.unreadCount + 1
+                            ))
+                            _uiState.update { it.copy(chats = chats) }
+                        } else {
+                            // Fetch new chat
+                            getChat(message.chatId).onSuccess { chat ->
+                                _uiState.update { state ->
+                                    val newChats = state.chats.toMutableList()
+                                    // Check again in case it was added
+                                    if (newChats.none { it.id == chat.id }) {
+                                        newChats.add(0, chat)
+                                    }
+                                    state.copy(chats = newChats)
+                                }
+                                downloadMissingPhotos(listOf(chat))
+                            }
+                        }
+                    }
+                    else -> {}
+                }
+            }
+        }
     }
 
     fun loadChats() {

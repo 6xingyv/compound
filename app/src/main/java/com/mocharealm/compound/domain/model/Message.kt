@@ -16,7 +16,11 @@ data class Message(
     val entities: List<TextEntity> = emptyList(),
     val replyTo: ReplyInfo? = null,
     val mediaAlbumId: Long = 0L,
-    val hasSpoiler: Boolean = false
+    val hasSpoiler: Boolean = false,
+    val thumbnailFileId: Int? = null,
+    val thumbnailUrl: String? = null,
+    val mediaWidth: Int = 0,
+    val mediaHeight: Int = 0
 )
 
 enum class MessageType {

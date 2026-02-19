@@ -33,7 +33,9 @@ val uiModule = module {
     viewModel {
         MsgListViewModel(
             getChats = get(),
-            downloadFile = get()
+            downloadFile = get(),
+            subscribeToMessageUpdates = get(),
+            getChat = get()
         )
     }
     viewModel { (chatId: Long) ->
@@ -41,6 +43,7 @@ val uiModule = module {
             chatId = chatId,
             getChatMessages = get(),
             downloadFile = get(),
+            downloadFileWithProgress = get(),
             sendMessage = get(),
             subscribeToMessageUpdates = get(),
             getChat = get()

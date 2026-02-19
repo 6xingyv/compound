@@ -1,8 +1,5 @@
 package com.mocharealm.compound.ui.screen.chat
 
-import android.net.Uri
-import android.view.TextureView
-import androidx.annotation.OptIn
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.Animatable
@@ -25,6 +22,7 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
 import androidx.compose.foundation.layout.IntrinsicSize
@@ -43,11 +41,13 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
@@ -63,6 +63,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -102,11 +103,9 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.viewinterop.AndroidView
+import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
-import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
-import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
@@ -122,6 +121,7 @@ import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.BackNavigationIcon
+import com.mocharealm.compound.ui.composable.VideoPlayer
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
@@ -129,6 +129,7 @@ import com.mocharealm.compound.ui.util.SpoilerShader
 import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousCapsule
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.drawBackdrop
@@ -145,6 +146,7 @@ import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.gaze.ui.modifier.surface
 import com.mocharealm.tci18n.core.tdString
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
@@ -165,6 +167,11 @@ private enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
 private data class DisplayItem(
     val messages: List<Message>, val isAlbum: Boolean
 )
+
+private val LocalVideoDownloadProgress =
+    staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
+private val LocalOnDownloadVideo =
+    staticCompositionLocalOf<(Long) -> Unit> { {} }
 
 @kotlin.OptIn(ExperimentalLayoutApi::class)
 @Composable
@@ -192,8 +199,6 @@ fun ChatScreen(
         drawContent()
     }
 
-    val scope = rememberCoroutineScope()
-
     val containerWidth = LocalWindowInfo.current.containerDpSize.width
 
     val layoutDirection = LocalLayoutDirection.current
@@ -209,468 +214,482 @@ fun ChatScreen(
         }
     }
 
-    Scaffold(modifier = Modifier.fillMaxSize(), topBar = {
-        Box(
-            Modifier
-                .drawWithCache {
-                    onDrawBehind {
-                        drawRect(
-                            Brush.verticalGradient(
-                                0f to surfaceColor.copy(0.4f),
-                                1f to surfaceColor.copy(0f),
-                                startY = statusBarHeightPx.toFloat()
-                            )
-                        )
-                    }
-                }
-                .statusBarsPadding()) {
-            Row(
+    Scaffold(
+        modifier = Modifier.fillMaxSize(),
+        topBar = {
+            Box(
                 Modifier
-                    .align(Alignment.CenterStart)
-                    .fillMaxWidth()
-            ) {
-                BackNavigationIcon(
-                    modifier = Modifier
-                        .padding(start = 16.dp)
-                        .size(48.dp)
-                        .drawBackdrop(
-                            layerBackdrop, shape = { CircleShape },
-                            effects = {
-                                vibrancy()
-                                blur(4.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx())
-                            },
-                            onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.6f)) },
-                        ),
-                    onClick = { navigator.pop() },
-                )
-            }
-            state.chatInfo?.let { chatInfo ->
-                Column(
-                    Modifier.align(Alignment.Center),
-                    verticalArrangement = Arrangement.spacedBy(-4.dp),
-                    horizontalAlignment = Alignment.CenterHorizontally
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(0.4f),
+                                    1f to surfaceColor.copy(0f),
+                                    startY = statusBarHeightPx.toFloat()
+                                )
+                            )
+                        }
+                    }
+                    .statusBarsPadding()) {
+                Row(
+                    Modifier
+                        .align(Alignment.CenterStart)
+                        .fillMaxWidth()
                 ) {
-                    Avatar(
-                        chatInfo.title.take(2),
+                    BackNavigationIcon(
                         modifier = Modifier
+                            .padding(start = 16.dp)
                             .size(48.dp)
-                            .zIndex(20f),
-                        photoPath = chatInfo.photoUrl
-                    )
-                    Row(
-                        Modifier
-                            .widthIn(max = (containerWidth - 160.dp).coerceAtLeast(0.dp))
                             .drawBackdrop(
-                                layerBackdrop, shape = { ContinuousCapsule },
+                                layerBackdrop, shape = { CircleShape },
                                 effects = {
                                     vibrancy()
                                     blur(4.dp.toPx())
-                                    lens(8.dp.toPx(), 16.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
                                 },
-                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
-                            )
-                            .padding(8.dp, 4.dp),
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            chatInfo.title,
-                            style = MiuixTheme.textStyles.footnote1,
-                            maxLines = 1,
-                            overflow = TextOverflow.Ellipsis,
-                            textAlign = TextAlign.Center
-                        )
-                    }
+                                onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.6f)) },
+                            ),
+                        onClick = { navigator.pop() },
+                    )
                 }
-            }
-        }
-    }, bottomBar = {
-        Row(
-            Modifier
-                .imePadding()
-                .drawWithCache {
-                    onDrawBehind {
-                        drawRect(
-                            Brush.verticalGradient(
-                                0f to surfaceColor.copy(0f), 1f to surfaceColor.copy(1f)
-                            )
-                        )
-                    }
-                }
-                .navigationBarsPadding()
-                .captionBarPadding()
-                .padding(bottom = 16.dp)
-                .fillMaxWidth(),
-            verticalAlignment = Alignment.Bottom) {
-            Spacer(Modifier.width(16.dp))
-            Box(
-                Modifier.size(48.dp)
-            ) {
-                androidx.compose.animation.AnimatedVisibility(
-                    !menuOpened.value, Modifier.dropShadow(CircleShape) {
-                        radius = 24f.dp.toPx()
-                        offset = Offset(0.dp.toPx(), 0.dp.toPx())
-                        color = Color.Black.copy(alpha = 0.1f)
-                    }, enter = fadeIn(), exit = fadeOut()
-                ) {
-                    LiquidSurface(
-                        layerBackdrop, Modifier.fillMaxSize(), Modifier.clickable {
-                            menuOpened.value = true
-                        }, effects = {
-                            vibrancy()
-                            blur(1.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
-                        }, shadow = {
-                            Shadow(
-                                radius = 0.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Transparent,
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        }, surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
-                    ) {
-                        Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center))
-                    }
-                }
-                PopupMenu(
-                    menuOpened,
-                    layerBackdrop,
-                    popupPositionProvider = OverlayPositionProvider,
-                    alignment = PopupPositionProvider.Align.BottomStart,
-                    surfaceColor = surfaceContainerColor.copy(0.4f),
-                    onDismissRequest = {
-                        menuOpened.value = false
-                    },
-                    effects = {
-                        blur(8.dp.toPx())
-                        lens(16.dp.toPx(), 32.dp.toPx())
-                    }
-                ) {
+                state.chatInfo?.let { chatInfo ->
                     Column(
-                        Modifier.padding(16.dp),
-                        verticalArrangement = Arrangement.spacedBy(16.dp)
+                        Modifier.align(Alignment.Center),
+                        verticalArrangement = Arrangement.spacedBy((-4).dp),
+                        horizontalAlignment = Alignment.CenterHorizontally
                     ) {
-                        val list = listOf(
-                            tdString("AttachSticker") to SFIcons.Face_Smiling,
-                            tdString("ChatGallery") to SFIcons.Photo_On_Rectangle_Angled,
-                            tdString("ChatDocument") to SFIcons.Document,
-                            tdString("ChatLocation") to SFIcons.Mappin
+                        Avatar(
+                            chatInfo.title.take(2),
+                            modifier = Modifier
+                                .size(48.dp)
+                                .zIndex(20f),
+                            photoPath = chatInfo.photoUrl
                         )
-                        list.forEach { item ->
-                            Row(
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(12.dp)
-                            ) {
-                                Icon(
-                                    item.second,
-                                    null,
-                                    Modifier
-                                        .clip(CircleShape)
-                                        .background(
-                                            Brush.verticalGradient(
-                                                0f to Color.Gray,
-                                                1f to Color.DarkGray
-                                            )
-                                        )
-                                        .padding(8.dp)
-                                        .size(20.dp),
-                                    tint = Color.White
+                        Row(
+                            Modifier
+                                .widthIn(max = (containerWidth - 160.dp).coerceAtLeast(0.dp))
+                                .drawBackdrop(
+                                    layerBackdrop, shape = { ContinuousCapsule },
+                                    effects = {
+                                        vibrancy()
+                                        blur(4.dp.toPx())
+                                        lens(8.dp.toPx(), 16.dp.toPx())
+                                    },
+                                    onDrawSurface = { drawRect(surfaceContainerColor.copy(alpha = 0.1f)) },
                                 )
-                                Text(item.first)
-                            }
+                                .padding(8.dp, 4.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.spacedBy(8.dp)
+                        ) {
+                            Text(
+                                chatInfo.title,
+                                style = MiuixTheme.textStyles.footnote1,
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis,
+                                textAlign = TextAlign.Center
+                            )
                         }
                     }
                 }
             }
-
-            Spacer(Modifier.width(16.dp))
-            CompositionLocalProvider(
-                LocalIndication provides EmptyIndication
-            ) {
-                LiquidSurface(
-                    layerBackdrop,
-                    Modifier
-                        .weight(1f),
-                    shape = { ContinuousRoundedRectangle(24.dp) },
-                    effects = {
-                        vibrancy()
-                        blur(2.dp.toPx())
-                        lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
-                    },
-                    surfaceColor = surfaceContainerColor.copy(alpha = 0.2f),
-                    shadow = {
-                        Shadow(
-                            radius = 24f.dp,
-                            offset = DpOffset(0.dp, 0.dp),
-                            color = Color.Black.copy(alpha = 0.1f),
-                            alpha = 1f,
-                            blendMode = DrawScope.DefaultBlendMode
-                        )
+        },
+        bottomBar = {
+            Row(
+                Modifier
+                    .imePadding()
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(0f), 1f to surfaceColor.copy(1f)
+                                )
+                            )
+                        }
                     }
+                    .navigationBarsPadding()
+                    .captionBarPadding()
+                    .padding(bottom = 16.dp)
+                    .fillMaxWidth(),
+                verticalAlignment = Alignment.Bottom) {
+                Spacer(Modifier.width(16.dp))
+                Box(
+                    Modifier.size(48.dp)
                 ) {
-                    Row(
-                        Modifier
-                            .padding(start = 12.dp)
-                            .padding(vertical = 12.dp),
-                        verticalAlignment = Alignment.CenterVertically
-                    )
-                    {
-                        var inAudioMode by remember { mutableStateOf(false) }
-                        Box(
-                            modifier = Modifier
-                                .weight(1f)
-                                .heightIn(min = 24.dp),
-                            contentAlignment = Alignment.CenterStart
+                    androidx.compose.animation.AnimatedVisibility(
+                        !menuOpened.value, Modifier.dropShadow(CircleShape) {
+                            radius = 24f.dp.toPx()
+                            offset = Offset(0.dp.toPx(), 0.dp.toPx())
+                            color = Color.Black.copy(alpha = 0.1f)
+                        }, enter = fadeIn(), exit = fadeOut()
+                    ) {
+                        LiquidSurface(
+                            layerBackdrop, Modifier.fillMaxSize(), Modifier.clickable {
+                                menuOpened.value = true
+                            }, effects = {
+                                vibrancy()
+                                blur(1.dp.toPx())
+                                lens(16.dp.toPx(), 32.dp.toPx())
+                            }, shadow = {
+                                Shadow(
+                                    radius = 0.dp,
+                                    offset = DpOffset(0.dp, 0.dp),
+                                    color = Color.Transparent,
+                                    alpha = 1f,
+                                    blendMode = DrawScope.DefaultBlendMode
+                                )
+                            }, surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
                         ) {
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = inAudioMode,
-                                enter = fadeIn() + slideInHorizontally { it },
-                                exit = fadeOut() + slideOutHorizontally { it }) {
-                                Row(verticalAlignment = Alignment.CenterVertically) {
+                            Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center))
+                        }
+                    }
+                    PopupMenu(
+                        menuOpened,
+                        layerBackdrop,
+                        popupPositionProvider = OverlayPositionProvider,
+                        alignment = PopupPositionProvider.Align.BottomStart,
+                        surfaceColor = surfaceContainerColor.copy(0.4f),
+                        onDismissRequest = {
+                            menuOpened.value = false
+                        },
+                        effects = {
+                            blur(8.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx())
+                        }
+                    ) {
+                        Column(
+                            Modifier.padding(16.dp),
+                            verticalArrangement = Arrangement.spacedBy(16.dp)
+                        ) {
+                            val list = listOf(
+                                tdString("AttachSticker") to SFIcons.Face_Smiling,
+                                tdString("ChatGallery") to SFIcons.Photo_On_Rectangle_Angled,
+                                tdString("ChatDocument") to SFIcons.Document,
+                                tdString("ChatLocation") to SFIcons.Mappin
+                            )
+                            list.forEach { item ->
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                ) {
                                     Icon(
-                                        SFIcons.Microphone, null, modifier = Modifier.clickable {})
-                                    Spacer(Modifier.width(8.dp))
-                                    Text(
-                                        text = tdString("AccDescrVoiceMessage"),
-                                        Modifier.weight(1f),
-                                        style = MiuixTheme.textStyles.body1,
-                                        maxLines = 1,
-                                        softWrap = false,
+                                        item.second,
+                                        null,
+                                        Modifier
+                                            .clip(CircleShape)
+                                            .background(
+                                                Brush.verticalGradient(
+                                                    0f to Color.Gray,
+                                                    1f to Color.DarkGray
+                                                )
+                                            )
+                                            .padding(8.dp)
+                                            .size(20.dp),
+                                        tint = Color.White
+                                    )
+                                    Text(item.first)
+                                }
+                            }
+                        }
+                    }
+                }
+
+                Spacer(Modifier.width(16.dp))
+                CompositionLocalProvider(
+                    LocalIndication provides EmptyIndication
+                ) {
+                    LiquidSurface(
+                        layerBackdrop,
+                        Modifier
+                            .weight(1f),
+                        shape = { ContinuousRoundedRectangle(24.dp) },
+                        effects = {
+                            vibrancy()
+                            blur(2.dp.toPx())
+                            lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
+                        },
+                        surfaceColor = surfaceContainerColor.copy(alpha = 0.2f),
+                        shadow = {
+                            Shadow(
+                                radius = 24f.dp,
+                                offset = DpOffset(0.dp, 0.dp),
+                                color = Color.Black.copy(alpha = 0.1f),
+                                alpha = 1f,
+                                blendMode = DrawScope.DefaultBlendMode
+                            )
+                        }
+                    ) {
+                        Row(
+                            Modifier
+                                .padding(start = 12.dp)
+                                .padding(vertical = 12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        )
+                        {
+                            var inAudioMode by remember { mutableStateOf(false) }
+                            Box(
+                                modifier = Modifier
+                                    .weight(1f)
+                                    .heightIn(min = 24.dp),
+                                contentAlignment = Alignment.CenterStart
+                            ) {
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = inAudioMode,
+                                    enter = fadeIn() + slideInHorizontally { it },
+                                    exit = fadeOut() + slideOutHorizontally { it }) {
+                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                        Icon(
+                                            SFIcons.Microphone,
+                                            null,
+                                            modifier = Modifier.clickable {})
+                                        Spacer(Modifier.width(8.dp))
+                                        Text(
+                                            text = tdString("AccDescrVoiceMessage"),
+                                            Modifier.weight(1f),
+                                            style = MiuixTheme.textStyles.body1,
+                                            maxLines = 1,
+                                            softWrap = false,
+                                        )
+                                    }
+                                }
+
+                                androidx.compose.animation.AnimatedVisibility(
+                                    visible = !inAudioMode,
+                                    enter = fadeIn() + slideInHorizontally { -it },
+                                    exit = fadeOut() + slideOutHorizontally { -it }) {
+                                    TextField(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .focusRequester(focusRequester),
+                                        state = viewModel.inputState,
+                                        outputTransformation = MarkdownTransformation,
+                                        lineLimits = TextFieldLineLimits.MultiLine(),
+                                        padding = 0.dp,
+                                        clipRadius = 0.dp,
+                                        activeBackgroundColor = Color.Transparent,
+                                        inactiveBackgroundColor = Color.Transparent,
+                                        activeBorderSize = 0.dp,
+                                        inactiveBorderSize = 0.dp,
+                                        textStyle = MiuixTheme.textStyles.body1,
+                                        decorator = { innerTextField ->
+                                            if (viewModel.inputState.text.isEmpty()) {
+                                                Box {
+                                                    innerTextField()
+                                                    Text(
+                                                        tdString("TypeMessage", "default"),
+                                                        color = LocalContentColor.current.copy(0.4f),
+                                                        style = MiuixTheme.textStyles.body1,
+                                                    )
+                                                }
+                                            } else innerTextField()
+                                        }
                                     )
                                 }
                             }
 
-                            androidx.compose.animation.AnimatedVisibility(
-                                visible = !inAudioMode,
-                                enter = fadeIn() + slideInHorizontally { -it },
-                                exit = fadeOut() + slideOutHorizontally { -it }) {
-                                TextField(
+                            AnimatedVisibility(
+                                visible = (viewModel.inputState.text.lines().size <= 1 || inAudioMode) && !state.loading,
+                                enter = fadeIn(),
+                                exit = fadeOut()
+                            ) {
+                                Box(
                                     modifier = Modifier
-                                        .fillMaxWidth()
-                                        .focusRequester(focusRequester),
-                                    state = viewModel.inputState,
-                                    outputTransformation = MarkdownTransformation,
-                                    lineLimits = TextFieldLineLimits.MultiLine(),
-                                    padding = 0.dp,
-                                    clipRadius = 0.dp,
-                                    activeBackgroundColor = Color.Transparent,
-                                    inactiveBackgroundColor = Color.Transparent,
-                                    activeBorderSize = 0.dp,
-                                    inactiveBorderSize = 0.dp,
-                                    textStyle = MiuixTheme.textStyles.body1,
-                                    decorator = { innerTextField ->
-                                        if (viewModel.inputState.text.isEmpty()) {
-                                            Box {
-                                                innerTextField()
-                                                Text(
-                                                    tdString("TypeMessage", "default"),
-                                                    color = LocalContentColor.current.copy(0.4f),
-                                                    style = MiuixTheme.textStyles.body1,
-                                                )
-                                            }
-                                        } else innerTextField()
-                                    }
-                                )
-                            }
-                        }
-
-                        AnimatedVisibility(
-                            visible = (viewModel.inputState.text.lines().size <= 1 || inAudioMode) && !state.loading,
-                            enter = fadeIn(),
-                            exit = fadeOut()
-                        ) {
-                            Box(
-                                modifier = Modifier
-                                    .padding(horizontal = 12.dp)
-                                    .clickable {
-                                        inAudioMode = !inAudioMode
-                                    }) {
-                                // 使用 AnimatedContent 平滑切换 Mic 和 Close 图标
-                                AnimatedContent(
-                                    targetState = inAudioMode, transitionSpec = {
-                                        (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
-                                    }, label = "IconSwitch"
-                                ) { isAudio ->
-                                    if (isAudio) {
-                                        Icon(SFIcons.Xmark, contentDescription = "Close Audio")
-                                    } else {
-                                        Icon(SFIcons.Microphone, contentDescription = "Open Audio")
+                                        .padding(horizontal = 12.dp)
+                                        .clickable {
+                                            inAudioMode = !inAudioMode
+                                        }) {
+                                    // 使用 AnimatedContent 平滑切换 Mic 和 Close 图标
+                                    AnimatedContent(
+                                        targetState = inAudioMode, transitionSpec = {
+                                            (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
+                                        }, label = "IconSwitch"
+                                    ) { isAudio ->
+                                        if (isAudio) {
+                                            Icon(SFIcons.Xmark, contentDescription = "Close Audio")
+                                        } else {
+                                            Icon(
+                                                SFIcons.Microphone,
+                                                contentDescription = "Open Audio"
+                                            )
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-            Spacer(Modifier.width(16.dp))
-            AnimatedVisibility(
-                !state.loading && viewModel.inputState.text.isNotBlank(),
-                Modifier,
-                enter = fadeIn() + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + expandHorizontally(),
-                exit = fadeOut() + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + shrinkHorizontally()) {
-                LiquidSurface(
-                    layerBackdrop,
-                    Modifier
-                        .padding(end = 16.dp)
-                        .size(48.dp),
-                    Modifier.clickable(onClick = viewModel::sendMessage),
-                    effects = {
-                        vibrancy()
-                        blur(4.dp.toPx())
-                        lens(16.dp.toPx(), 32.dp.toPx())
-                    },
-                    tint = primaryColor,
-                    shadow = {
-                        Shadow(
-                            radius = 16.dp,
-                            offset = DpOffset(0.dp, 0.dp),
-                            alpha = 1f,
-                            blendMode = DrawScope.DefaultBlendMode
-                        )
-                    },
-                ) {
-                    Icon(
-                        SFIcons.Paperplane, null, Modifier.align(Alignment.Center), Color.White
-                    )
-                }
-            }
-        }
-    }) { innerPadding ->
-        val displayMessages = state.messages.reversed()
-
-        val displayItems = remember(displayMessages) {
-            val items = mutableListOf<DisplayItem>()
-            var i = 0
-            while (i < displayMessages.size) {
-                val msg = displayMessages[i]
-                val isMediaAlbumType =
-                    msg.messageType == MessageType.PHOTO || msg.messageType == MessageType.VIDEO
-                if (msg.mediaAlbumId != 0L && isMediaAlbumType) {
-                    val albumId = msg.mediaAlbumId
-                    val albumMessages = mutableListOf(msg)
-                    while (i + 1 < displayMessages.size && displayMessages[i + 1].mediaAlbumId == albumId && (displayMessages[i + 1].messageType == MessageType.PHOTO || displayMessages[i + 1].messageType == MessageType.VIDEO)) {
-                        i++
-                        albumMessages.add(displayMessages[i])
-                    }
-                    items.add(DisplayItem(albumMessages, isAlbum = true))
-                } else {
-                    items.add(DisplayItem(listOf(msg), isAlbum = false))
-                }
-                i++
-            }
-            items
-        }
-
-        val onReplyClick: (Long) -> Unit = { replyMessageId ->
-            viewModel.scrollToMessage(replyMessageId)
-        }
-
-        val scrollTarget = state.scrollToMessageId
-        LaunchedEffect(scrollTarget, displayItems) {
-            if (scrollTarget != null) {
-                val targetIdx = displayItems.indexOfFirst { item ->
-                    item.messages.any { it.id == scrollTarget }
-                }
-                if (targetIdx >= 0) {
-                    listState.animateScrollToItem(targetIdx)
-                    viewModel.clearScrollTarget()
-                }
-            }
-        }
-        LazyColumn(
-            state = listState,
-            reverseLayout = true,
-            modifier = Modifier
-                .layerBackdrop(layerBackdrop)
-                .fillMaxSize()
-                .imeNestedScroll(focusRequester)
-                .scrollEndHaptic(),
-            contentPadding = innerPadding,
-            overscrollEffect = null,
-        ) {
-            if (state.loading && state.messages.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        BasicComponent(title = tdString("Loading"))
-                    }
-                }
-            } else if (state.error != null && state.messages.isEmpty()) {
-                item {
-                    Card(
-                        modifier = Modifier.padding(12.dp)
-                    ) {
-                        BasicComponent(
-                            title = tdString("ErrorOccurred"),
-                            summary = state.error,
-                        )
-                        TextButton(
-                            text = tdString("Retry"),
-                            onClick = { viewModel.loadMessages() },
-                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                        )
-                    }
-                }
-            } else {
-                items(
-                    displayItems.size, key = { displayItems[it].messages.first().id }) { index ->
-                    val item = displayItems[index]
-                    val primaryMessage = item.messages.first()
-
-                    // Group position based on the primary message's senderId
-                    val prevMsg = displayItems.getOrNull(index - 1)?.messages?.first()
-                    val nextMsg = displayItems.getOrNull(index + 1)?.messages?.first()
-
-                    val prevSender = prevMsg?.senderId
-                    val nextSender = nextMsg?.senderId
-
-                    val sameBelow = prevSender == primaryMessage.senderId &&
-                            primaryMessage.messageType != MessageType.SYSTEM &&
-                            prevMsg?.messageType != MessageType.SYSTEM
-                    val sameAbove = nextSender == primaryMessage.senderId &&
-                            primaryMessage.messageType != MessageType.SYSTEM &&
-                            nextMsg?.messageType != MessageType.SYSTEM
-
-                    val groupPosition = when {
-                        !sameAbove && !sameBelow -> GroupPosition.SINGLE
-                        !sameAbove -> GroupPosition.FIRST
-                        !sameBelow -> GroupPosition.LAST
-                        else -> GroupPosition.MIDDLE
-                    }
-
-                    if (primaryMessage.messageType == MessageType.SYSTEM) {
-                        SystemMessage(primaryMessage)
-                    } else if (item.isAlbum) {
-                        MessageBubble(
-                            message = primaryMessage,
-                            groupPosition = groupPosition,
-                            albumMessages = item.messages,
-                            onReplyClick = onReplyClick,
-                        )
-                    } else {
-                        MessageBubble(
-                            message = primaryMessage,
-                            groupPosition = groupPosition,
-                            onReplyClick = onReplyClick,
-                        )
-                    }
-                }
-
-                if (state.loadingMore) {
-                    item {
-                        Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(12.dp),
-                            horizontalArrangement = Arrangement.Center
-                        ) {
-                            Text(
-                                text = tdString("Loading"),
-                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                Spacer(Modifier.width(16.dp))
+                AnimatedVisibility(
+                    !state.loading && viewModel.inputState.text.isNotBlank(),
+                    Modifier,
+                    enter = fadeIn() + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + expandHorizontally(),
+                    exit = fadeOut() + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + shrinkHorizontally()) {
+                    LiquidSurface(
+                        layerBackdrop,
+                        Modifier
+                            .padding(end = 16.dp)
+                            .size(48.dp),
+                        Modifier.clickable(onClick = viewModel::sendMessage),
+                        effects = {
+                            vibrancy()
+                            blur(4.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx())
+                        },
+                        tint = primaryColor,
+                        shadow = {
+                            Shadow(
+                                radius = 16.dp,
+                                offset = DpOffset(0.dp, 0.dp),
+                                alpha = 1f,
+                                blendMode = DrawScope.DefaultBlendMode
                             )
+                        },
+                    ) {
+                        Icon(
+                            SFIcons.Paperplane, null, Modifier.align(Alignment.Center), Color.White
+                        )
+                    }
+                }
+            }
+        }) { innerPadding ->
+        CompositionLocalProvider(
+            LocalVideoDownloadProgress provides state.videoDownloadProgress,
+            LocalOnDownloadVideo provides { messageId: Long -> viewModel.downloadVideo(messageId) }
+        ) {
+            val displayMessages = state.messages.reversed()
+
+            val displayItems = remember(displayMessages) {
+                val items = mutableListOf<DisplayItem>()
+                var i = 0
+                while (i < displayMessages.size) {
+                    val msg = displayMessages[i]
+                    val isMediaAlbumType =
+                        msg.messageType == MessageType.PHOTO || msg.messageType == MessageType.VIDEO
+                    if (msg.mediaAlbumId != 0L && isMediaAlbumType) {
+                        val albumId = msg.mediaAlbumId
+                        val albumMessages = mutableListOf(msg)
+                        while (i + 1 < displayMessages.size && displayMessages[i + 1].mediaAlbumId == albumId && (displayMessages[i + 1].messageType == MessageType.PHOTO || displayMessages[i + 1].messageType == MessageType.VIDEO)) {
+                            i++
+                            albumMessages.add(displayMessages[i])
+                        }
+                        items.add(DisplayItem(albumMessages, isAlbum = true))
+                    } else {
+                        items.add(DisplayItem(listOf(msg), isAlbum = false))
+                    }
+                    i++
+                }
+                items
+            }
+
+            val onReplyClick: (Long) -> Unit = { replyMessageId ->
+                viewModel.scrollToMessage(replyMessageId)
+            }
+
+            val scrollTarget = state.scrollToMessageId
+            LaunchedEffect(scrollTarget, displayItems) {
+                if (scrollTarget != null) {
+                    val targetIdx = displayItems.indexOfFirst { item ->
+                        item.messages.any { it.id == scrollTarget }
+                    }
+                    if (targetIdx >= 0) {
+                        listState.animateScrollToItem(targetIdx)
+                        viewModel.clearScrollTarget()
+                    }
+                }
+            }
+            LazyColumn(
+                state = listState,
+                reverseLayout = true,
+                modifier = Modifier
+                    .layerBackdrop(layerBackdrop)
+                    .fillMaxSize()
+                    .imeNestedScroll(focusRequester)
+                    .scrollEndHaptic(),
+                contentPadding = innerPadding,
+                overscrollEffect = null,
+            ) {
+                if (state.loading && state.messages.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            BasicComponent(title = tdString("Loading"))
+                        }
+                    }
+                } else if (state.error != null && state.messages.isEmpty()) {
+                    item {
+                        Card(
+                            modifier = Modifier.padding(12.dp)
+                        ) {
+                            BasicComponent(
+                                title = tdString("ErrorOccurred"),
+                                summary = state.error,
+                            )
+                            TextButton(
+                                text = tdString("Retry"),
+                                onClick = { viewModel.loadMessages() },
+                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            )
+                        }
+                    }
+                } else {
+                    items(
+                        displayItems.size,
+                        key = { displayItems[it].messages.first().id }) { index ->
+                        val item = displayItems[index]
+                        val primaryMessage = item.messages.first()
+
+                        // Group position based on the primary message's senderId
+                        val prevMsg = displayItems.getOrNull(index - 1)?.messages?.first()
+                        val nextMsg = displayItems.getOrNull(index + 1)?.messages?.first()
+
+                        val prevSender = prevMsg?.senderId
+                        val nextSender = nextMsg?.senderId
+
+                        val sameBelow = prevSender == primaryMessage.senderId &&
+                                primaryMessage.messageType != MessageType.SYSTEM &&
+                                prevMsg?.messageType != MessageType.SYSTEM
+                        val sameAbove = nextSender == primaryMessage.senderId &&
+                                primaryMessage.messageType != MessageType.SYSTEM &&
+                                nextMsg?.messageType != MessageType.SYSTEM
+
+                        val groupPosition = when {
+                            !sameAbove && !sameBelow -> GroupPosition.SINGLE
+                            !sameAbove -> GroupPosition.FIRST
+                            !sameBelow -> GroupPosition.LAST
+                            else -> GroupPosition.MIDDLE
+                        }
+
+                        if (primaryMessage.messageType == MessageType.SYSTEM) {
+                            SystemMessage(primaryMessage)
+                        } else if (item.isAlbum) {
+                            MessageBubble(
+                                message = primaryMessage,
+                                groupPosition = groupPosition,
+                                albumMessages = item.messages,
+                                onReplyClick = onReplyClick,
+                            )
+                        } else {
+                            MessageBubble(
+                                message = primaryMessage,
+                                groupPosition = groupPosition,
+                                onReplyClick = onReplyClick,
+                            )
+                        }
+                    }
+
+                    if (state.loadingMore) {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(12.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = tdString("Loading"),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                )
+                            }
                         }
                     }
                 }
@@ -874,8 +893,9 @@ private fun MessageContent(
 
     val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
     val contentColor = LocalContentColor.current
-    val linkColor = if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
-    else MiuixTheme.colorScheme.primary
+    val linkColor =
+        if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
+        else MiuixTheme.colorScheme.primary
 
     // State for revealed spoilers
     val revealedSpoilers = rememberSaveable(message.id) { mutableStateOf(setOf<Int>()) }
@@ -969,10 +989,148 @@ private fun MessageContent(
             }
         }
 
+        MessageType.VIDEO -> {
+            val maxWidth = 280.dp
+            val aspectRatio = if (message.mediaWidth > 0 && message.mediaHeight > 0)
+                message.mediaWidth.toFloat() / message.mediaHeight.toFloat() else 16f / 9f
+            val videoModifier = Modifier
+                .width(maxWidth)
+                .height(maxWidth / aspectRatio)
+
+            if (!message.fileUrl.isNullOrEmpty()) {
+                Column(modifier = Modifier.width(IntrinsicSize.Min)) {
+                    SpoilerImage(
+                        hasSpoiler = message.hasSpoiler, modifier = Modifier.wrapContentSize()
+                    ) {
+                        MessageVideoPlayer(
+                            filePath = message.fileUrl,
+                            modifier = videoModifier,
+                        )
+                    }
+
+                    val caption = message.content.removePrefix("Video: ").takeIf { it != "Video" }
+                    if (!caption.isNullOrBlank()) {
+                        val captionRich =
+                            remember(caption, message.entities, revealedSpoilers.value) {
+                                buildAnnotatedString(
+                                    caption, message.entities, linkColor, revealedSpoilers.value
+                                )
+                            }
+                        RichTextContent(
+                            text = captionRich,
+                            contentColor = contentColor,
+                            modifier = textPadding.fillMaxWidth(),
+                            uriHandler = uriHandler,
+                            revealedEntityIndices = revealedSpoilers.value,
+                            onSpoilerClick = { index -> revealedSpoilers.value += index })
+                    }
+                }
+            } else {
+                // Not downloaded — show thumbnail + download overlay
+                val downloadPercent = LocalVideoDownloadProgress.current[message.id]
+                val onDownloadVideo = LocalOnDownloadVideo.current
+                val layerBackdrop = rememberLayerBackdrop {
+                    drawRect(Color.Black)
+                    drawContent()
+                }
+                Column(modifier = Modifier.width(IntrinsicSize.Min)) {
+                    Box(
+                        modifier = videoModifier
+                            .clip(RoundedCornerShape(4.dp))
+                            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
+                            .clickable { if (downloadPercent == null) onDownloadVideo(message.id) },
+                        contentAlignment = Alignment.Center
+                    ) {
+                        // Thumbnail
+                        if (!message.thumbnailUrl.isNullOrEmpty()) {
+                            AsyncImage(
+                                model = ImageRequest.Builder(LocalContext.current)
+                                    .data(java.io.File(message.thumbnailUrl)).build(),
+                                contentDescription = "Video thumbnail",
+                                modifier = Modifier
+                                    .matchParentSize()
+                                    .layerBackdrop(layerBackdrop),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+
+                        // Overlay: play icon or progress text
+                        if (downloadPercent != null) {
+                            LiquidSurface(
+                                layerBackdrop,
+                                Modifier.padding(horizontal = 12.dp, vertical = 6.dp),
+                                Modifier.clickable {
+                                    onDownloadVideo(message.id)
+                                },
+                                effects = {
+                                    vibrancy()
+                                    blur(1.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                },
+                                shadow = {
+                                    Shadow(
+                                        radius = 0.dp,
+                                        offset = DpOffset(0.dp, 0.dp),
+                                        color = Color.Transparent,
+                                        alpha = 1f,
+                                        blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                },
+                                surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.6f)
+                            ) {
+                                Text(
+                                    text = "$downloadPercent%",
+                                    color = Color.White,
+                                    fontSize = 16.sp,
+                                    fontWeight = FontWeight.Bold,
+                                )
+                            }
+                        } else {
+                            LiquidSurface(
+                                layerBackdrop, Modifier.size(48.dp), Modifier.clickable {
+                                    onDownloadVideo(message.id)
+                                }, effects = {
+                                    vibrancy()
+                                    lens(8.dp.toPx(), 16.dp.toPx())
+                                }, shadow = {
+                                    Shadow(
+                                        radius = 0.dp,
+                                        offset = DpOffset(0.dp, 0.dp),
+                                        color = Color.Transparent,
+                                        alpha = 1f,
+                                        blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                }, surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.6f)
+                            ) {
+                                Icon(SFIcons.Play_Fill, null, Modifier.align(Alignment.Center))
+                            }
+                        }
+                    }
+
+                    val caption = message.content.removePrefix("Video: ").takeIf { it != "Video" }
+                    if (!caption.isNullOrBlank()) {
+                        val captionRich =
+                            remember(caption, message.entities, revealedSpoilers.value) {
+                                buildAnnotatedString(
+                                    caption, message.entities, linkColor, revealedSpoilers.value
+                                )
+                            }
+                        RichTextContent(
+                            text = captionRich,
+                            contentColor = contentColor,
+                            modifier = textPadding.fillMaxWidth(),
+                            uriHandler = uriHandler,
+                            revealedEntityIndices = revealedSpoilers.value,
+                            onSpoilerClick = { index -> revealedSpoilers.value += index })
+                    }
+                }
+            }
+        }
+
         MessageType.STICKER -> {
             if (!message.fileUrl.isNullOrEmpty()) {
                 when (message.stickerFormat) {
-                    StickerFormat.WEBM -> LoopingVideoSticker(
+                    StickerFormat.WEBM -> VideoPlayer(
                         filePath = message.fileUrl, modifier = Modifier.size(120.dp)
                     )
 
@@ -1201,37 +1359,6 @@ private fun RichTextContent(
             })
 }
 
-@OptIn(UnstableApi::class)
-@Composable
-private fun LoopingVideoSticker(filePath: String, modifier: Modifier = Modifier) {
-    val context = LocalContext.current
-    val exoPlayer = remember(filePath) {
-        ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.fromFile(java.io.File(filePath))))
-            repeatMode = Player.REPEAT_MODE_ALL
-            volume = 0f
-            playWhenReady = true
-            prepare()
-        }
-    }
-
-    DisposableEffect(filePath) {
-        onDispose {
-            exoPlayer.release()
-        }
-    }
-
-    // TODO: fix transparent background
-    AndroidView(factory = { ctx ->
-        TextureView(ctx).apply {
-            isOpaque = false
-        }
-    }, modifier = modifier, update = { textureView ->
-        exoPlayer.setVideoTextureView(textureView)
-    }, onRelease = {
-        exoPlayer.clearVideoTextureView(it)
-    })
-}
 
 @Composable
 private fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
@@ -1298,6 +1425,104 @@ private fun ReplyPreview(
     }
 }
 
+// Only for MessageType.Video
+@Composable
+private fun MessageVideoPlayer(
+    filePath: String,
+    modifier: Modifier = Modifier,
+) {
+    var isControlsVisible by remember { mutableStateOf(false) }
+    val layerBackdrop = rememberLayerBackdrop {
+        drawRect(Color.Black)
+        drawContent()
+    }
+    VideoPlayer(
+        filePath = filePath,
+        modifier = modifier,
+        playerSurfaceModifier = Modifier.layerBackdrop(layerBackdrop),
+        loop = false,
+        mute = false,
+        gestureHandler = {
+            detectTapGestures {
+                isControlsVisible = !isControlsVisible
+            }
+        },
+        playerControls = { player ->
+            ControlLayer(
+                layerBackdrop = layerBackdrop,
+                player = player,
+                isVisible = isControlsVisible,
+                onVisibilityChange = { isControlsVisible = it }
+            )
+        }
+    )
+}
+
+@Composable
+private fun BoxScope.ControlLayer(
+    layerBackdrop: LayerBackdrop,
+    player: ExoPlayer,
+    isVisible: Boolean,
+    onVisibilityChange: (Boolean) -> Unit
+) {
+    var isPlaying by remember { mutableStateOf(player.isPlaying) }
+
+    DisposableEffect(player) {
+        val listener = object : Player.Listener {
+            override fun onIsPlayingChanged(playing: Boolean) {
+                isPlaying = playing
+            }
+        }
+        player.addListener(listener)
+        onDispose { player.removeListener(listener) }
+    }
+
+    LaunchedEffect(isVisible, isPlaying) {
+        if (isVisible && isPlaying) {
+            delay(2000)
+            onVisibilityChange(false)
+        }
+    }
+
+    AnimatedVisibility(
+        visible = isVisible,
+        enter = fadeIn(),
+        exit = fadeOut(),
+        modifier = Modifier.align(Alignment.Center)
+    ) {
+        LiquidSurface(
+            layerBackdrop,
+            Modifier.size(48.dp),
+            Modifier.clickable {
+                if (player.isPlaying) {
+                    player.pause()
+                } else {
+                    player.play()
+                }
+            },
+            effects = {
+                vibrancy()
+                lens(8.dp.toPx(), 16.dp.toPx())
+            },
+            shadow = {
+                Shadow(
+                    radius = 0.dp,
+                    offset = DpOffset(0.dp, 0.dp),
+                    color = Color.Transparent,
+                    alpha = 1f,
+                    blendMode = DrawScope.DefaultBlendMode
+                )
+            },
+            surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.6f)
+        ) {
+            AnimatedContent(isPlaying, Modifier.align(Alignment.Center)) { isPlaying ->
+                if (isPlaying) Icon(SFIcons.Pause_Fill, null)
+                else Icon(SFIcons.Play_Fill, null)
+            }
+        }
+    }
+}
+
 @Composable
 private fun MediaAlbumGrid(messages: List<Message>) {
     val columns = if (messages.size >= 2) 2 else 1
@@ -1318,13 +1543,22 @@ private fun MediaAlbumGrid(messages: List<Message>) {
                                     .heightIn(min = 80.dp, max = 200.dp)
                                     .padding(1.dp), hasSpoiler = msg.hasSpoiler
                             ) {
-                                AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current)
-                                        .data(java.io.File(fileUrl)).build(),
-                                    contentDescription = "Album photo",
-                                    modifier = Modifier.fillMaxSize(),
-                                    contentScale = ContentScale.Crop
-                                )
+                                if (msg.messageType == MessageType.VIDEO) {
+                                    VideoPlayer(
+                                        filePath = fileUrl,
+                                        modifier = Modifier.fillMaxSize(),
+                                        loop = false,
+                                        mute = true
+                                    )
+                                } else {
+                                    AsyncImage(
+                                        model = ImageRequest.Builder(LocalContext.current)
+                                            .data(java.io.File(fileUrl)).build(),
+                                        contentDescription = "Album photo",
+                                        modifier = Modifier.fillMaxSize(),
+                                        contentScale = ContentScale.Crop
+                                    )
+                                }
                             }
                         } else {
                             Box(

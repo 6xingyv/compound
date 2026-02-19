@@ -8,6 +8,7 @@ import com.mocharealm.compound.data.dto.MessageDto
 import com.mocharealm.compound.data.dto.UserDto
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
+import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
@@ -19,6 +20,7 @@ import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.tdLangPackId
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
@@ -35,7 +37,6 @@ import kotlin.coroutines.resumeWithException
 class TelegramRepositoryImpl(
     private val client: Client,
     private val context: Context,
-    private val fileUpdates: SharedFlow<TdApi.UpdateFile>,
     private val updates: SharedFlow<TdApi.Update>
 ) : TelegramRepository {
     private suspend fun <T : TdApi.Object> send(query: TdApi.Function<T>): T =
@@ -286,6 +287,32 @@ class TelegramRepositoryImpl(
         downloaded.local?.path ?: error("Download failed: local path is null")
     }
 
+    override fun downloadFileWithProgress(fileId: Int): Flow<DownloadProgress> = channelFlow {
+        // Check if already downloaded
+        val existingFile = this@TelegramRepositoryImpl.send(TdApi.GetFile(fileId))
+        if (existingFile.local?.isDownloadingCompleted == true) {
+            send(DownloadProgress.Completed(existingFile.local.path))
+            return@channelFlow
+        }
+
+        // Start async download (synchronous = false)
+        this@TelegramRepositoryImpl.sendSafe(TdApi.DownloadFile(fileId, 32, 0, 0, false))
+
+        // Collect progress from UpdateFile events
+        updates
+            .filter { it is TdApi.UpdateFile && it.file.id == fileId }
+            .collect { update ->
+                val file = (update as TdApi.UpdateFile).file
+                if (file.local.isDownloadingCompleted) {
+                    send(DownloadProgress.Completed(file.local.path))
+                    return@collect
+                } else if (file.expectedSize > 0) {
+                    val percent = (file.local.downloadedSize * 100 / file.expectedSize).toInt()
+                    send(DownloadProgress.Downloading(percent))
+                }
+            }
+    }
+
     override suspend fun getChat(chatId: Long): Result<Chat> = runCatching {
         val chat = send(TdApi.GetChat(chatId))
         if (chat !is TdApi.Chat) error("Invalid chat response")
@@ -319,9 +346,9 @@ class TelegramRepositoryImpl(
 
         // Fallback: wait for file update event
         return withTimeoutOrNull(10_000L) {
-            fileUpdates
-                .filter { it.file.id == file.id }
-                .map { it.file.local }
+            updates
+                .filter { it is TdApi.UpdateFile && it.file.id == file.id }
+                .map { (it as TdApi.UpdateFile).file.local }
                 .first { it.isDownloadingCompleted }
         }
     }

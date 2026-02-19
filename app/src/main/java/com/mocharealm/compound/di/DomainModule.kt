@@ -3,6 +3,7 @@ package com.mocharealm.compound.di
 import com.mocharealm.compound.domain.usecase.CheckAuthenticationCodeUseCase
 import com.mocharealm.compound.domain.usecase.CheckAuthenticationPasswordUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
+import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
@@ -50,5 +51,8 @@ val domainModule = module {
     }
     factory {
         SubscribeToMessageUpdatesUseCase(get())
+    }
+    factory {
+        DownloadFileWithProgressUseCase(get())
     }
 }

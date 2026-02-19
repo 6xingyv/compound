@@ -51,7 +51,6 @@ fun MsgListScreen(
     val state by viewModel.uiState.collectAsState()
     val listState = rememberLazyListState()
 
-    // 从 ChatScreen 返回时刷新聊天列表
     LaunchedEffect(refreshSignal) {
         if (refreshSignal > 0) {
             viewModel.refreshChats()

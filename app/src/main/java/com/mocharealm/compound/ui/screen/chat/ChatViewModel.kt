@@ -5,10 +5,12 @@ import androidx.compose.foundation.text.input.clearText
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocharealm.compound.domain.model.Chat
+import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
+import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
@@ -27,12 +29,14 @@ data class ChatUiState(
     val initialLoaded: Boolean = false,
     val error: String? = null,
     val scrollToMessageId: Long? = null,
+    val videoDownloadProgress: Map<Long, Int> = emptyMap()
 )
 
 class ChatViewModel(
     private val chatId: Long,
     private val getChatMessages: GetChatMessagesUseCase,
     private val downloadFile: DownloadFileUseCase,
+    private val downloadFileWithProgress: DownloadFileWithProgressUseCase,
     private val sendMessage: SendMessageUseCase,
     private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
     private val getChat: GetChatUseCase
@@ -279,18 +283,69 @@ class ChatViewModel(
     private fun downloadMissingFiles(messages: List<Message>) {
         val mediaTypes = setOf(MessageType.PHOTO, MessageType.STICKER)
         for (msg in messages) {
-            val fileId = msg.fileId ?: continue
-            if (msg.fileUrl != null) continue
-            if (msg.messageType !in mediaTypes) continue
-            viewModelScope.launch {
-                downloadFile(fileId).onSuccess { path ->
-                    _uiState.update { state ->
-                        val updated = state.messages.toMutableList()
-                        val idx = updated.indexOfFirst { it.id == msg.id }
-                        if (idx >= 0) {
-                            updated[idx] = updated[idx].copy(fileUrl = path)
+            // Download media files (photos, stickers)
+            val fileId = msg.fileId
+            if (fileId != null && msg.fileUrl == null && msg.messageType in mediaTypes) {
+                viewModelScope.launch {
+                    downloadFile(fileId).onSuccess { path ->
+                        _uiState.update { state ->
+                            val updated = state.messages.toMutableList()
+                            val idx = updated.indexOfFirst { it.id == msg.id }
+                            if (idx >= 0) {
+                                updated[idx] = updated[idx].copy(fileUrl = path)
+                            }
+                            state.copy(messages = updated)
                         }
-                        state.copy(messages = updated)
+                    }
+                }
+            }
+            // Download video thumbnails
+            val thumbId = msg.thumbnailFileId
+            if (thumbId != null && msg.thumbnailUrl == null && msg.messageType == MessageType.VIDEO) {
+                viewModelScope.launch {
+                    downloadFile(thumbId).onSuccess { path ->
+                        _uiState.update { state ->
+                            val updated = state.messages.toMutableList()
+                            val idx = updated.indexOfFirst { it.id == msg.id }
+                            if (idx >= 0) {
+                                updated[idx] = updated[idx].copy(thumbnailUrl = path)
+                            }
+                            state.copy(messages = updated)
+                        }
+                    }
+                }
+            }
+        }
+    }
+
+    fun downloadVideo(messageId: Long) {
+        val msg = _uiState.value.messages.find { it.id == messageId } ?: return
+        val fileId = msg.fileId ?: return
+        if (msg.fileUrl != null) return // already downloaded
+        if (_uiState.value.videoDownloadProgress.containsKey(messageId)) return // already downloading
+
+        viewModelScope.launch {
+            downloadFileWithProgress(fileId).collect { progress ->
+                when (progress) {
+                    is DownloadProgress.Downloading -> {
+                        _uiState.update { state ->
+                            state.copy(
+                                videoDownloadProgress = state.videoDownloadProgress + (messageId to progress.percent)
+                            )
+                        }
+                    }
+                    is DownloadProgress.Completed -> {
+                        _uiState.update { state ->
+                            val updated = state.messages.toMutableList()
+                            val idx = updated.indexOfFirst { it.id == messageId }
+                            if (idx >= 0) {
+                                updated[idx] = updated[idx].copy(fileUrl = progress.path)
+                            }
+                            state.copy(
+                                messages = updated,
+                                videoDownloadProgress = state.videoDownloadProgress - messageId
+                            )
+                        }
                     }
                 }
             }

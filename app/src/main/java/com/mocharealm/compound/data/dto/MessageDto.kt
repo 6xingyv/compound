@@ -23,7 +23,10 @@ data class MessageDto(
     val entities: List<TextEntity> = emptyList(),
     val replyTo: ReplyInfo? = null,
     val mediaAlbumId: Long = 0L,
-    val hasSpoiler: Boolean = false
+    val hasSpoiler: Boolean = false,
+    val thumbnailFileId: Int? = null,
+    val mediaWidth: Int = 0,
+    val mediaHeight: Int = 0
 ) {
     fun toDomain(): Message = Message(
         id = id,
@@ -41,7 +44,10 @@ data class MessageDto(
         entities = entities,
         replyTo = replyTo,
         mediaAlbumId = mediaAlbumId,
-        hasSpoiler = hasSpoiler
+        hasSpoiler = hasSpoiler,
+        thumbnailFileId = thumbnailFileId,
+        mediaWidth = mediaWidth,
+        mediaHeight = mediaHeight
     )
 
     companion object {
@@ -51,7 +57,10 @@ data class MessageDto(
             val fileId: Int?,
             val stickerFormat: StickerFormat? = null,
             val entities: List<TextEntity> = emptyList(),
-            val hasSpoiler: Boolean = false
+            val hasSpoiler: Boolean = false,
+            val thumbnailFileId: Int? = null,
+            val mediaWidth: Int = 0,
+            val mediaHeight: Int = 0
         )
 
         fun fromTdApi(
@@ -77,7 +86,10 @@ data class MessageDto(
                 entities = parsed.entities,
                 replyTo = replyInfo,
                 mediaAlbumId = msg.mediaAlbumId,
-                hasSpoiler = parsed.hasSpoiler
+                hasSpoiler = parsed.hasSpoiler,
+                thumbnailFileId = parsed.thumbnailFileId,
+                mediaWidth = parsed.mediaWidth,
+                mediaHeight = parsed.mediaHeight
             )
         }
 
@@ -135,11 +147,16 @@ data class MessageDto(
 
                 is TdApi.MessageVideo -> {
                     val caption = content.caption.text
+                    val videoFileId = content.video.video.id
+                    val thumbFileId = content.video.thumbnail?.file?.id
                     ParsedContent(
                         if (caption.isNotEmpty()) "Video: $caption" else "Video",
                         MessageType.VIDEO,
-                        null,
-                        hasSpoiler = content.hasSpoiler
+                        videoFileId,
+                        hasSpoiler = content.hasSpoiler,
+                        thumbnailFileId = thumbFileId,
+                        mediaWidth = content.video.width,
+                        mediaHeight = content.video.height
                     )
                 }
 

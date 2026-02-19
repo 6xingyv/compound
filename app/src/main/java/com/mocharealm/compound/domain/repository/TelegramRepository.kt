@@ -2,6 +2,7 @@ package com.mocharealm.compound.domain.repository
 
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
+import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.TextEntity
@@ -56,6 +57,11 @@ interface TelegramRepository {
      * 下载文件并返回本地路径
      */
     suspend fun downloadFile(fileId: Int): Result<String>
+
+    /**
+     * 下载文件并通过 Flow 发送进度
+     */
+    fun downloadFileWithProgress(fileId: Int): Flow<DownloadProgress>
 
     /**
      * 发送文本消息

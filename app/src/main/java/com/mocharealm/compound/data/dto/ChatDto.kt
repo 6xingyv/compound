@@ -28,16 +28,8 @@ data class ChatDto(
 
     companion object {
         fun fromTdApi(chat: TdApi.Chat): ChatDto {
-            val lastMessageText = when (chat.lastMessage?.content) {
-                is TdApi.MessageText -> (chat.lastMessage!!.content as TdApi.MessageText).text.text
-                is TdApi.MessagePhoto -> "Photo"
-                is TdApi.MessageVideo -> "Video"
-                is TdApi.MessageDocument -> "Document"
-                is TdApi.MessageAudio -> "Audio"
-                is TdApi.MessageVoiceNote -> "Voice message"
-                is TdApi.MessageAnimatedEmoji -> (chat.lastMessage!!.content as TdApi.MessageAnimatedEmoji).emoji
-                is TdApi.MessageSticker -> "Sticker: ${(chat.lastMessage!!.content as TdApi.MessageSticker).sticker.emoji}"
-                else -> "Message $chat"
+            val lastMessageText = chat.lastMessage?.content?.let {
+                MessageDto.parseMessageContent(it).text
             }
             val small = chat.photo?.small
             val localPath = small?.local?.takeIf { it.isDownloadingCompleted }?.path
