@@ -13,6 +13,7 @@ import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ReplyInfo
+import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.model.SystemActionType
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.User
@@ -273,6 +274,53 @@ class TelegramRepositoryImpl(
             Result.success(mapMessageFast(sentMessage))
         } catch (e: Exception) {
             Result.failure(e)
+        }
+    }
+
+    override suspend fun sendFiles(
+        chatId: Long,
+        files: List<ShareFileInfo>,
+        caption: String,
+        captionEntities: List<TextEntity>,
+        replyToMessageId: Long
+    ): Result<List<Message>> = runCatching {
+        val formattedCaption = TdApi.FormattedText(
+            caption,
+            MessageDto.mapToTdApiEntities(captionEntities)
+        )
+
+        val contents = files.mapIndexed { index, file ->
+            val isLast = index == files.lastIndex
+            val cap = if (isLast) formattedCaption else TdApi.FormattedText("", emptyArray())
+
+            val thumbnail = file.thumbnailPath?.let { path ->
+                TdApi.InputThumbnail(TdApi.InputFileLocal(path), 320, 320)
+            }
+
+            TdApi.InputMessageDocument(
+                TdApi.InputFileLocal(file.filePath),
+                thumbnail,
+                false,
+                cap
+            )
+        }
+
+        val replyTo = if (replyToMessageId != 0L) {
+            TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
+        } else null
+
+        if (contents.size == 1) {
+            val msg = send(
+                TdApi.SendMessage(chatId, null, replyTo, null, null, contents[0])
+            )
+            listOf(mapMessageFast(msg))
+        } else {
+            val messages = send(
+                TdApi.SendMessageAlbum(
+                    chatId, null, replyTo, null, contents.toTypedArray()
+                )
+            )
+            messages.messages.map { mapMessageFast(it) }
         }
     }
 

@@ -1,6 +1,6 @@
 [versions]
-appVersionCode = "6"
-appVersionName = "flight 6"
+appVersionCode = "7"
+appVersionName = "flight 7"
 agp = "9.0.1"
 coreKtx = "1.17.0"
 junit = "4.13.2"
@@ -40,6 +40,7 @@ miuix-nav3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version
 miuix-nav3-adaptive = { module = "top.yukonga.miuix.kmp:miuix-navigation3-adaptive", version.ref = "miuix" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version = "3.3.0" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version = "3.3.0" }
+coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version = "3.3.0" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref="media3" }
 media3-ui = { module = "androidx.media3:media3-ui-compose", version.ref="media3" }
 gaze-capsule = { module = "com.mocharealm.gaze:capsule", version = "2.1.1-patch2" }
@@ -53,7 +54,7 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
 miuix-nav3 = ["miuix-nav3-ui","miuix-nav3-adaptive"]
-
+coil = ["coil-compose","coil-gif","coil-network-okhttp"]
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }

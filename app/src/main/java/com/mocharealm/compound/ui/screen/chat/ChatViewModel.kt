@@ -20,8 +20,28 @@ import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
+enum class GroupPosition { FIRST, MIDDLE, LAST, SINGLE }
+
+sealed interface ChatItem {
+    val key: String
+}
+
+data class TimestampItem(val timestamp: Long) : ChatItem {
+    override val key = "ts_$timestamp"
+}
+
+data class MessageItem(
+    val messages: List<Message>,
+    val isAlbum: Boolean,
+    val groupPosition: GroupPosition
+) : ChatItem {
+    override val key = "msg_${messages.first().id}"
+    val primaryMessage get() = messages.first()
+}
+
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
+    val chatItems: List<ChatItem> = emptyList(),
     val chatInfo: Chat? = null,
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
@@ -60,11 +80,11 @@ class ChatViewModel(
                     when (event) {
                         is MessageUpdateEvent.NewMessage -> {
                             if (event.message.chatId == chatId) {
-                                _uiState.update { state ->
-                                    if (state.messages.any { it.id == event.message.id }) {
-                                        state
+                                updateMessagesState { currentMessages ->
+                                    if (currentMessages.any { it.id == event.message.id }) {
+                                        currentMessages
                                     } else {
-                                        state.copy(messages = state.messages + event.message)
+                                        currentMessages + event.message
                                     }
                                 }
                                 downloadMissingFiles(listOf(event.message))
@@ -73,15 +93,15 @@ class ChatViewModel(
 
                         is MessageUpdateEvent.MessageUpdated -> {
                             if (event.message.chatId == chatId) {
-                                _uiState.update { state ->
+                                updateMessagesState { currentMessages ->
                                     val index =
-                                        state.messages.indexOfFirst { it.id == event.message.id }
+                                        currentMessages.indexOfFirst { it.id == event.message.id }
                                     if (index != -1) {
-                                        val updated = state.messages.toMutableList()
+                                        val updated = currentMessages.toMutableList()
                                         updated[index] = event.message
-                                        state.copy(messages = updated)
+                                        updated
                                     } else {
-                                        state
+                                        currentMessages
                                     }
                                 }
                                 downloadMissingFiles(listOf(event.message))
@@ -90,18 +110,18 @@ class ChatViewModel(
 
                         is MessageUpdateEvent.MessageSendSucceeded -> {
                             if (event.message.chatId == chatId) {
-                                _uiState.update { state ->
+                                updateMessagesState { currentMessages ->
                                     val oldIndex =
-                                        state.messages.indexOfFirst { it.id == event.oldMessageId }
+                                        currentMessages.indexOfFirst { it.id == event.oldMessageId }
                                     if (oldIndex != -1) {
-                                        val updated = state.messages.toMutableList()
+                                        val updated = currentMessages.toMutableList()
                                         updated[oldIndex] = event.message
-                                        state.copy(messages = updated)
+                                        updated
                                     } else {
-                                        if (state.messages.any { it.id == event.message.id }) {
-                                            state
+                                        if (currentMessages.any { it.id == event.message.id }) {
+                                            currentMessages
                                         } else {
-                                            state.copy(messages = state.messages + event.message)
+                                            currentMessages + event.message
                                         }
                                     }
                                 }
@@ -111,16 +131,13 @@ class ChatViewModel(
 
                         is MessageUpdateEvent.MessageDeleted -> {
                             if (event.chatId == chatId) {
-                                _uiState.update { state ->
-                                    val updated =
-                                        state.messages.filterNot { it.id == event.messageId }
-                                    state.copy(messages = updated)
+                                updateMessagesState { currentMessages ->
+                                    currentMessages.filterNot { it.id == event.messageId }
                                 }
                             }
                         }
                     }
                 }
-
         }
     }
 
@@ -144,9 +161,6 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * 加载消息：先从本地缓存加载，再从网络获取最新消息
-     */
     fun loadMessages() {
         viewModelScope.launch {
             _uiState.update {
@@ -158,13 +172,13 @@ class ChatViewModel(
                 )
             }
 
-            // ① 先加载本地缓存消息（立即显示）
             val localResult = getChatMessages(chatId, PAGE_SIZE, onlyLocal = true)
             localResult.onSuccess { localMessages ->
                 if (localMessages.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
                             messages = localMessages,
+                            chatItems = computeChatItems(localMessages),
                             loading = false,
                             initialLoaded = true,
                         )
@@ -173,12 +187,10 @@ class ChatViewModel(
                 }
             }
 
-            // ② 再从网络加载最新消息（覆盖/补充）
             getChatMessages(chatId, PAGE_SIZE)
                 .fold(
                     onSuccess = { networkMessages ->
                         _uiState.update { state ->
-                            // 合并：网络消息为准，保留已有 fileUrl
                             val existingFileUrls = state.messages.associate { it.id to it.fileUrl }
                             val merged = networkMessages.map { msg ->
                                 val existingUrl = existingFileUrls[msg.id]
@@ -186,6 +198,7 @@ class ChatViewModel(
                             }
                             state.copy(
                                 messages = merged,
+                                chatItems = computeChatItems(merged),
                                 loading = false,
                                 hasMore = networkMessages.size >= PAGE_SIZE,
                                 initialLoaded = true,
@@ -194,7 +207,6 @@ class ChatViewModel(
                         downloadMissingFiles(networkMessages)
                     },
                     onFailure = { error ->
-                        // 网络失败时，如果本地已有数据就保留，只清 loading
                         _uiState.update { state ->
                             if (state.messages.isEmpty()) {
                                 state.copy(error = error.message, loading = false)
@@ -207,9 +219,6 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * 向上滚动加载更旧的消息
-     */
     fun loadOlderMessages() {
         val state = _uiState.value
         if (state.loadingMore || state.loading || !state.hasMore) return
@@ -223,12 +232,13 @@ class ChatViewModel(
                         if (olderMessages.isEmpty()) {
                             _uiState.update { it.copy(loadingMore = false, hasMore = false) }
                         } else {
-                            // 去重：过滤掉已有的消息
                             val existingIds = state.messages.map { it.id }.toSet()
                             val newMessages = olderMessages.filter { it.id !in existingIds }
+                            val combinedMessages = newMessages + state.messages
                             _uiState.update {
                                 it.copy(
-                                    messages = newMessages + it.messages,
+                                    messages = combinedMessages,
+                                    chatItems = computeChatItems(combinedMessages),
                                     loadingMore = false,
                                     hasMore = olderMessages.size >= PAGE_SIZE,
                                 )
@@ -243,26 +253,24 @@ class ChatViewModel(
         }
     }
 
-    /**
-     * 跳转到指定消息：如果尚未加载，则加载包含该消息的批次
-     */
     fun scrollToMessage(messageId: Long) {
-        // If already in the list, just signal scroll
         if (_uiState.value.messages.any { it.id == messageId }) {
             _uiState.update { it.copy(scrollToMessageId = messageId) }
             return
         }
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
-            // Load a page of messages starting from the target message
             getChatMessages(chatId, PAGE_SIZE, fromMessageId = messageId, offset = -1)
                 .fold(
                     onSuccess = { loaded ->
                         val existingIds = _uiState.value.messages.map { it.id }.toSet()
                         val newMessages = loaded.filter { it.id !in existingIds }
+                        val combinedMessages =
+                            (newMessages + _uiState.value.messages).sortedBy { it.timestamp }
                         _uiState.update { state ->
                             state.copy(
-                                messages = (newMessages + state.messages).sortedBy { it.timestamp },
+                                messages = combinedMessages,
+                                chatItems = computeChatItems(combinedMessages),
                                 loadingMore = false,
                                 scrollToMessageId = messageId
                             )
@@ -280,37 +288,103 @@ class ChatViewModel(
         _uiState.update { it.copy(scrollToMessageId = null) }
     }
 
+    private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {
+        _uiState.update { state ->
+            val newMessages = updateFn(state.messages)
+            state.copy(
+                messages = newMessages,
+                chatItems = computeChatItems(newMessages)
+            )
+        }
+    }
+
+    private fun computeChatItems(messages: List<Message>): List<ChatItem> {
+        val items = mutableListOf<ChatItem>()
+        var lastTimestamp = 0L
+
+        var i = 0
+        while (i < messages.size) {
+            val msg = messages[i]
+
+            if (lastTimestamp == 0L || msg.timestamp - lastTimestamp > 300) {
+                items.add(TimestampItem(msg.timestamp))
+                lastTimestamp = msg.timestamp
+            }
+
+            val albumMessages = mutableListOf(msg)
+            if (
+                msg.mediaAlbumId != 0L
+                && msg.messageType in listOf(
+                    MessageType.PHOTO, MessageType.VIDEO,
+                    MessageType.DOCUMENT
+                )
+            ) {
+                while (i + 1 < messages.size && messages[i + 1].mediaAlbumId == msg.mediaAlbumId &&
+                    (messages[i + 1].messageType == MessageType.PHOTO || messages[i + 1].messageType == MessageType.VIDEO)
+                ) {
+                    i++
+                    albumMessages.add(messages[i])
+                }
+            }
+
+            items.add(MessageItem(albumMessages, albumMessages.size > 1, GroupPosition.SINGLE))
+            i++
+        }
+
+        for (j in items.indices) {
+            val current = items[j] as? MessageItem ?: continue
+            val primary = current.primaryMessage
+
+            if (primary.messageType == MessageType.SYSTEM) continue
+            val prevItem = items.getOrNull(j - 1) as? MessageItem
+            val nextItem = items.getOrNull(j + 1) as? MessageItem
+
+            val sameAbove =
+                prevItem?.primaryMessage?.senderId == primary.senderId && prevItem.primaryMessage.messageType != MessageType.SYSTEM
+            val sameBelow =
+                nextItem?.primaryMessage?.senderId == primary.senderId && nextItem.primaryMessage.messageType != MessageType.SYSTEM
+
+            val position = when {
+                !sameAbove && !sameBelow -> GroupPosition.SINGLE
+                !sameAbove -> GroupPosition.FIRST
+                !sameBelow -> GroupPosition.LAST
+                else -> GroupPosition.MIDDLE
+            }
+            items[j] = current.copy(groupPosition = position)
+        }
+
+        return items.reversed()
+    }
+
     private fun downloadMissingFiles(messages: List<Message>) {
         val mediaTypes = setOf(MessageType.PHOTO, MessageType.STICKER)
         for (msg in messages) {
-            // Download media files (photos, stickers)
             val fileId = msg.fileId
             if (fileId != null && msg.fileUrl == null && msg.messageType in mediaTypes) {
                 viewModelScope.launch {
                     downloadFile(fileId).onSuccess { path ->
-                        _uiState.update { state ->
-                            val updated = state.messages.toMutableList()
+                        updateMessagesState { currentMessages ->
+                            val updated = currentMessages.toMutableList()
                             val idx = updated.indexOfFirst { it.id == msg.id }
                             if (idx >= 0) {
                                 updated[idx] = updated[idx].copy(fileUrl = path)
                             }
-                            state.copy(messages = updated)
+                            updated
                         }
                     }
                 }
             }
-            // Download video thumbnails
             val thumbId = msg.thumbnailFileId
             if (thumbId != null && msg.thumbnailUrl == null && msg.messageType == MessageType.VIDEO) {
                 viewModelScope.launch {
                     downloadFile(thumbId).onSuccess { path ->
-                        _uiState.update { state ->
-                            val updated = state.messages.toMutableList()
+                        updateMessagesState { currentMessages ->
+                            val updated = currentMessages.toMutableList()
                             val idx = updated.indexOfFirst { it.id == msg.id }
                             if (idx >= 0) {
                                 updated[idx] = updated[idx].copy(thumbnailUrl = path)
                             }
-                            state.copy(messages = updated)
+                            updated
                         }
                     }
                 }
@@ -321,8 +395,8 @@ class ChatViewModel(
     fun downloadVideo(messageId: Long) {
         val msg = _uiState.value.messages.find { it.id == messageId } ?: return
         val fileId = msg.fileId ?: return
-        if (msg.fileUrl != null) return // already downloaded
-        if (_uiState.value.videoDownloadProgress.containsKey(messageId)) return // already downloading
+        if (msg.fileUrl != null) return
+        if (_uiState.value.videoDownloadProgress.containsKey(messageId)) return
 
         viewModelScope.launch {
             downloadFileWithProgress(fileId).collect { progress ->
@@ -334,17 +408,18 @@ class ChatViewModel(
                             )
                         }
                     }
+
                     is DownloadProgress.Completed -> {
-                        _uiState.update { state ->
-                            val updated = state.messages.toMutableList()
+                        updateMessagesState { currentMessages ->
+                            val updated = currentMessages.toMutableList()
                             val idx = updated.indexOfFirst { it.id == messageId }
                             if (idx >= 0) {
                                 updated[idx] = updated[idx].copy(fileUrl = progress.path)
                             }
-                            state.copy(
-                                messages = updated,
-                                videoDownloadProgress = state.videoDownloadProgress - messageId
-                            )
+                            updated
+                        }
+                        _uiState.update { state ->
+                            state.copy(videoDownloadProgress = state.videoDownloadProgress - messageId)
                         }
                     }
                 }

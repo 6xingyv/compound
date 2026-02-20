@@ -20,7 +20,8 @@ data class Message(
     val thumbnailFileId: Int? = null,
     val thumbnailUrl: String? = null,
     val mediaWidth: Int = 0,
-    val mediaHeight: Int = 0
+    val mediaHeight: Int = 0,
+    val shareInfo: ShareInfo? = null
 )
 
 enum class MessageType {

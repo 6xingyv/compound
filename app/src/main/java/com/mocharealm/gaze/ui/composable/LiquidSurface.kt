@@ -41,7 +41,7 @@ fun LiquidSurface(
     effects: BackdropEffectScope.() -> Unit = {
         vibrancy()
         blur(2f.dp.toPx())
-        lens(12f.dp.toPx(), 24f.dp.toPx())
+        lens(12f.dp.toPx(), 24f.dp.toPx(), chromaticAberration = false)
     },
     shadow: (() -> Shadow?)? = { Shadow.Default },
     exportedBackdrop: LayerBackdrop? = null,

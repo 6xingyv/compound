@@ -124,8 +124,7 @@ dependencies {
     implementation(libs.gaze.capsule)
     implementation(libs.gaze.glassy.liquid.effect)
 
-    implementation(libs.coil.compose)
-    implementation(libs.coil.gif)
+    implementation(libs.bundles.coil)
     implementation(libs.lottie.compose)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)

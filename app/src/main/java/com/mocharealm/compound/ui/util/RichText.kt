@@ -30,6 +30,11 @@ fun buildAnnotatedString(
         append(text)
 
         entities.forEachIndexed { index, entity ->
+            // Skip Compound share protocol entities (invisible metadata)
+            if (entity.type is TextEntityType.TextUrl &&
+                entity.type.url.startsWith("https://compound.mocharealm.com/share")
+            ) return@forEachIndexed
+
             val start = entity.offset
             val end = (entity.offset + entity.length).coerceAtMost(text.length)
             if (start >= text.length || start >= end) return@forEachIndexed

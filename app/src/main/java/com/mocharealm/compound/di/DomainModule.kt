@@ -10,6 +10,7 @@ import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
 import com.mocharealm.compound.domain.usecase.LogoutUseCase
+import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
@@ -45,6 +46,9 @@ val domainModule = module {
     }
     factory {
         SendMessageUseCase(get())
+    }
+    factory {
+        SendFilesUseCase(get())
     }
     factory {
         GetChatUseCase(get())

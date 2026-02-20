@@ -27,6 +27,7 @@ fun VideoPlayer(
     playerSurfaceModifier: Modifier = Modifier,
     loop: Boolean = true,
     mute: Boolean = true,
+    playWhenReady: Boolean = true,
     gestureHandler: PointerInputEventHandler = {},
     playerControls: @Composable BoxScope.(player: ExoPlayer) -> Unit = { _ -> }
 ) {
@@ -36,7 +37,9 @@ fun VideoPlayer(
             setMediaItem(MediaItem.fromUri(Uri.fromFile(java.io.File(filePath))))
             repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
             volume = if (mute) 0f else 1f
-            playWhenReady = true
+            if (playWhenReady) {
+                this.playWhenReady = true
+            }
             prepare()
         }
     }

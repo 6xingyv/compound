@@ -6,6 +6,7 @@ import com.mocharealm.compound.domain.model.ReplyInfo
 import com.mocharealm.compound.domain.model.StickerFormat
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.TextEntityType
+import com.mocharealm.compound.domain.util.ShareProtocol
 import org.drinkless.tdlib.TdApi
 
 data class MessageDto(
@@ -28,27 +29,41 @@ data class MessageDto(
     val mediaWidth: Int = 0,
     val mediaHeight: Int = 0
 ) {
-    fun toDomain(): Message = Message(
-        id = id,
-        chatId = chatId,
-        senderId = senderId,
-        senderName = senderName,
-        content = content,
-        timestamp = timestamp,
-        isOutgoing = isOutgoing,
-        messageType = messageType,
-        fileUrl = null,
-        fileId = fileId,
-        avatarUrl = avatarUrl,
-        stickerFormat = stickerFormat,
-        entities = entities,
-        replyTo = replyTo,
-        mediaAlbumId = mediaAlbumId,
-        hasSpoiler = hasSpoiler,
-        thumbnailFileId = thumbnailFileId,
-        mediaWidth = mediaWidth,
-        mediaHeight = mediaHeight
-    )
+    fun toDomain(): Message {
+        val shareInfo = ShareProtocol.decode(content, entities)
+        if (shareInfo != null) {
+            android.util.Log.d("ShareProtocol", "Decoded ShareInfo: $shareInfo")
+        } else {
+             // Look for ANY compound share URL to see if it exists but decode failed
+            val rawUrl = entities.find { (it.type as? TextEntityType.TextUrl)?.url?.startsWith("https://compound.mocharealm.com/share") == true }
+            if (rawUrl != null) {
+                android.util.Log.d("ShareProtocol", "Found raw URL entity but decode returned null: ${(rawUrl.type as TextEntityType.TextUrl).url}")
+            }
+        }
+        val (strippedContent, strippedEntities) = ShareProtocol.strip(content, entities)
+        return Message(
+            id = id,
+            chatId = chatId,
+            senderId = senderId,
+            senderName = senderName,
+            content = strippedContent,
+            timestamp = timestamp,
+            isOutgoing = isOutgoing,
+            messageType = messageType,
+            fileUrl = null,
+            fileId = fileId,
+            avatarUrl = avatarUrl,
+            stickerFormat = stickerFormat,
+            entities = strippedEntities,
+            replyTo = replyTo,
+            mediaAlbumId = mediaAlbumId,
+            hasSpoiler = hasSpoiler,
+            thumbnailFileId = thumbnailFileId,
+            mediaWidth = mediaWidth,
+            mediaHeight = mediaHeight,
+            shareInfo = shareInfo
+        )
+    }
 
     companion object {
         data class ParsedContent(
@@ -160,11 +175,14 @@ data class MessageDto(
                     )
                 }
 
-                is TdApi.MessageDocument -> ParsedContent(
-                    "Document: ${content.document.fileName}",
-                    MessageType.DOCUMENT,
-                    null
-                )
+                is TdApi.MessageDocument -> {
+                    ParsedContent(
+                        content.document.fileName,
+                        MessageType.DOCUMENT,
+                        null,
+                        entities = mapFormattedTextEntities(content.caption)
+                    )
+                }
 
                 is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
                 is TdApi.MessageVoiceNote -> ParsedContent("Voice message", MessageType.VOICE, null)

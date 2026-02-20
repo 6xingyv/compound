@@ -5,6 +5,7 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
+import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.model.TextEntity
 import com.mocharealm.compound.domain.model.User
 import kotlinx.coroutines.flow.Flow
@@ -67,6 +68,17 @@ interface TelegramRepository {
      * 发送文本消息
      */
     suspend fun sendMessage(chatId: Long, text: String, entities: List<TextEntity> = emptyList(), replyToMessageId: Long = 0): Result<Message>
+
+    /**
+     * 发送文件（单个或多个组成相册）
+     */
+    suspend fun sendFiles(
+        chatId: Long,
+        files: List<ShareFileInfo>,
+        caption: String = "",
+        captionEntities: List<TextEntity> = emptyList(),
+        replyToMessageId: Long = 0
+    ): Result<List<Message>>
 
     /**
      * 实时消息流
