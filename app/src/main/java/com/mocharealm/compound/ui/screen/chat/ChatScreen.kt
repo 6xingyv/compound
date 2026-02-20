@@ -37,6 +37,7 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -896,9 +897,9 @@ private fun MessageContent(
     val rootModifier = if (useIntrinsicWidth) {
         Modifier
             .width(IntrinsicSize.Min)
-            .widthIn(min = 44.dp)
+            .sizeIn(44.dp,50.dp)
     } else {
-        Modifier.widthIn(min = 44.dp)
+        Modifier.sizeIn(44.dp,50.dp)
     }
 
     Column(modifier = rootModifier) {
