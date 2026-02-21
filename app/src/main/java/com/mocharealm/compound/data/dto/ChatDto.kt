@@ -7,13 +7,14 @@ import org.drinkless.tdlib.TdApi
 data class ChatDto(
     val id: Long,
     val title: String,
+    val lastMessageSenderId: Long? = null,
     val lastMessage: String? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
     val isChannel: Boolean = false,
     val isGroup: Boolean = false,
     val photoUrl: String? = null,
-    val photoFileId: Int? = null
+    val photoFileId: Int? = null,
 ) {
     fun toDomain(): Chat = Chat(
         id = id,
@@ -37,12 +38,19 @@ data class ChatDto(
             val isGroup =
                 type is TdApi.ChatTypeBasicGroup || (supergroup != null && !supergroup.isChannel)
 
-            val lastMessageText = chat.lastMessage?.content?.let {
+            val lastMsg = chat.lastMessage
+            val senderId = when (val s = lastMsg?.senderId) {
+                is TdApi.MessageSenderUser -> s.userId
+                is TdApi.MessageSenderChat -> s.chatId
+                else -> null
+            }
+            val lastMessageText = lastMsg?.content?.let {
                 MessageDto.parseMessageContent(it).text
             }
             return ChatDto(
                 id = chat.id,
                 title = chat.title,
+                lastMessageSenderId = senderId,
                 lastMessage = lastMessageText,
                 lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
                 unreadCount = chat.unreadCount,

@@ -192,10 +192,28 @@ class TelegramRepositoryImpl(
 
         val chats = mutableListOf<Chat>()
         for (id in chatIds) {
-            val chat = runCatching { send(TdApi.GetChat(id)) }.getOrNull()
-            if (chat is TdApi.Chat) {
-                chats.add(ChatDto.fromTdApi(chat).toDomain())
+            val tdChat = runCatching { send(TdApi.GetChat(id)) }.getOrNull() as? TdApi.Chat ?: continue
+            val dto = ChatDto.fromTdApi(tdChat)
+
+            var lastMsgContent = dto.lastMessage
+
+            if (dto.isGroup && dto.lastMessageSenderId != null) {
+                val senderName = when {
+                    dto.lastMessageSenderId < 0 -> {
+                        sendSafe(TdApi.GetChat(dto.lastMessageSenderId)).getOrNull()?.title
+                    }
+                    else -> {
+                        val user = sendSafe(TdApi.GetUser(dto.lastMessageSenderId)).getOrNull()
+                        user?.let { "${it.firstName} ${it.lastName}".trim() }
+                    }
+                }
+
+                if (!senderName.isNullOrEmpty()) {
+                    lastMsgContent = "$senderName: $lastMsgContent"
+                }
             }
+
+            chats.add(dto.toDomain().copy(lastMessage = lastMsgContent))
         }
         chats
     }
@@ -213,8 +231,6 @@ class TelegramRepositoryImpl(
         messages.reversed()
     }
 
-    // ── Mapping helpers (fast, no network) ─────────────────────────────
-
     private suspend fun parseAuthState(state: TdApi.Object): AuthState = when (state) {
         is TdApi.Ok -> parseAuthState(send(TdApi.GetAuthorizationState()))
         is TdApi.AuthorizationStateWaitPhoneNumber -> AuthState.WaitingForPhoneNumber
@@ -230,8 +246,6 @@ class TelegramRepositoryImpl(
         }
         else -> AuthState.Error("Unknown authentication state: $state")
     }
-
-    // ── File download ────────────────────────────────────────────────────
 
     override suspend fun sendMessage(
         chatId: Long,
@@ -406,9 +420,6 @@ class TelegramRepositoryImpl(
         return UserDto.fromTdApi(user, photoPath).toDomain()
     }
 
-
-
-    /** Suspend mapper — resolves real sender name and avatar via TDLib. */
     private suspend fun mapMessageFast(msg: TdApi.Message): Message {
         val senderId: Long
         val senderName: String
@@ -570,6 +581,4 @@ class TelegramRepositoryImpl(
             text = previewText
         )
     }
-
-
 }
