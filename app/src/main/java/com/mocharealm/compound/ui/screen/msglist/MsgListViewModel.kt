@@ -11,6 +11,7 @@ import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import java.text.SimpleDateFormat
@@ -38,7 +39,7 @@ class MsgListViewModel(
     }
 
     private val _uiState = MutableStateFlow(MsgListUiState())
-    val uiState: StateFlow<MsgListUiState> = _uiState
+    val uiState = _uiState.asStateFlow()
 
     init {
         loadChats()

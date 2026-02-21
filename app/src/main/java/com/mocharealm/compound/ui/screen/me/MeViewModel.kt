@@ -7,6 +7,7 @@ import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
 import com.mocharealm.compound.domain.usecase.LogoutUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -22,7 +23,7 @@ class MeViewModel(
 ) : ViewModel() {
 
     private val _uiState = MutableStateFlow(MeUiState())
-    val uiState: StateFlow<MeUiState> = _uiState
+    val uiState = _uiState.asStateFlow()
 
     init {
         loadUser()

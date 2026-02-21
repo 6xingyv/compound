@@ -17,6 +17,7 @@ import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 
@@ -67,7 +68,7 @@ class ChatViewModel(
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
-    val uiState: StateFlow<ChatUiState> = _uiState
+    val uiState = _uiState.asStateFlow()
 
     val inputState = TextFieldState()
 
