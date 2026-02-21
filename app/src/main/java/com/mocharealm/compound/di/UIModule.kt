@@ -3,6 +3,8 @@ package com.mocharealm.compound.di
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
+import com.mocharealm.compound.ui.screen.home.HomeScreen
+import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
@@ -50,8 +52,12 @@ val uiModule = module {
         )
     }
 
+    viewModel {
+        HomeViewModel(get())
+    }
+
     navigation<Screen.Home> {
-        com.mocharealm.compound.ui.HomeScreen()
+        HomeScreen()
     }
     navigation<Screen.Chat> { route ->
         ChatScreen(

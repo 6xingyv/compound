@@ -62,6 +62,7 @@ import com.mocharealm.gaze.ui.animation.InteractiveHighlight
 import kotlinx.coroutines.flow.collectLatest
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
+import top.yukonga.miuix.kmp.theme.MiuixTheme
 import kotlin.math.abs
 import kotlin.math.sign
 
@@ -97,16 +98,14 @@ fun BottomTabs(
     content: @Composable RowScope.() -> Unit
 ) {
     val isLightTheme = !isSystemInDarkTheme()
-    val accentColor = if (isLightTheme) Color(0xFF0088FF) else Color(0xFF0091FF)
-    val containerColor =
-        if (isLightTheme) Color(0xFFFAFAFA).copy(0.4f) else Color(0xFF121212).copy(0.4f)
+    val accentColor = MiuixTheme.colorScheme.primary
+    val containerColor = MiuixTheme.colorScheme.surfaceContainer.copy(0.4f)
 
     val tabsBackdrop = rememberLayerBackdrop()
     val density = LocalDensity.current
     val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     val animationScope = rememberCoroutineScope()
 
-    // 关键状态：测量得到的单个 Tab 物理宽度
     var tabWidthPx by remember { mutableFloatStateOf(0f) }
     var totalWidthPx by remember { mutableFloatStateOf(0f) }
 
@@ -178,12 +177,10 @@ fun BottomTabs(
         )
     }
 
-    // 关键修改：外层使用 width(IntrinsicSize.Min) 让宽度由子内容决定
     Box(
         modifier = modifier.width(IntrinsicSize.Min),
         contentAlignment = Alignment.CenterStart
     ) {
-        // 背景层 & 测量层
         Row(
             Modifier
                 .onGloballyPositioned { coords ->
