@@ -6,8 +6,13 @@ data class Chat(
     val lastMessage: String? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
-    val isChannel: Boolean = false,
-    val isGroup: Boolean = false,
+    val type: ChatType = ChatType.DIRECT,
     val photoUrl: String? = null,
     val photoFileId: Int? = null
 )
+
+enum class ChatType{
+    DIRECT,
+    GROUP,
+    CHANNEL
+}

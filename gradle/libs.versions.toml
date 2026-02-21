@@ -55,6 +55,7 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 miuix-android = ["miuix-android", "miuix-icons-android"]
 miuix-nav3 = ["miuix-nav3-ui","miuix-nav3-adaptive"]
 coil = ["coil-compose","coil-gif","coil-network-okhttp"]
+
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
