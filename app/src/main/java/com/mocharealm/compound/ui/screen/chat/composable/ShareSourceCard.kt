@@ -16,6 +16,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -37,14 +38,15 @@ import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 @Composable
 fun ShareSourceCard(
     shareInfo: ShareInfo,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    accentColor: Color = MiuixTheme.colorScheme.onSurfaceVariantActions,
 ) {
     val context = LocalContext.current
 
     Row(
         modifier = modifier
             .clip(ContinuousRoundedRectangle(8.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
+            .background(MiuixTheme.colorScheme.onSurfaceContainer.copy(0.1f))
             .clickable {
                 runCatching {
                     context.startActivity(
@@ -66,7 +68,6 @@ fun ShareSourceCard(
                 .clip(CircleShape),
             contentScale = ContentScale.Crop,
             error = {
-                // 打印具体异常到控制台
                 val error by painter.state.collectAsState()
                 Log.e("CoilError", "Throwable: $error")
 
@@ -81,7 +82,7 @@ fun ShareSourceCard(
             text = shareInfo.name,
             fontSize = 12.sp,
             fontWeight = FontWeight.Medium,
-            color = MiuixTheme.colorScheme.onSurfaceVariantActions
+            color = accentColor
         )
     }
 }

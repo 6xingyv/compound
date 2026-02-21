@@ -37,7 +37,6 @@ import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.sizeIn
 import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
@@ -54,7 +53,6 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
@@ -629,7 +627,8 @@ fun ChatScreen(
                 } else {
                     items(
                         count = state.chatItems.size,
-                        key = { state.chatItems[it].key }
+                        key = { state.chatItems[it].key },
+                        contentType = { state.chatItems[it]::class.simpleName }
                     ) { index ->
                         when (val item = state.chatItems[index]) {
                             is TimestampItem -> {
@@ -984,7 +983,8 @@ private fun MessageContent(
                     bottom = bottomPadding,
                     start = 12.dp,
                     end = 12.dp
-                )
+                ),
+                accentColor = contentColor,
             )
         }
     }
@@ -1074,6 +1074,7 @@ private fun StickerBlock(message: Message, modifier: Modifier = Modifier) {
         when (message.stickerFormat) {
             StickerFormat.WEBM,
             StickerFormat.MP4 -> VideoPlayer(filePath = message.fileUrl, modifier = modifier)
+
             StickerFormat.TGS -> LottieSticker(filePath = message.fileUrl, modifier = modifier)
             else -> AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
