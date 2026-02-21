@@ -29,6 +29,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.tci18n.core.tdString
@@ -45,17 +46,10 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 fun MsgListScreen(
     padding: PaddingValues,
     onChatClick: (Long) -> Unit = { _ -> },
-    refreshSignal: Int = 0,
     viewModel: MsgListViewModel = koinViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
-
-    LaunchedEffect(refreshSignal) {
-        if (refreshSignal > 0) {
-            viewModel.refreshChats()
-        }
-    }
 
     // 当滚动到无法再往下滚动时加载更多聊天
     val shouldLoadMore by remember {

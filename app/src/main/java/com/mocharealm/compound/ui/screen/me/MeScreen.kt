@@ -10,6 +10,7 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
@@ -24,7 +25,7 @@ fun MeScreen(
     padding: PaddingValues,
     viewModel: MeViewModel = koinViewModel()
 ) {
-    val state by viewModel.uiState.collectAsState()
+    val state by viewModel.uiState.collectAsStateWithLifecycle()
 
     LazyColumn(
         modifier = Modifier.fillMaxHeight(),
