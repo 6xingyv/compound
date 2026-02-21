@@ -14,7 +14,7 @@ koin = "4.2.0-RC1"
 miuix = "0.8.3"
 nav3 = "1.1.0-alpha04"
 media3 = "1.9.2"
-ksp="2.3.6"
+ksp = "2.3.6"
 kotlinpoet = "2.2.0"
 
 [libraries]
@@ -41,26 +41,26 @@ miuix-nav3-adaptive = { module = "top.yukonga.miuix.kmp:miuix-navigation3-adapti
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version = "3.3.0" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version = "3.3.0" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version = "3.3.0" }
-media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref="media3" }
-media3-ui = { module = "androidx.media3:media3-ui-compose", version.ref="media3" }
+media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }
+media3-ui = { module = "androidx.media3:media3-ui-compose", version.ref = "media3" }
 gaze-capsule = { module = "com.mocharealm.gaze:capsule", version = "2.1.1-patch2" }
 gaze-glassy-liquid-effect = { module = "com.mocharealm.gaze:glassy-liquid-effect", version = "2.0.0" }
 lottie-compose = { module = "com.airbnb.android:lottie-compose", version = "6.7.1" }
-kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version = "1.10.0"}
+kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-serialization-core", version = "1.10.0" }
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet-core = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
-miuix-nav3 = ["miuix-nav3-ui","miuix-nav3-adaptive"]
-coil = ["coil-compose","coil-gif","coil-network-okhttp"]
+miuix-nav3 = ["miuix-nav3-ui", "miuix-nav3-adaptive"]
+coil = ["coil-compose", "coil-gif", "coil-network-okhttp"]
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
-kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref="kotlin" }
+kotlin-serialization = { id = "org.jetbrains.kotlin.plugin.serialization", version.ref = "kotlin" }
 kotlin-jvm = { id = "org.jetbrains.kotlin.jvm", version.ref = "kotlin" }
 kotlin-multiplatform = { id = "org.jetbrains.kotlin.multiplatform", version.ref = "kotlin" }
-kotlin-androidlib = {id="com.android.kotlin.multiplatform.library",version.ref="agp"}
-ksp= {id="com.google.devtools.ksp",version.ref="ksp"}
+kotlin-androidlib = { id = "com.android.kotlin.multiplatform.library", version.ref = "agp" }
+ksp = { id = "com.google.devtools.ksp", version.ref = "ksp" }

@@ -49,7 +49,9 @@ enum class SystemActionType {
 enum class StickerFormat {
     WEBP,
     TGS,
-    WEBM
+    WEBM,
+    MP4,
+    GIF
 }
 
 data class ReplyInfo(

@@ -231,13 +231,16 @@ fun ChatScreen(
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
                     LiquidSurface(
-                        layerBackdrop, Modifier.size(48.dp), Modifier.clickable {
+                        layerBackdrop, Modifier.size(48.dp),
+                        Modifier.clickable {
                             navigator.pop()
-                        }, effects = {
+                        },
+                        effects = {
                             vibrancy()
                             blur(1.dp.toPx())
                             lens(16.dp.toPx(), 32.dp.toPx())
-                        }, shadow = {
+                        },
+                        shadow = {
                             Shadow(
                                 radius = 24f.dp,
                                 offset = DpOffset(0.dp, 0.dp),
@@ -258,11 +261,13 @@ fun ChatScreen(
                         )
                     }
                     LiquidSurface(
-                        layerBackdrop, Modifier.size(48.dp), effects = {
+                        layerBackdrop, Modifier.size(48.dp),
+                        effects = {
                             vibrancy()
                             blur(1.dp.toPx())
                             lens(16.dp.toPx(), 32.dp.toPx())
-                        }, shadow = {
+                        },
+                        shadow = {
                             Shadow(
                                 radius = 24f.dp,
                                 offset = DpOffset(0.dp, 0.dp),
@@ -897,9 +902,9 @@ private fun MessageContent(
     val rootModifier = if (useIntrinsicWidth) {
         Modifier
             .width(IntrinsicSize.Min)
-            .sizeIn(44.dp,50.dp)
+            .widthIn(44.dp)
     } else {
-        Modifier.sizeIn(44.dp,50.dp)
+        Modifier.widthIn(44.dp)
     }
 
     Column(modifier = rootModifier) {
@@ -994,7 +999,6 @@ private fun ReplyPreview(
 ) {
     Row(
         modifier = modifier
-            // 此处删除了 .fillMaxWidth()
             .clip(ContinuousRoundedRectangle(8.dp))
             .background(MiuixTheme.colorScheme.onSurfaceContainer.copy(0.1f))
             .clickable(onClick = onClick)
@@ -1067,7 +1071,8 @@ private fun VideoBlock(message: Message) {
 private fun StickerBlock(message: Message, modifier: Modifier = Modifier) {
     if (!message.fileUrl.isNullOrEmpty()) {
         when (message.stickerFormat) {
-            StickerFormat.WEBM -> VideoPlayer(filePath = message.fileUrl, modifier = modifier)
+            StickerFormat.WEBM,
+            StickerFormat.MP4 -> VideoPlayer(filePath = message.fileUrl, modifier = modifier)
             StickerFormat.TGS -> LottieSticker(filePath = message.fileUrl, modifier = modifier)
             else -> AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)

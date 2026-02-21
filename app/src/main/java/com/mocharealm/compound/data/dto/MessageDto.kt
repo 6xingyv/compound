@@ -34,10 +34,14 @@ data class MessageDto(
         if (shareInfo != null) {
             android.util.Log.d("ShareProtocol", "Decoded ShareInfo: $shareInfo")
         } else {
-             // Look for ANY compound share URL to see if it exists but decode failed
-            val rawUrl = entities.find { (it.type as? TextEntityType.TextUrl)?.url?.startsWith("https://compound.mocharealm.com/share") == true }
+            // Look for ANY compound share URL to see if it exists but decode failed
+            val rawUrl =
+                entities.find { (it.type as? TextEntityType.TextUrl)?.url?.startsWith("https://compound.mocharealm.com/share") == true }
             if (rawUrl != null) {
-                android.util.Log.d("ShareProtocol", "Found raw URL entity but decode returned null: ${(rawUrl.type as TextEntityType.TextUrl).url}")
+                android.util.Log.d(
+                    "ShareProtocol",
+                    "Found raw URL entity but decode returned null: ${(rawUrl.type as TextEntityType.TextUrl).url}"
+                )
             }
         }
         val (strippedContent, strippedEntities) = ShareProtocol.strip(content, entities)
@@ -141,6 +145,20 @@ data class MessageDto(
                         content.emoji,
                         MessageType.STICKER,
                         sticker?.sticker?.id,
+                        format
+                    )
+                }
+
+                is TdApi.MessageAnimation -> {
+                    val format = when (content.animation.mimeType) {
+                        "image/gif" -> StickerFormat.GIF
+                        "video/mp4" -> StickerFormat.MP4
+                        else -> StickerFormat.WEBP
+                    }
+                    ParsedContent(
+                        "Sticker",
+                        MessageType.STICKER,
+                        content.animation.animation.id,
                         format
                     )
                 }
