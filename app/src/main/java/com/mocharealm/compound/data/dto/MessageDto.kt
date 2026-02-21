@@ -133,6 +133,21 @@ data class MessageDto(
                     )
                 }
 
+                is TdApi.MessageVideo -> {
+                    val caption = content.caption.text
+                    val videoFileId = content.video.video.id
+                    val thumbFileId = content.video.thumbnail?.file?.id
+                    ParsedContent(
+                        if (caption.isNotEmpty()) "Video: $caption" else "Video",
+                        MessageType.VIDEO,
+                        videoFileId,
+                        hasSpoiler = content.hasSpoiler,
+                        thumbnailFileId = thumbFileId,
+                        mediaWidth = content.video.width,
+                        mediaHeight = content.video.height
+                    )
+                }
+
                 is TdApi.MessageAnimatedEmoji -> {
                     val sticker = content.animatedEmoji.sticker
                     val format = when (sticker?.format) {
@@ -178,28 +193,28 @@ data class MessageDto(
                     )
                 }
 
-                is TdApi.MessageVideo -> {
-                    val caption = content.caption.text
-                    val videoFileId = content.video.video.id
-                    val thumbFileId = content.video.thumbnail?.file?.id
-                    ParsedContent(
-                        if (caption.isNotEmpty()) "Video: $caption" else "Video",
-                        MessageType.VIDEO,
-                        videoFileId,
-                        hasSpoiler = content.hasSpoiler,
-                        thumbnailFileId = thumbFileId,
-                        mediaWidth = content.video.width,
-                        mediaHeight = content.video.height
-                    )
-                }
-
                 is TdApi.MessageDocument -> {
-                    ParsedContent(
-                        content.document.fileName,
-                        MessageType.DOCUMENT,
-                        null,
-                        entities = mapFormattedTextEntities(content.caption)
-                    )
+                    when {
+                        content.document.mimeType.startsWith("image/") -> ParsedContent(
+                            content.caption.text,
+                            MessageType.PHOTO,
+                            content.document.document.id,
+                            entities = mapFormattedTextEntities(content.caption)
+                        )
+                        content.document.mimeType.startsWith("video/") -> ParsedContent(
+                            content.caption.text,
+                            MessageType.VIDEO,
+                            content.document.document.id,
+                            entities = mapFormattedTextEntities(content.caption)
+                        )
+
+                        else -> ParsedContent(
+                            content.caption.text,
+                            MessageType.DOCUMENT,
+                            null,
+                            entities = mapFormattedTextEntities(content.caption)
+                        )
+                    }
                 }
 
                 is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
