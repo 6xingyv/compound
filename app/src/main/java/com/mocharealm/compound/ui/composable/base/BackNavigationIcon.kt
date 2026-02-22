@@ -1,4 +1,4 @@
-package com.mocharealm.compound.ui.composable
+package com.mocharealm.compound.ui.composable.base
 
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier

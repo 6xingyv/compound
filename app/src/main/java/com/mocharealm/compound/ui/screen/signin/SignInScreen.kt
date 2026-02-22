@@ -21,7 +21,6 @@ import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.composable.Avatar
-import com.mocharealm.compound.ui.composable.BackNavigationIcon
 import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -31,7 +30,6 @@ import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.SmallTitle
 import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.basic.TextField
-import top.yukonga.miuix.kmp.basic.TopAppBar
 
 @Composable
 fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
@@ -39,7 +37,6 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
     val navigator = LocalNavigator.current
     val topAppBarScrollBehavior = MiuixScrollBehavior()
 
-    // When auth succeeds, navigate back to Home
     LaunchedEffect(state.authState) {
         if (state.authState is AuthState.Ready) {
             navigator.replaceAll(Screen.Home)
@@ -49,11 +46,6 @@ fun SignInScreen(viewModel: SignInViewModel = koinViewModel()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            TopAppBar(
-                title = "Sign In",
-                scrollBehavior = topAppBarScrollBehavior,
-                navigationIcon = {},
-            )
         },
         popupHost = {},
     ) { innerPadding ->

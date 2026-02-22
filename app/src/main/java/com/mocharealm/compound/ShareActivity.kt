@@ -73,8 +73,6 @@ class ShareActivity : ComponentActivity() {
         }
     }
 
-    // ── Extract data from the incoming intent ──────────────────────────
-
     private fun extractPayload(): SharePayload? {
         val action = intent.action ?: return null
         if (action != Intent.ACTION_SEND && action != Intent.ACTION_SEND_MULTIPLE) return null

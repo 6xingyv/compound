@@ -15,7 +15,6 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
@@ -116,9 +115,15 @@ fun MsgListScreen(
                 }
             }
         } else {
-            items(state.chats) { chat ->
+            items(
+                state.chats,
+                key = { chat->
+                    chat.id
+                }
+            ) { chat ->
                 Row(
                     Modifier
+                        .animateItem()
                         .fillMaxWidth()
                         .clickable {
                             onChatClick(chat.id)

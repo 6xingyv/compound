@@ -6,11 +6,12 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mocharealm.compound.ui.LocalNavigator
+import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
@@ -26,7 +27,7 @@ fun MeScreen(
     viewModel: MeViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
-
+    val navigator = LocalNavigator.current
     LazyColumn(
         modifier = Modifier.fillMaxHeight(),
         contentPadding = PaddingValues(
@@ -99,8 +100,20 @@ fun MeScreen(
                     )
                 }
             }
-        } else {
-
+            item {
+                Card(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 12.dp),
+                ) {
+                    SuperArrow(
+                        title = tdString("LogOut"),
+                        onClick = {
+                            navigator.replaceAll(Screen.Intro)
+                        },
+                    )
+                }
+            }
         }
     }
 }

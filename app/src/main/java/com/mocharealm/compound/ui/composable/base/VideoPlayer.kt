@@ -1,4 +1,4 @@
-package com.mocharealm.compound.ui.composable
+package com.mocharealm.compound.ui.composable.base
 
 import android.net.Uri
 import androidx.annotation.OptIn
@@ -18,6 +18,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
+import java.io.File
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -34,7 +35,7 @@ fun VideoPlayer(
     val context = LocalContext.current
     val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.fromFile(java.io.File(filePath))))
+            setMediaItem(MediaItem.fromUri(Uri.fromFile(File(filePath))))
             repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
             volume = if (mute) 0f else 1f
             if (playWhenReady) {
