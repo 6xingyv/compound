@@ -418,7 +418,6 @@ fun ChatScreen(
                         }
                     }
                 }
-
                 Spacer(Modifier.width(16.dp))
                 CompositionLocalProvider(LocalIndication provides EmptyIndication) {
                     LiquidSurface(

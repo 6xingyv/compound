@@ -100,20 +100,6 @@ fun MeScreen(
                     )
                 }
             }
-            item {
-                Card(
-                    modifier = Modifier
-                        .padding(horizontal = 12.dp)
-                        .padding(top = 12.dp),
-                ) {
-                    SuperArrow(
-                        title = tdString("LogOut"),
-                        onClick = {
-                            navigator.replaceAll(Screen.Intro)
-                        },
-                    )
-                }
-            }
         }
     }
 }

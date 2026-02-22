@@ -58,7 +58,7 @@ val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator f
 @OptIn(KoinExperimentalAPI::class)
 @Composable
 fun AppNav() {
-    val backStack = rememberNavBackStack(Screen.Home)
+    val backStack = rememberNavBackStack(Screen.Intro)
 
     val navigator = remember { Navigator(backStack) }
     val getAuthState: GetAuthenticationStateUseCase = koinInject()
@@ -66,11 +66,7 @@ fun AppNav() {
     LaunchedEffect(Unit) {
         val authState = getAuthState()
         if (authState !is AuthState.Ready) {
-            if (backStack.size == 1 && backStack.first() == Screen.Home) {
-                backStack[0] = Screen.SignIn
-            } else {
-                backStack.add(Screen.SignIn)
-            }
+            navigator.replaceAll(Screen.Intro)
         }
     }
 

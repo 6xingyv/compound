@@ -48,6 +48,8 @@ fun MessageBubble(
     showAvatar: Boolean = true,
     albumMessages: List<Message>? = null,
     onReplyClick: (Long) -> Unit = {},
+    modifier: Modifier = Modifier
+        .fillMaxWidth()
 ) {
     val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
     val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
@@ -63,8 +65,7 @@ fun MessageBubble(
     }
 
     Row(
-        modifier = Modifier
-            .fillMaxWidth()
+        modifier = modifier
             .then(rowPadding),
         horizontalArrangement = if (message.isOutgoing) Arrangement.End else Arrangement.Start,
         verticalAlignment = Alignment.Bottom

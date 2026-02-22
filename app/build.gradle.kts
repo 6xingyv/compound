@@ -17,6 +17,19 @@ fun getSecretProperty(key: String): String? {
     return localProperties.getProperty(key) ?: project.findProperty(key) as? String
 }
 
+fun getGitCommitHash(): String {
+    return try {
+        val process = ProcessBuilder("git", "rev-parse", "--short", "HEAD")
+            .directory(project.rootDir)
+            .redirectErrorStream(true)
+            .start()
+        process.inputStream.bufferedReader().readText().trim()
+    } catch (e: Exception) {
+        println("Error: ${e.message}")
+        "unknown"
+    }
+}
+
 android {
     namespace = "com.mocharealm.compound"
     compileSdk {
@@ -39,6 +52,7 @@ android {
 
         buildConfigField("int", "TD_API_ID", apiId)
         buildConfigField("String", "TD_API_HASH", "\"$apiHash\"")
+        buildConfigField("String","GIT_COMMIT_HASH", "\"${getGitCommitHash()}\"")
     }
 
     sourceSets {
@@ -114,6 +128,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.constraintlayout.compose)
 
     implementation(libs.koin.androidx.compose)
     implementation(libs.koin.compose.navigation3)

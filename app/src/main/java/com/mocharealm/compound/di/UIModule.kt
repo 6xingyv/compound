@@ -5,6 +5,7 @@ import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
+import com.mocharealm.compound.ui.screen.intro.IntroScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
@@ -66,5 +67,8 @@ val uiModule = module {
     }
     navigation<Screen.SignIn> {
         SignInScreen()
+    }
+    navigation<Screen.Intro> {
+        IntroScreen()
     }
 }

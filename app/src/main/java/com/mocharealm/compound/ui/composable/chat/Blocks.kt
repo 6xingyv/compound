@@ -141,7 +141,7 @@ fun PhotoBlock(message: Message) {
         SpoilerImage(hasSpoiler = message.hasSpoiler, modifier = Modifier.wrapContentWidth()) {
             AsyncImage(
                 model = ImageRequest.Builder(LocalContext.current)
-                    .data(java.io.File(message.fileUrl)).build(),
+                    .data(message.fileUrl).build(),
                 contentDescription = "Photo",
                 modifier = Modifier
                     .heightIn(max = 300.dp)
