@@ -258,7 +258,7 @@ fun IntroScreen() {
                 title = tdString("login_with_telegram"),
                 onDismissRequest = { showBottomSheet.value = false }
             ) {
-                Column(Modifier.padding(innerPadding.takeExcept(PaddingValuesSide.Top)).fillMaxSize()) {
+                Column(Modifier.fillMaxSize()) {
                     SignInScreen()
                 }
             }

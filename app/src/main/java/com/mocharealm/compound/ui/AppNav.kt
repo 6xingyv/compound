@@ -1,5 +1,6 @@
 package com.mocharealm.compound.ui
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.Immutable
@@ -58,13 +59,14 @@ val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator f
 @OptIn(KoinExperimentalAPI::class)
 @Composable
 fun AppNav() {
-    val backStack = rememberNavBackStack(Screen.Intro)
+    val backStack = rememberNavBackStack(Screen.Home)
 
     val navigator = remember { Navigator(backStack) }
     val getAuthState: GetAuthenticationStateUseCase = koinInject()
 
     LaunchedEffect(Unit) {
         val authState = getAuthState()
+        Log.d("AppNav", "authState: $authState")
         if (authState !is AuthState.Ready) {
             navigator.replaceAll(Screen.Intro)
         }

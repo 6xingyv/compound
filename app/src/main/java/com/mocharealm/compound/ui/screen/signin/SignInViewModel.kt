@@ -11,11 +11,9 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.compose.foundation.text.input.TextFieldState
 
 data class SignInUiState(
-    val phone: String = "",
-    val code: String = "",
-    val password: String = "",
     val authState: AuthState = AuthState.WaitingForPhoneNumber,
     val loading: Boolean = false,
     val error: String? = null
@@ -31,28 +29,20 @@ class SignInViewModel(
     private val _uiState = MutableStateFlow(SignInUiState())
     val uiState: StateFlow<SignInUiState> = _uiState
 
+    val phone = TextFieldState()
+    val code = TextFieldState()
+    val password = TextFieldState()
+
     init {
         refreshAuthState()
     }
 
-    fun onPhoneChange(value: String) {
-        _uiState.update { it.copy(phone = value, error = null) }
-    }
-
-    fun onCodeChange(value: String) {
-        _uiState.update { it.copy(code = value, error = null) }
-    }
-
-    fun onPasswordChange(value: String) {
-        _uiState.update { it.copy(password = value, error = null) }
-    }
-
     fun submitPhone() {
-        val phone = _uiState.value.phone
-        if (phone.isBlank()) return
+        val phoneText = phone.text
+        if (phoneText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = setAuthenticationPhoneNumber(phone)
+            val result = setAuthenticationPhoneNumber(phoneText as String)
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
@@ -60,11 +50,11 @@ class SignInViewModel(
     }
 
     fun submitCode() {
-        val code = _uiState.value.code
-        if (code.isBlank()) return
+        val codeText = code.text
+        if (codeText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = checkAuthenticationCode(code)
+            val result = checkAuthenticationCode(codeText as String)
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
@@ -72,11 +62,11 @@ class SignInViewModel(
     }
 
     fun submitPassword() {
-        val password = _uiState.value.password
-        if (password.isBlank()) return
+        val passwordText = password.text
+        if (passwordText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = checkAuthenticationPassword(password)
+            val result = checkAuthenticationPassword(passwordText as String)
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
