@@ -1,6 +1,8 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.data.source.PhoneFormatRepositoryImpl
 import com.mocharealm.compound.data.source.TelegramRepositoryImpl
+import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.TdStringProvider
 import com.mocharealm.tci18n.core.tdLangPackId
@@ -32,6 +34,9 @@ val dataModule = module {
     }
     single<TelegramRepository> {
         TelegramRepositoryImpl(get(), get(), get())
+    }
+    single<PhoneFormatRepository> {
+        PhoneFormatRepositoryImpl(get())
     }
     single {
         val client: Client = get()
