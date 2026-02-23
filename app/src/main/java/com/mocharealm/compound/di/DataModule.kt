@@ -1,7 +1,9 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.data.source.IcuNameFormatterImpl
 import com.mocharealm.compound.data.source.PhoneFormatRepositoryImpl
 import com.mocharealm.compound.data.source.TelegramRepositoryImpl
+import com.mocharealm.compound.domain.repository.PersonNameFormatterRepository
 import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.TdStringProvider
@@ -21,7 +23,6 @@ val dataModule = module {
     single { MutableSharedFlow<TdApi.Update>(extraBufferCapacity = 64) }
     single<SharedFlow<TdApi.Update>> { get<MutableSharedFlow<TdApi.Update>>() }
     single {
-        // Wire TDLib client with basic update and exception handlers
         Client.create(
             { obj: Object? ->
                 if (obj is TdApi.Update) {

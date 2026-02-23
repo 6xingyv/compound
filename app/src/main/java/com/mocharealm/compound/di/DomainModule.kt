@@ -1,11 +1,12 @@
 package com.mocharealm.compound.di
 
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationCodeUseCase
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationPasswordUseCase
+import com.mocharealm.compound.domain.usecase.auth.CheckAuthenticationCodeUseCase
+import com.mocharealm.compound.domain.usecase.auth.CheckAuthenticationPasswordUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
-import com.mocharealm.compound.domain.usecase.FormatPhoneNumberUseCase
-import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
+import com.mocharealm.compound.domain.usecase.FormatPersonNameUseCase
+import com.mocharealm.compound.domain.usecase.phonenumber.FormatPhoneNumberUseCase
+import com.mocharealm.compound.domain.usecase.auth.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
@@ -15,7 +16,7 @@ import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
-import com.mocharealm.compound.domain.usecase.ValidatePhoneNumberUseCase
+import com.mocharealm.compound.domain.usecase.phonenumber.ValidatePhoneNumberUseCase
 import org.koin.dsl.module
 
 val domainModule = module {

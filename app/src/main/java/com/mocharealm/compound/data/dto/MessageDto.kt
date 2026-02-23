@@ -73,13 +73,13 @@ data class MessageDto(
         data class ParsedContent(
             val text: String,
             val type: MessageType,
-            val fileId: Int?,
+            val fileId: Int? = null,
             val stickerFormat: StickerFormat? = null,
             val entities: List<TextEntity> = emptyList(),
             val hasSpoiler: Boolean = false,
             val thumbnailFileId: Int? = null,
             val mediaWidth: Int = 0,
-            val mediaHeight: Int = 0
+            val mediaHeight: Int = 0,
         )
 
         fun fromTdApi(
@@ -201,6 +201,7 @@ data class MessageDto(
                             content.document.document.id,
                             entities = mapFormattedTextEntities(content.caption)
                         )
+
                         content.document.mimeType.startsWith("video/") -> ParsedContent(
                             content.caption.text,
                             MessageType.VIDEO,
@@ -230,6 +231,11 @@ data class MessageDto(
                     MessageType.SYSTEM,
                     null
                 )
+
+                is TdApi.MessageVenue -> {
+                    ParsedContent("Venue", MessageType.VENUE, null)
+                    TODO()
+                }
 
                 else -> ParsedContent("Message $content", MessageType.TEXT, null)
             }

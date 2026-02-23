@@ -2,10 +2,6 @@ package com.mocharealm.compound.ui.screen.chat
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.AnimationVector1D
-import androidx.compose.animation.core.LinearEasing
-import androidx.compose.animation.core.tween
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -15,24 +11,19 @@ import androidx.compose.animation.shrinkHorizontally
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
-import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.BoxScope
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ExperimentalLayoutApi
-import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.captionBarPadding
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -41,100 +32,52 @@ import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.wrapContentSize
-import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableFloatStateOf
-import androidx.compose.runtime.mutableStateMapOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
-import androidx.compose.runtime.withFrameNanos
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.blur
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
-import androidx.compose.ui.draw.drawWithContent
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
-import androidx.compose.ui.geometry.Rect
-import androidx.compose.ui.geometry.Size
-import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.graphics.ClipOp
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.graphics.Paint
-import androidx.compose.ui.graphics.Path
-import androidx.compose.ui.graphics.ShaderBrush
-import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.drawscope.DrawScope
-import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
-import androidx.compose.ui.layout.ContentScale
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalWindowInfo
-import androidx.compose.ui.semantics.isTraversalGroup
-import androidx.compose.ui.semantics.semantics
-import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.media3.common.Player
-import androidx.media3.exoplayer.ExoPlayer
-import coil3.compose.AsyncImage
-import coil3.request.ImageRequest
-import com.airbnb.lottie.compose.LottieAnimation
-import com.airbnb.lottie.compose.LottieCompositionSpec
-import com.airbnb.lottie.compose.LottieConstants
-import com.airbnb.lottie.compose.rememberLottieComposition
 import com.mocharealm.compound.domain.model.ChatType
-import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageType
-import com.mocharealm.compound.domain.model.StickerFormat
-import com.mocharealm.compound.domain.model.SystemActionType
 import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
-import com.mocharealm.compound.ui.composable.base.VideoPlayer
 import com.mocharealm.compound.ui.composable.chat.MessageBubble
 import com.mocharealm.compound.ui.composable.chat.SystemMessage
 import com.mocharealm.compound.ui.composable.chat.TimestampLabel
-import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
-import com.mocharealm.compound.ui.shape.BubbleContinuousShape
-import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.MarkdownTransformation
-import com.mocharealm.compound.ui.util.SpoilerShader
-import com.mocharealm.compound.ui.util.buildAnnotatedString
-import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
-import com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
@@ -145,14 +88,13 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
 import com.mocharealm.gaze.ui.composable.PopupMenu
+import com.mocharealm.gaze.ui.composable.RevealDirection
+import com.mocharealm.gaze.ui.composable.RevealSwipe
 import com.mocharealm.gaze.ui.composable.TextField
+import com.mocharealm.gaze.ui.composable.rememberRevealState
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
-import com.mocharealm.gaze.ui.modifier.surface
 import com.mocharealm.tci18n.core.tdString
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
-import kotlinx.coroutines.yield
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
 import top.yukonga.miuix.kmp.basic.Card
@@ -164,12 +106,11 @@ import top.yukonga.miuix.kmp.basic.TextButton
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
-import kotlin.math.hypot
 
- val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
- val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
+val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
+val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
-@kotlin.OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class)
 @Composable
 fun ChatScreen(
     viewModel: ChatViewModel = koinViewModel()
@@ -197,6 +138,7 @@ fun ChatScreen(
 
     val containerWidth = LocalWindowInfo.current.containerDpSize.width
     val layoutDirection = LocalLayoutDirection.current
+    val directionFactor = if (layoutDirection== LayoutDirection.Ltr) 1f else -1f
     val density = LocalDensity.current
     val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
     val focusRequester = remember { FocusRequester() }
@@ -568,7 +510,8 @@ fun ChatScreen(
                     }
                 }
             }
-        }) { innerPadding ->
+        },
+    ) { innerPadding ->
         CompositionLocalProvider(
             LocalVideoDownloadProgress provides state.videoDownloadProgress,
             LocalOnDownloadVideo provides { messageId: Long -> viewModel.downloadVideo(messageId) }) {

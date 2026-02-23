@@ -1,4 +1,4 @@
-package com.mocharealm.compound.domain.usecase
+package com.mocharealm.compound.domain.usecase.auth
 
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.compound.domain.model.AuthState

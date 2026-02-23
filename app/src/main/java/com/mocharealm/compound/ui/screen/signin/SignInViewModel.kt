@@ -3,9 +3,9 @@ package com.mocharealm.compound.ui.screen.signin
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocharealm.compound.domain.model.AuthState
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationCodeUseCase
-import com.mocharealm.compound.domain.usecase.CheckAuthenticationPasswordUseCase
-import com.mocharealm.compound.domain.usecase.GetAuthenticationStateUseCase
+import com.mocharealm.compound.domain.usecase.auth.CheckAuthenticationCodeUseCase
+import com.mocharealm.compound.domain.usecase.auth.CheckAuthenticationPasswordUseCase
+import com.mocharealm.compound.domain.usecase.auth.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
