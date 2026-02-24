@@ -1,6 +1,6 @@
 package com.mocharealm.compound.di
 
-import com.mocharealm.compound.data.source.IcuNameFormatterImpl
+import com.mocharealm.compound.data.source.IcuPersonNameFormatterRepositoryImpl
 import com.mocharealm.compound.data.source.PhoneFormatRepositoryImpl
 import com.mocharealm.compound.data.source.TelegramRepositoryImpl
 import com.mocharealm.compound.domain.repository.PersonNameFormatterRepository
@@ -38,6 +38,9 @@ val dataModule = module {
     }
     single<PhoneFormatRepository> {
         PhoneFormatRepositoryImpl(get())
+    }
+    single<PersonNameFormatterRepository> {
+        IcuPersonNameFormatterRepositoryImpl()
     }
     single {
         val client: Client = get()

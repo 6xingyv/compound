@@ -68,4 +68,7 @@ val domainModule = module {
     factory {
         ValidatePhoneNumberUseCase(get())
     }
+    factory {
+        FormatPersonNameUseCase(get())
+    }
 }
