@@ -143,6 +143,7 @@ dependencies {
     implementation(libs.lottie.compose)
     implementation(libs.media3.exoplayer)
     implementation(libs.media3.ui)
+    implementation(libs.maplibre.compose)
 
     implementation(libs.kotlinx.serialization.core)
 

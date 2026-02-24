@@ -50,57 +50,9 @@ class Navigator(private val backStack: MutableList<NavKey>) {
     }
 
     fun replaceAll(key: NavKey) {
-        backStack.clear(); backStack.add(key)
+        backStack.clear()
+        backStack.add(key)
     }
 }
 
 val LocalNavigator = staticCompositionLocalOf<Navigator> { error("No navigator found!") }
-
-@OptIn(KoinExperimentalAPI::class)
-@Composable
-fun AppNav() {
-    val backStack = rememberNavBackStack(Screen.Home)
-
-    val navigator = remember { Navigator(backStack) }
-    val getAuthState: GetAuthenticationStateUseCase = koinInject()
-
-    LaunchedEffect(Unit) {
-        val authState = getAuthState()
-        Log.d("AppNav", "authState: $authState")
-        if (authState !is AuthState.Ready) {
-            navigator.replaceAll(Screen.Intro)
-        }
-    }
-
-    val onBack = remember(navigator) { { navigator.pop() } }
-
-    val rawEntryProvider = koinEntryProvider<NavKey>()
-    val currentEntryProvider by rememberUpdatedState(rawEntryProvider)
-    val entryProvider = remember {
-        { key: NavKey -> currentEntryProvider(key) }
-    }
-
-    val tdStringProvider: TdStringProvider = koinInject()
-    val i18nDecorator = remember(tdStringProvider) {
-        tdI18nNavEntryDecorator<NavKey>(
-            provider = tdStringProvider,
-            getKeys = { pageId -> TdManifest.getKeys(pageId) }
-        )
-    }
-
-    CompositionLocalProvider(
-        LocalNavigator provides navigator,
-        LocalTdStringProvider provides tdStringProvider,
-    ) {
-        NavDisplay(
-            backStack = backStack,
-            onBack = onBack,
-            entryDecorators = listOf(
-                rememberSaveableStateHolderNavEntryDecorator(),
-                i18nDecorator,
-            ),
-            entryProvider = entryProvider,
-        )
-    }
-}
-

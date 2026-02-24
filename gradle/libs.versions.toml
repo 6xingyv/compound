@@ -51,6 +51,7 @@ kotlinx-serialization-core = { group = "org.jetbrains.kotlinx", name = "kotlinx-
 ksp-api = { module = "com.google.devtools.ksp:symbol-processing-api", version.ref = "ksp" }
 kotlinpoet-core = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoet" }
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
+maplibre-compose = { module = "io.github.rallista:maplibre-compose", version = "1.4.1" }
 
 [bundles]
 miuix-android = ["miuix-android", "miuix-icons-android"]
