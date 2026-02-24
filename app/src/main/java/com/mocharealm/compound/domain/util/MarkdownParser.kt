@@ -1,50 +1,49 @@
 package com.mocharealm.compound.domain.util
 
-import com.mocharealm.compound.domain.model.TextEntity
-import com.mocharealm.compound.domain.model.TextEntityType
+import com.mocharealm.compound.domain.model.Text
 
 object MarkdownParser {
 
     private data class MarkdownRule(
         val regex: Regex,
-        val createType: (MatchResult) -> TextEntityType,
+        val createType: (MatchResult) -> Text.TextEntityType,
         val contentGroupIndex: Int = 1
     )
 
     private val rules = listOf(
         // PreCode: ```lang\ncode``` (supports optional lang, optional newline)
         // Group 1: Lang, Group 2: Content
-        MarkdownRule(Regex("""```(\w*)\n?([\s\S]*?)```"""), { res -> 
-            TextEntityType.PreCode(res.groupValues[1]) 
+        MarkdownRule(Regex("""```(\w*)\n?([\s\S]*?)```"""), { res ->
+            Text.TextEntityType.PreCode(res.groupValues[1])
         }, contentGroupIndex = 2),
-        
+
         // Code: `code`
-        MarkdownRule(Regex("""`([^`]+)`"""), { _ -> TextEntityType.Code }),
+        MarkdownRule(Regex("""`([^`]+)`"""), { _ -> Text.TextEntityType.Code }),
 
         // TextUrl: [text](url)
         // Group 1: Text, Group 2: URL
-        MarkdownRule(Regex("""\[(.*?)\]\((.*?)\)"""), { res -> 
-            TextEntityType.TextUrl(res.groupValues[2]) 
+        MarkdownRule(Regex("""\[(.*?)\]\((.*?)\)"""), { res ->
+            Text.TextEntityType.TextUrl(res.groupValues[2])
         }, contentGroupIndex = 1),
 
         // Bold: **bold**
-        MarkdownRule(Regex("""\*\*(.*?)\*\*"""), { _ -> TextEntityType.Bold }),
+        MarkdownRule(Regex("""\*\*(.*?)\*\*"""), { _ -> Text.TextEntityType.Bold }),
 
         // Italic: *italic*
-        MarkdownRule(Regex("""\*(.*?)\*"""), { _ -> TextEntityType.Italic }),
+        MarkdownRule(Regex("""\*(.*?)\*"""), { _ -> Text.TextEntityType.Italic }),
 
         // Strikethrough: ~~strike~~
-        MarkdownRule(Regex("""~~(.*?)~~"""), { _ -> TextEntityType.Strikethrough }),
+        MarkdownRule(Regex("""~~(.*?)~~"""), { _ -> Text.TextEntityType.Strikethrough }),
 
         // Underline: <u>underline</u>
-        MarkdownRule(Regex("""<u>(.*?)</u>"""), { _ -> TextEntityType.Underline }),
+        MarkdownRule(Regex("""<u>(.*?)</u>"""), { _ -> Text.TextEntityType.Underline }),
 
         // Spoiler: ||spoiler||
-        MarkdownRule(Regex("""\|\|(.*?)\|\|"""), { _ -> TextEntityType.Spoiler })
+        MarkdownRule(Regex("""\|\|(.*?)\|\|"""), { _ -> Text.TextEntityType.Spoiler })
     )
 
     data class MarkdownMatch(
-        val type: TextEntityType,
+        val type: Text.TextEntityType,
         val fullRange: IntRange,
         val contentRange: IntRange,
         val content: String
@@ -78,12 +77,12 @@ object MarkdownParser {
      * Parses the text, strips markdown symbols, and returns the Clean Text + TextEntities.
      * Useful for sending messages.
      */
-    fun parseForSending(text: String): Pair<String, List<TextEntity>> {
+    fun parseForSending(text: String): Pair<String, List<Text.TextEntity>> {
         val matches = findMatches(text)
         if (matches.isEmpty()) return text to emptyList()
 
         val builder = StringBuilder()
-        val entities = mutableListOf<TextEntity>()
+        val entities = mutableListOf<Text.TextEntity>()
         var lastIndex = 0
 
         // Note: Simple handling for non-overlapping matches.
@@ -97,7 +96,7 @@ object MarkdownParser {
         // For this MVP, let's stick to flat replacement or outer-first.
         // If there's overlap, we skip properties that are subsumed?
         // Simple approach: Filter out matches that are inside processed ranges.
-        
+
         val validMatches = mutableListOf<MarkdownMatch>()
         var maxReachable = 0
         for (match in matches) {
@@ -110,19 +109,19 @@ object MarkdownParser {
         for (match in validMatches) {
             // Append text before match
             builder.append(text.substring(lastIndex, match.fullRange.first))
-            
+
             // Record start of content in the new string
             val start = builder.length // UTF-16 length
-            
+
             // Append content (without symbols)
             builder.append(match.content)
-            
+
             val length = builder.length - start
-            entities.add(TextEntity(start, length, match.type))
-            
+            entities.add(Text.TextEntity(start, length, match.type))
+
             lastIndex = match.fullRange.last + 1
         }
-        
+
         // Append remaining
         if (lastIndex < text.length) {
             builder.append(text.substring(lastIndex))
