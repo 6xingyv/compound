@@ -1,4 +1,4 @@
-package com.mocharealm.compound.domain.usecase
+package com.mocharealm.compound.domain.usecase.phonenumber
 
 import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import com.mocharealm.compound.domain.util.DefaultPhoneNumberSanitizer

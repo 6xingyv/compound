@@ -248,7 +248,6 @@ fun MessageContent(
                 uriHandler = uriHandler,
                 revealedEntityIndices = revealedSpoilers.value,
                 onSpoilerClick = { index -> revealedSpoilers.value += index },
-                // 去掉了原本错误赋予的 fillMaxWidth()
                 modifier = Modifier.padding(
                     top = textTop, bottom = textBottom, start = 12.dp, end = 12.dp
                 )

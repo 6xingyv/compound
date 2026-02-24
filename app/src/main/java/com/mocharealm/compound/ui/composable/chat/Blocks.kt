@@ -21,6 +21,7 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -240,135 +241,137 @@ fun RichTextContent(
         }
         paths
     }
-
-    Text(
-        text = text,
-        color = contentColor,
-        onTextLayout = { layoutResult.value = it },
-        modifier = modifier
-            .drawWithContent {
-                val obscuredPath = Path()
-                var hasObscured = false
-                spoilerPaths.forEach { (index, path) ->
-                    if (index !in revealedEntityIndices || index in revealingSpoilers) {
-                        obscuredPath.addPath(path)
-                        hasObscured = true
+    SelectionContainer {
+        Text(
+            text = text,
+            color = contentColor,
+            onTextLayout = { layoutResult.value = it },
+            modifier = modifier
+                .drawWithContent {
+                    val obscuredPath = Path()
+                    var hasObscured = false
+                    spoilerPaths.forEach { (index, path) ->
+                        if (index !in revealedEntityIndices || index in revealingSpoilers) {
+                            obscuredPath.addPath(path)
+                            hasObscured = true
+                        }
                     }
-                }
 
-                if (!hasObscured) {
-                    drawContent()
-                    return@drawWithContent
-                }
+                    if (!hasObscured) {
+                        drawContent()
+                        return@drawWithContent
+                    }
 
-                clipPath(obscuredPath, clipOp = ClipOp.Difference) {
-                    this@drawWithContent.drawContent()
-                }
+                    clipPath(obscuredPath, clipOp = ClipOp.Difference) {
+                        this@drawWithContent.drawContent()
+                    }
 
-                val hasRipples = revealingSpoilers.isNotEmpty()
-                if (hasRipples) {
+                    val hasRipples = revealingSpoilers.isNotEmpty()
+                    if (hasRipples) {
+                        clipPath(obscuredPath) {
+                            val canvas = drawContext.canvas
+                            canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+
+                            revealingSpoilers.forEach { (index, anim) ->
+                                revealingOrigins[index]?.let { origin ->
+                                    val radius = anim.value
+                                    if (radius > 0f) {
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                0.0f to Color.Black,
+                                                0.5f to Color.Black,
+                                                1.0f to Color.Transparent,
+                                                center = origin,
+                                                radius = radius
+                                            ), center = origin, radius = radius
+                                        )
+                                    }
+                                }
+                            }
+
+                            canvas.saveLayer(
+                                Rect(0f, 0f, size.width, size.height),
+                                Paint().apply { blendMode = BlendMode.SrcIn })
+                            this@drawWithContent.drawContent()
+                            canvas.restore()
+                            canvas.restore()
+                        }
+                    }
+
                     clipPath(obscuredPath) {
                         val canvas = drawContext.canvas
                         canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
 
-                        revealingSpoilers.forEach { (index, anim) ->
-                            revealingOrigins[index]?.let { origin ->
-                                val radius = anim.value
-                                if (radius > 0f) {
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            0.0f to Color.Black,
-                                            0.5f to Color.Black,
-                                            1.0f to Color.Transparent,
+                        shader.setFloatUniform(
+                            "particleColor",
+                            contentColor.red,
+                            contentColor.green,
+                            contentColor.blue,
+                            contentColor.alpha
+                        )
+                        shader.setFloatUniform("time", time)
+                        shader.setFloatUniform("resolution", size.width, size.height)
+                        drawRect(brush = brush)
+
+                        if (hasRipples) {
+                            revealingSpoilers.forEach { (index, anim) ->
+                                revealingOrigins[index]?.let { origin ->
+                                    val radius = anim.value
+                                    if (radius > 0f) {
+                                        drawCircle(
+                                            brush = Brush.radialGradient(
+                                                0.0f to Color.Black,
+                                                0.5f to Color.Black,
+                                                1.0f to Color.Transparent,
+                                                center = origin,
+                                                radius = radius
+                                            ),
                                             center = origin,
-                                            radius = radius
-                                        ), center = origin, radius = radius
-                                    )
+                                            radius = radius,
+                                            blendMode = BlendMode.DstOut
+                                        )
+                                    }
                                 }
                             }
                         }
-
-                        canvas.saveLayer(
-                            Rect(0f, 0f, size.width, size.height),
-                            Paint().apply { blendMode = BlendMode.SrcIn })
-                        this@drawWithContent.drawContent()
-                        canvas.restore()
                         canvas.restore()
                     }
                 }
+                .pointerInput(text, layoutResult, revealedEntityIndices) {
+                    detectTapGestures { pos ->
+                        val layout = layoutResult.value ?: return@detectTapGestures
+                        if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
+                        val offset = layout.getOffsetForPosition(pos)
 
-                clipPath(obscuredPath) {
-                    val canvas = drawContext.canvas
-                    canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+                        text.getStringAnnotations("URL", offset, offset).firstOrNull()
+                            ?.let { uriHandler.openUri(it.item) }
 
-                    shader.setFloatUniform(
-                        "particleColor",
-                        contentColor.red,
-                        contentColor.green,
-                        contentColor.blue,
-                        contentColor.alpha
-                    )
-                    shader.setFloatUniform("time", time)
-                    shader.setFloatUniform("resolution", size.width, size.height)
-                    drawRect(brush = brush)
+                        text.getStringAnnotations("SPOILER", offset, offset).firstOrNull()?.let {
+                            val index = it.item.toIntOrNull() ?: return@let
+                            if (index in revealedEntityIndices || revealingSpoilers.containsKey(index)) return@let
 
-                    if (hasRipples) {
-                        revealingSpoilers.forEach { (index, anim) ->
-                            revealingOrigins[index]?.let { origin ->
-                                val radius = anim.value
-                                if (radius > 0f) {
-                                    drawCircle(
-                                        brush = Brush.radialGradient(
-                                            0.0f to Color.Black,
-                                            0.5f to Color.Black,
-                                            1.0f to Color.Transparent,
-                                            center = origin,
-                                            radius = radius
-                                        ),
-                                        center = origin,
-                                        radius = radius,
-                                        blendMode = BlendMode.DstOut
-                                    )
-                                }
+                            val maxRadius = hypot(
+                                layout.size.width.toDouble(), layout.size.height.toDouble()
+                            ).toFloat()
+                            val anim = Animatable(0f)
+                            revealingSpoilers[index] = anim
+                            revealingOrigins[index] = pos
+
+                            coroutineScope.launch {
+                                anim.animateTo(
+                                    targetValue = maxRadius,
+                                    animationSpec = tween(durationMillis = 400, easing = LinearEasing)
+                                )
+                                onSpoilerClick(index)
+                                yield()
+                                revealingSpoilers.remove(index)
+                                revealingOrigins.remove(index)
                             }
                         }
                     }
-                    canvas.restore()
                 }
-            }
-            .pointerInput(text, layoutResult, revealedEntityIndices) {
-                detectTapGestures { pos ->
-                    val layout = layoutResult.value ?: return@detectTapGestures
-                    if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
-                    val offset = layout.getOffsetForPosition(pos)
-
-                    text.getStringAnnotations("URL", offset, offset).firstOrNull()
-                        ?.let { uriHandler.openUri(it.item) }
-
-                    text.getStringAnnotations("SPOILER", offset, offset).firstOrNull()?.let {
-                        val index = it.item.toIntOrNull() ?: return@let
-                        if (index in revealedEntityIndices || revealingSpoilers.containsKey(index)) return@let
-
-                        val maxRadius = hypot(
-                            layout.size.width.toDouble(), layout.size.height.toDouble()
-                        ).toFloat()
-                        val anim = Animatable(0f)
-                        revealingSpoilers[index] = anim
-                        revealingOrigins[index] = pos
-
-                        coroutineScope.launch {
-                            anim.animateTo(
-                                targetValue = maxRadius,
-                                animationSpec = tween(durationMillis = 400, easing = LinearEasing)
-                            )
-                            onSpoilerClick(index)
-                            yield()
-                            revealingSpoilers.remove(index)
-                            revealingOrigins.remove(index)
-                        }
-                    }
-                }
-            })
+        )
+    }
 }
 
 @Composable
