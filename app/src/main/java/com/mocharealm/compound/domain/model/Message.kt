@@ -32,7 +32,8 @@ enum class MessageType {
     AUDIO,
     VOICE,
     STICKER,
-    SYSTEM
+    SYSTEM,
+    VENUE
 }
 
 // TODO: Support all types
