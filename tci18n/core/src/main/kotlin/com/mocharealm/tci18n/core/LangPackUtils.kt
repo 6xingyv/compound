@@ -15,10 +15,10 @@ fun tdLangPackId(locale: Locale): String {
     val lang = locale.language
     val script = locale.script
     val country = locale.country
-    Log.e("Inr","lang:$lang \nscript:$script \ncountry:$country")
 
     return when {
         script.isNotEmpty() -> "$lang-${script.lowercase()}"
+        // Chinese
         lang == "zh" -> when (country) {
             "TW", "HK", "MO" -> "zh-hant-beta"
             else -> "zh-hans-beta"

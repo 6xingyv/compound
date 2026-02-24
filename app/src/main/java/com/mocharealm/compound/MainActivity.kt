@@ -37,7 +37,7 @@ class MainActivity : ComponentActivity() {
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             CompoundTheme {
-                val backStack = rememberNavBackStack()
+                val backStack = rememberNavBackStack(Screen.Intro)
 
                 val navigator = remember { Navigator(backStack) }
                 val getAuthState: GetAuthenticationStateUseCase = koinInject()
@@ -46,9 +46,7 @@ class MainActivity : ComponentActivity() {
                     val authState = getAuthState()
                     Log.d("AppNav", "authState: $authState")
                     if (authState is AuthState.Ready) {
-                        navigator.push(Screen.Home)
-                    } else {
-                        navigator.push(Screen.Intro)
+                        navigator.replaceAll(Screen.Home)
                     }
                 }
 
