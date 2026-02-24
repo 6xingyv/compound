@@ -40,7 +40,7 @@ android {
 
     defaultConfig {
         applicationId = "com.mocharealm.compound"
-        minSdk = 33
+        minSdk = 34
         targetSdk = 36
         versionCode = libs.versions.appVersionCode.get().toInt()
         versionName = libs.versions.appVersionName.get()
