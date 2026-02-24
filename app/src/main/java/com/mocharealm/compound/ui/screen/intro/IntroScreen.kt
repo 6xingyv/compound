@@ -28,6 +28,7 @@ import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
@@ -73,7 +74,7 @@ fun IntroScreen() {
 
     val animation = remember { Animatable(0f) }
     LaunchedEffect(Unit) {
-        delay(5000)
+        delay(8000)
         launch {
             animation.animateTo(1f, tween(1000))
         }
@@ -119,6 +120,7 @@ fun IntroScreen() {
                 Modifier
                     .fillMaxSize()
                     .graphicsLayer {
+                        translationY = -200f * animation.value
                         compositingStrategy = CompositingStrategy.Offscreen
                     }
                     .drawWithCache {
@@ -256,7 +258,8 @@ fun IntroScreen() {
             SuperBottomSheet(
                 show = showBottomSheet,
                 title = tdString("login_with_telegram"),
-                onDismissRequest = { showBottomSheet.value = false }
+                insideMargin = DpSize.Zero,
+                onDismissRequest = { showBottomSheet.value = false },
             ) {
                 Column(Modifier.fillMaxSize()) {
                     SignInScreen()
@@ -346,8 +349,8 @@ private fun generateMessages(count: Int, seed: Long): List<Message> {
         .map { it }
 
     val stickers = 1..70
-    val life_photos = 1..17
-    val clef_photos = 1..4
+    val lifePhotos = 1..13
+    val clefPhotos = 1..4
 
     return buildList(count) {
         repeat(count) { index ->
@@ -371,9 +374,9 @@ private fun generateMessages(count: Int, seed: Long): List<Message> {
                         messageType = type,
                         fileUrl = "file:///android_asset/photos/${
                             if (isClef)
-                                "clef/${clef_photos.random(random)}"
+                                "clef/${clefPhotos.random(random)}"
                             else
-                                "life/${life_photos.random(random)}"
+                                "life/${lifePhotos.random(random)}"
                         }.webp",
                         fileId = random.nextInt(),
                         stickerFormat = StickerFormat.TGS,
