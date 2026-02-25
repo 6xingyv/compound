@@ -53,8 +53,9 @@ class MsgListViewModel(
                         if (index != -1) {
                             val chat = chats[index]
                             chats.removeAt(index)
+                            // TODO
                             chats.add(0, chat.copy(
-                                lastMessage = message.content,
+                                lastMessage = message.toString(),
                                 lastMessageDate = message.timestamp,
                                 unreadCount = if (message.isOutgoing) chat.unreadCount else chat.unreadCount + 1
                             ))

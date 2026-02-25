@@ -44,8 +44,9 @@ data class ChatDto(
                 is TdApi.MessageSenderChat -> s.chatId
                 else -> null
             }
-            val lastMessageText = lastMsg?.content?.let {
-                MessageDto.parseMessageContent(it).text
+            // TODO
+            val lastMessageText = lastMsg?.let {
+                MessageDto.parseMessageContent(it.content,it.id,it.date.toLong()).toString()
             }
             return ChatDto(
                 id = chat.id,

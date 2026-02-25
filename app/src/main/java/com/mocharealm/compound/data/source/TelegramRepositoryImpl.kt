@@ -10,12 +10,10 @@ import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
-import com.mocharealm.compound.domain.model.MessageType
+import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
-import com.mocharealm.compound.domain.model.ReplyInfo
 import com.mocharealm.compound.domain.model.ShareFileInfo
-import com.mocharealm.compound.domain.model.SystemActionType
-import com.mocharealm.compound.domain.model.TextEntity
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.model.User
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.tdLangPackId
@@ -46,11 +44,16 @@ class TelegramRepositoryImpl(
                 query,
                 { result: TdApi.Object? ->
                     when (result) {
-                        is TdApi.Error -> cont.resumeWithException(Exception(result.message))
-                        null -> cont.resumeWithException(NullPointerException("Result is null"))
+                        is TdApi.Error ->
+                            cont.resumeWithException(Exception(result.message))
+
+                        null ->
+                            cont.resumeWithException(
+                                NullPointerException("Result is null")
+                            )
+
                         else -> {
-                            @Suppress("UNCHECKED_CAST")
-                            cont.resume(result as T)
+                            @Suppress("UNCHECKED_CAST") cont.resume(result as T)
                         }
                     }
                 },
@@ -61,7 +64,9 @@ class TelegramRepositoryImpl(
         }
 
     private suspend fun <T : TdApi.Object> sendSafe(query: TdApi.Function<T>): Result<T> =
-        runCatching { send(query) }
+        runCatching {
+            send(query)
+        }
 
     init {
         runBlocking {
@@ -92,20 +97,21 @@ class TelegramRepositoryImpl(
 
     override suspend fun setAuthenticationPhoneNumber(phoneNumber: String): AuthState {
         return try {
-            val response = send(
-                TdApi.SetAuthenticationPhoneNumber(
-                    phoneNumber,
-                    TdApi.PhoneNumberAuthenticationSettings(
-                        false,
-                        false,
-                        true,
-                        false,
-                        true,
-                        TdApi.FirebaseAuthenticationSettingsAndroid(),
-                        emptyArray<String>()
+            val response =
+                send(
+                    TdApi.SetAuthenticationPhoneNumber(
+                        phoneNumber,
+                        TdApi.PhoneNumberAuthenticationSettings(
+                            false,
+                            false,
+                            true,
+                            false,
+                            true,
+                            TdApi.FirebaseAuthenticationSettingsAndroid(),
+                            emptyArray<String>()
+                        )
                     )
                 )
-            )
             parseAuthState(response)
         } catch (e: Exception) {
             AuthState.Error(e.message ?: "Unknown error")
@@ -165,20 +171,17 @@ class TelegramRepositoryImpl(
         runCatching {
             // 持续调用 LoadChats 把足够数量的聊天加载进 TDLib 内部列表
             // offsetChatId != 0 时说明已经加载过前面的，需要多加载一些
-            val totalNeeded = if (offsetChatId == 0L) limit else {
-                // 需要获取 offset 之后的 limit 条，先把前面的 + 后面的都加载进来
-                limit + limit // 多加载一些以确保有足够的后续数据
-            }
+            val totalNeeded =
+                if (offsetChatId == 0L) limit
+                else {
+                    // 需要获取 offset 之后的 limit 条，先把前面的 + 后面的都加载进来
+                    limit + limit // 多加载一些以确保有足够的后续数据
+                }
             // 循环调用 LoadChats 直到加载够或者没有更多
             var loaded = 0
             while (loaded < totalNeeded) {
                 val batch = runCatching {
-                    send(
-                        TdApi.LoadChats(
-                            TdApi.ChatListMain(),
-                            totalNeeded - loaded
-                        )
-                    )
+                    send(TdApi.LoadChats(TdApi.ChatListMain(), totalNeeded - loaded))
                 }
                 if (batch.isFailure) break // 404 = 没有更多聊天了
                 loaded += totalNeeded - loaded
@@ -187,16 +190,17 @@ class TelegramRepositoryImpl(
             val chatList = send(TdApi.GetChats(TdApi.ChatListMain(), totalNeeded))
             if (chatList !is TdApi.Chats) error("Invalid chat list response")
 
-            val chatIds = if (offsetChatId == 0L) {
-                chatList.chatIds.take(limit)
-            } else {
-                val idx = chatList.chatIds.indexOf(offsetChatId)
-                if (idx >= 0 && idx + 1 < chatList.chatIds.size) {
-                    chatList.chatIds.drop(idx + 1).take(limit)
+            val chatIds =
+                if (offsetChatId == 0L) {
+                    chatList.chatIds.take(limit)
                 } else {
-                    emptyList()
+                    val idx = chatList.chatIds.indexOf(offsetChatId)
+                    if (idx >= 0 && idx + 1 < chatList.chatIds.size) {
+                        chatList.chatIds.drop(idx + 1).take(limit)
+                    } else {
+                        emptyList()
+                    }
                 }
-            }
 
             val chats = mutableListOf<Chat>()
             for (id in chatIds) {
@@ -206,16 +210,21 @@ class TelegramRepositoryImpl(
                 var lastMsgContent = dto.lastMessage
 
                 if (dto.isGroup && dto.lastMessageSenderId != null) {
-                    val senderName = when {
-                        dto.lastMessageSenderId < 0 -> {
-                            sendSafe(TdApi.GetChat(dto.lastMessageSenderId)).getOrNull()?.title
-                        }
+                    val senderName =
+                        when {
+                            dto.lastMessageSenderId < 0 -> {
+                                sendSafe(TdApi.GetChat(dto.lastMessageSenderId))
+                                    .getOrNull()
+                                    ?.title
+                            }
 
-                        else -> {
-                            val user = sendSafe(TdApi.GetUser(dto.lastMessageSenderId)).getOrNull()
-                            user?.let { "${it.firstName} ${it.lastName}".trim() }
+                            else -> {
+                                val user =
+                                    sendSafe(TdApi.GetUser(dto.lastMessageSenderId))
+                                        .getOrNull()
+                                user?.let { "${it.firstName} ${it.lastName}".trim() }
+                            }
                         }
-                    }
 
                     if (!senderName.isNullOrEmpty()) {
                         lastMsgContent = "$senderName: $lastMsgContent"
@@ -234,74 +243,68 @@ class TelegramRepositoryImpl(
         onlyLocal: Boolean,
         offset: Int
     ): Result<List<Message>> = runCatching {
-        val result = send(
-            TdApi.GetChatHistory(chatId, fromMessageId, offset, limit, onlyLocal)
-        )
+        val result = send(TdApi.GetChatHistory(chatId, fromMessageId, offset, limit, onlyLocal))
         if (result !is TdApi.Messages) error("Invalid messages response type")
 
-        val messages = mutableListOf<Message>()
-        for (msg in result.messages) {
-            messages.add(mapMessageFast(msg))
-        }
-        messages.reversed()
+        val rawMessages = result.messages.map { mapSingleTdMessage(it) }
+        aggregateAlbums(rawMessages)
     }
 
-    private suspend fun parseAuthState(state: TdApi.Object): AuthState = when (state) {
-        is TdApi.Ok -> parseAuthState(send(TdApi.GetAuthorizationState()))
-        is TdApi.AuthorizationStateWaitPhoneNumber -> AuthState.WaitingForPhoneNumber
-        is TdApi.AuthorizationStateWaitCode -> AuthState.WaitingForOtp
-        is TdApi.AuthorizationStateWaitPassword -> AuthState.WaitingForPassword
-        is TdApi.AuthorizationStateReady -> {
-            runCatching { send(TdApi.GetMe()) }
-                .mapCatching { if (it is TdApi.User) mapUser(it) else error("Invalid response") }
-                .fold(
-                    onSuccess = { AuthState.Ready(it) },
-                    onFailure = { AuthState.Error(it.message ?: "Failed to load user") }
-                )
-        }
+    private suspend fun parseAuthState(state: TdApi.Object): AuthState =
+        when (state) {
+            is TdApi.Ok -> parseAuthState(send(TdApi.GetAuthorizationState()))
+            is TdApi.AuthorizationStateWaitPhoneNumber -> AuthState.WaitingForPhoneNumber
+            is TdApi.AuthorizationStateWaitCode -> AuthState.WaitingForOtp
+            is TdApi.AuthorizationStateWaitPassword -> AuthState.WaitingForPassword
+            is TdApi.AuthorizationStateReady -> {
+                runCatching { send(TdApi.GetMe()) }
+                    .mapCatching {
+                        if (it is TdApi.User) mapUser(it) else error("Invalid response")
+                    }
+                    .fold(
+                        onSuccess = { AuthState.Ready(it) },
+                        onFailure = {
+                            AuthState.Error(it.message ?: "Failed to load user")
+                        }
+                    )
+            }
 
-        else -> AuthState.Error("Unknown authentication state: $state")
-    }
+            else -> AuthState.Error("Unknown authentication state: $state")
+        }
 
     override suspend fun sendMessage(
         chatId: Long,
         text: String,
-        entities: List<TextEntity>,
+        entities: List<Text.TextEntity>,
         replyToMessageId: Long
     ): Result<Message> {
         return try {
-            val (finalText, finalEntities) = if (entities.isEmpty()) {
-                com.mocharealm.compound.domain.util.MarkdownParser.parseForSending(text)
-            } else {
-                text to entities
-            }
+            val (finalText, finalEntities) =
+                if (entities.isEmpty()) {
+                    com.mocharealm.compound.domain.util.MarkdownParser.parseForSending(text)
+                } else {
+                    text to entities
+                }
 
-            val content = TdApi.InputMessageText(
-                TdApi.FormattedText(
-                    finalText,
-                    MessageDto.mapToTdApiEntities(finalEntities)
-                ),
-                null,
-                true
-            )
-
-            val replyTo = if (replyToMessageId != 0L) {
-                TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
-            } else {
-                null
-            }
-
-            val sentMessage = send(
-                TdApi.SendMessage(
-                    chatId,
+            val content =
+                TdApi.InputMessageText(
+                    TdApi.FormattedText(
+                        finalText,
+                        MessageDto.mapToTdApiEntities(finalEntities)
+                    ),
                     null,
-                    replyTo,
-                    null,
-                    null,
-                    content
+                    true
                 )
-            )
-            Result.success(mapMessageFast(sentMessage))
+
+            val replyTo =
+                if (replyToMessageId != 0L) {
+                    TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
+                } else {
+                    null
+                }
+
+            val sentMessage = send(TdApi.SendMessage(chatId, null, replyTo, null, null, content))
+            Result.success(mapSingleTdMessage(sentMessage))
         } catch (e: Exception) {
             Result.failure(e)
         }
@@ -311,46 +314,52 @@ class TelegramRepositoryImpl(
         chatId: Long,
         files: List<ShareFileInfo>,
         caption: String,
-        captionEntities: List<TextEntity>,
+        captionEntities: List<Text.TextEntity>,
         replyToMessageId: Long
     ): Result<List<Message>> = runCatching {
-        val formattedCaption = TdApi.FormattedText(
-            caption,
-            MessageDto.mapToTdApiEntities(captionEntities)
-        )
+        val formattedCaption =
+            TdApi.FormattedText(caption, MessageDto.mapToTdApiEntities(captionEntities))
 
-        val contents = files.mapIndexed { index, file ->
-            val isLast = index == files.lastIndex
-            val cap = if (isLast) formattedCaption else TdApi.FormattedText("", emptyArray())
+        val contents =
+            files.mapIndexed { index, file ->
+                val isLast = index == files.lastIndex
+                val cap =
+                    if (isLast) formattedCaption else TdApi.FormattedText("", emptyArray())
 
-            val thumbnail = file.thumbnailPath?.let { path ->
-                TdApi.InputThumbnail(TdApi.InputFileLocal(path), 320, 320)
+                val thumbnail =
+                    file.thumbnailPath?.let { path ->
+                        TdApi.InputThumbnail(TdApi.InputFileLocal(path), 320, 320)
+                    }
+
+                TdApi.InputMessageDocument(
+                    TdApi.InputFileLocal(file.filePath),
+                    thumbnail,
+                    false,
+                    cap
+                )
             }
 
-            TdApi.InputMessageDocument(
-                TdApi.InputFileLocal(file.filePath),
-                thumbnail,
-                false,
-                cap
-            )
-        }
-
-        val replyTo = if (replyToMessageId != 0L) {
-            TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
-        } else null
+        val replyTo =
+            if (replyToMessageId != 0L) {
+                TdApi.InputMessageReplyToMessage(replyToMessageId, null, 0)
+            } else null
 
         if (contents.size == 1) {
-            val msg = send(
-                TdApi.SendMessage(chatId, null, replyTo, null, null, contents[0])
-            )
-            listOf(mapMessageFast(msg))
+            val msg = send(TdApi.SendMessage(chatId, null, replyTo, null, null, contents[0]))
+            listOf(mapSingleTdMessage(msg))
         } else {
-            val messages = send(
-                TdApi.SendMessageAlbum(
-                    chatId, null, replyTo, null, contents.toTypedArray()
+            val messages =
+                send(
+                    TdApi.SendMessageAlbum(
+                        chatId,
+                        null,
+                        replyTo,
+                        null,
+                        contents.toTypedArray()
+                    )
                 )
-            )
-            messages.messages.map { mapMessageFast(it) }
+            val rawMessages = messages.messages.map { mapSingleTdMessage(it) }
+            aggregateAlbums(rawMessages)
         }
     }
 
@@ -377,18 +386,16 @@ class TelegramRepositoryImpl(
         this@TelegramRepositoryImpl.sendSafe(TdApi.DownloadFile(fileId, 32, 0, 0, false))
 
         // Collect progress from UpdateFile events
-        updates
-            .filter { it is TdApi.UpdateFile && it.file.id == fileId }
-            .collect { update ->
-                val file = (update as TdApi.UpdateFile).file
-                if (file.local.isDownloadingCompleted) {
-                    send(DownloadProgress.Completed(file.local.path))
-                    return@collect
-                } else if (file.expectedSize > 0) {
-                    val percent = (file.local.downloadedSize * 100 / file.expectedSize).toInt()
-                    send(DownloadProgress.Downloading(percent))
-                }
+        updates.filter { it is TdApi.UpdateFile && it.file.id == fileId }.collect { update ->
+            val file = (update as TdApi.UpdateFile).file
+            if (file.local.isDownloadingCompleted) {
+                send(DownloadProgress.Completed(file.local.path))
+                return@collect
+            } else if (file.expectedSize > 0) {
+                val percent = (file.local.downloadedSize * 100 / file.expectedSize).toInt()
+                send(DownloadProgress.Downloading(percent))
             }
+        }
     }
 
     override suspend fun getChat(chatId: Long): Result<Chat> = runCatching {
@@ -397,54 +404,39 @@ class TelegramRepositoryImpl(
         ChatDto.fromTdApi(chat).toDomain()
     }
 
-    override val messageUpdates: Flow<MessageUpdateEvent> = updates
-        .transform { update ->
+    override val messageUpdates: Flow<MessageUpdateEvent> =
+        updates.transform { update ->
             when (update) {
-                is TdApi.UpdateNewMessage -> emit(
-                    MessageUpdateEvent.NewMessage(
-                        mapMessageFast(
-                            update.message
-                        )
-                    )
-                )
+                is TdApi.UpdateNewMessage ->
+                    emit(MessageUpdateEvent.NewMessage(mapSingleTdMessage(update.message)))
 
                 is TdApi.UpdateMessageContent -> {
                     val msg =
-                        sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
-                    if (msg is TdApi.Message) emit(
-                        MessageUpdateEvent.MessageUpdated(
-                            mapMessageFast(
-                                msg
-                            )
-                        )
-                    )
+                        sendSafe(TdApi.GetMessage(update.chatId, update.messageId))
+                            .getOrNull()
+                    if (msg is TdApi.Message)
+                        emit(MessageUpdateEvent.MessageUpdated(mapSingleTdMessage(msg)))
                 }
 
                 is TdApi.UpdateMessageEdited -> {
                     val msg =
-                        sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
-                    if (msg is TdApi.Message) emit(
-                        MessageUpdateEvent.MessageUpdated(
-                            mapMessageFast(
-                                msg
-                            )
-                        )
-                    )
+                        sendSafe(TdApi.GetMessage(update.chatId, update.messageId))
+                            .getOrNull()
+                    if (msg is TdApi.Message)
+                        emit(MessageUpdateEvent.MessageUpdated(mapSingleTdMessage(msg)))
                 }
 
                 is TdApi.UpdateMessageSendSucceeded -> {
-                    val msg = sendSafe(
-                        TdApi.GetMessage(
-                            update.message.chatId,
-                            update.message.id
+                    val msg =
+                        sendSafe(TdApi.GetMessage(update.message.chatId, update.message.id))
+                            .getOrNull()
+                    if (msg is TdApi.Message)
+                        emit(
+                            MessageUpdateEvent.MessageSendSucceeded(
+                                update.oldMessageId,
+                                mapSingleTdMessage(msg)
+                            )
                         )
-                    ).getOrNull()
-                    if (msg is TdApi.Message) emit(
-                        MessageUpdateEvent.MessageSendSucceeded(
-                            update.oldMessageId,
-                            mapMessageFast(msg)
-                        )
-                    )
                 }
             }
         }
@@ -469,189 +461,312 @@ class TelegramRepositoryImpl(
         return UserDto.fromTdApi(user, photoPath).toDomain()
     }
 
-    private suspend fun mapMessageFast(msg: TdApi.Message): Message {
-        val senderId: Long
-        val senderName: String
-        val avatarPath: String?
+    // ── Core message mapping ─────────────────────────────────────────────
 
-        when (msg.senderId) {
+    /**
+     * Maps a single TdApi.Message to a domain Message with a single block. Album aggregation
+     * happens in [aggregateAlbums].
+     */
+    private suspend fun mapSingleTdMessage(msg: TdApi.Message): Message {
+        val sender = resolveSender(msg)
+        val replyTo = resolveReplyMessage(msg)
+
+        // System messages get a typed SystemActionBlock
+        val block =
+            resolveSystemBlock(msg, sender)
+                ?: MessageDto.parseMessageContent(
+                    content = msg.content,
+                    messageId = msg.id,
+                    timestamp = msg.date.toLong(),
+                    mediaAlbumId = msg.mediaAlbumId,
+                )
+
+        // ShareInfo decoding for text blocks
+        val shareInfo =
+            if (block is MessageBlock.TextBlock) {
+                com.mocharealm.compound.domain.util.ShareProtocol.decode(
+                    block.content.content,
+                    block.content.entities
+                )
+            } else null
+
+        // Strip share protocol from text content if present
+        val finalBlock =
+            if (shareInfo != null && block is MessageBlock.TextBlock) {
+                val (strippedContent, strippedEntities) =
+                    com.mocharealm.compound.domain.util.ShareProtocol.strip(
+                        block.content.content,
+                        block.content.entities
+                    )
+                block.copy(content = Text(strippedContent, strippedEntities))
+            } else block
+
+        return Message(
+            sender = sender,
+            chatId = msg.chatId,
+            isOutgoing = msg.isOutgoing,
+            blocks = listOf(finalBlock),
+            replyTo = replyTo,
+            shareInfo = shareInfo,
+        )
+    }
+
+    /**
+     * Aggregates messages with matching mediaAlbumId into a single Message with multiple blocks.
+     * Non-album messages pass through unchanged.
+     */
+    private fun aggregateAlbums(messages: List<Message>): List<Message> {
+        val result = mutableListOf<Message>()
+        var i = 0
+        while (i < messages.size) {
+            val msg = messages[i]
+            val block = msg.blocks.first()
+            val albumId =
+                when (block) {
+                    is MessageBlock.MediaBlock -> block.mediaAlbumId
+                    is MessageBlock.DocumentBlock -> block.mediaAlbumId
+                    else -> 0L
+                }
+
+            if (albumId != 0L) {
+                val albumBlocks = mutableListOf(block)
+                var j = i + 1
+                while (j < messages.size) {
+                    val nextBlock = messages[j].blocks.first()
+                    val nextAlbumId =
+                        when (nextBlock) {
+                            is MessageBlock.MediaBlock -> nextBlock.mediaAlbumId
+                            is MessageBlock.DocumentBlock -> nextBlock.mediaAlbumId
+                            else -> 0L
+                        }
+                    if (nextAlbumId == albumId) {
+                        albumBlocks.add(nextBlock)
+                        j++
+                    } else break
+                }
+                result.add(msg.copy(blocks = albumBlocks))
+                i = j
+            } else {
+                result.add(msg)
+                i++
+            }
+        }
+        return result
+    }
+
+    // ── Sender resolution ────────────────────────────────────────────────
+
+    private suspend fun resolveSender(msg: TdApi.Message): User {
+        return when (msg.senderId) {
             is TdApi.MessageSenderUser -> {
                 val userId = (msg.senderId as TdApi.MessageSenderUser).userId
-                senderId = userId
                 val user = sendSafe(TdApi.GetUser(userId)).getOrNull()
-                senderName = if (user != null) {
-                    buildString {
-                        append(user.firstName)
-                        if (user.lastName.isNotEmpty()) {
-                            append(' ').append(user.lastName)
-                        }
-                    }
+                if (user != null) {
+                    val smallPhoto = user.profilePhoto?.small
+                    val avatarPath =
+                        smallPhoto?.local?.takeIf { it.isDownloadingCompleted }?.path
+                            ?: smallPhoto?.let { getLocalFileOrDownload(it)?.path }
+                    User(
+                        id = userId,
+                        firstName = user.firstName,
+                        lastName = user.lastName,
+                        username = user.usernames?.activeUsernames?.firstOrNull() ?: "",
+                        profilePhotoUrl = avatarPath,
+                    )
                 } else {
-                    "User $userId"
+                    User(id = userId, firstName = "User $userId", lastName = "", username = "")
                 }
-                val smallPhoto = user?.profilePhoto?.small
-                avatarPath = smallPhoto?.local?.takeIf { it.isDownloadingCompleted }?.path
-                    ?: smallPhoto?.let { getLocalFileOrDownload(it)?.path }
             }
 
             is TdApi.MessageSenderChat -> {
                 val chatId = (msg.senderId as TdApi.MessageSenderChat).chatId
-                senderId = chatId
                 val chat = sendSafe(TdApi.GetChat(chatId)).getOrNull()
-                senderName = chat?.title ?: "Chat $chatId"
                 val smallPhoto = chat?.photo?.small
-                avatarPath = smallPhoto?.local?.takeIf { it.isDownloadingCompleted }?.path
-                    ?: smallPhoto?.let { getLocalFileOrDownload(it)?.path }
+                val avatarPath =
+                    smallPhoto?.local?.takeIf { it.isDownloadingCompleted }?.path
+                        ?: smallPhoto?.let { getLocalFileOrDownload(it)?.path }
+                User(
+                    id = chatId,
+                    firstName = chat?.title ?: "Chat $chatId",
+                    lastName = "",
+                    username = "",
+                    profilePhotoUrl = avatarPath,
+                )
             }
 
-            else -> {
-                senderId = 0L
-                senderName = "Unknown"
-                avatarPath = null
-            }
+            else -> User(id = 0L, firstName = "Unknown", lastName = "", username = "")
         }
+    }
 
-        val replyInfo = resolveReplyInfo(msg)
-        val domainMsg = MessageDto.fromTdApi(
-            msg = msg,
-            senderId = senderId,
-            senderName = senderName,
-            avatarPath = avatarPath,
-            replyInfo = replyInfo
-        ).toDomain()
+    // ── System action resolution ─────────────────────────────────────────
 
-        if (domainMsg.messageType == MessageType.SYSTEM) {
-            val encodedContent = when (val systemContent = msg.content) {
+    private suspend fun resolveSystemBlock(
+        msg: TdApi.Message,
+        sender: User,
+    ): MessageBlock.SystemActionBlock? {
+        val actionType: MessageBlock.SystemActionBlock.SystemActionType =
+            when (val c = msg.content) {
                 is TdApi.MessageChatAddMembers -> {
-                    val adderName = senderName
-                    val addedNames = systemContent.memberUserIds.map { userId ->
-                        val u = sendSafe(TdApi.GetUser(userId)).getOrNull()
-                        u?.let { "${it.firstName} ${it.lastName}".trim() } ?: "$userId"
-                    }
-                    if (addedNames.size == 1 && addedNames[0] == adderName) {
-                        "${SystemActionType.MEMBER_JOINED_BY_LINK.ordinal}|$adderName"
+                    val addedNames =
+                        c.memberUserIds.map { userId ->
+                            val u = sendSafe(TdApi.GetUser(userId)).getOrNull()
+                            u?.let { "${it.firstName} ${it.lastName}".trim() } ?: "$userId"
+                        }
+                    val addedIds = c.memberUserIds.toList()
+                    if (addedIds.size == 1 && addedIds[0] == sender.id) {
+                        MessageBlock.SystemActionBlock.SystemActionType.MemberJoinedByLink(
+                            userId = sender.id,
+                            userName = "${sender.firstName} ${sender.lastName}".trim()
+                        )
                     } else {
-                        "${SystemActionType.MEMBER_JOINED.ordinal}|$adderName|${
-                            addedNames.joinToString(
-                                ", "
-                            )
-                        }"
+                        MessageBlock.SystemActionBlock.SystemActionType.MemberJoined(
+                            actorId = sender.id,
+                            actorName = "${sender.firstName} ${sender.lastName}".trim(),
+                            targetId = addedIds.firstOrNull() ?: 0L,
+                            targetName = addedNames.joinToString(", ")
+                        )
                     }
                 }
 
                 is TdApi.MessageChatJoinByLink -> {
-                    "${SystemActionType.MEMBER_JOINED_BY_LINK.ordinal}|$senderName"
-                }
-
-                is TdApi.MessageChatDeleteMember -> {
-                    val deletedName = if (systemContent.userId == senderId) {
-                        senderName
-                    } else {
-                        val u = sendSafe(TdApi.GetUser(systemContent.userId)).getOrNull()
-                        u?.let { "${it.firstName} ${it.lastName}".trim() }
-                            ?: "${systemContent.userId}"
-                    }
-                    "${SystemActionType.MEMBER_LEFT.ordinal}|$deletedName"
+                    MessageBlock.SystemActionBlock.SystemActionType.MemberJoinedByLink(
+                        userId = sender.id,
+                        userName = "${sender.firstName} ${sender.lastName}".trim()
+                    )
                 }
 
                 is TdApi.MessageChatChangeTitle -> {
-                    "${SystemActionType.CHAT_CHANGED_TITLE.ordinal}|$senderName|${systemContent.title}"
-                }
-
-                is TdApi.MessageChatChangePhoto -> {
-                    "${SystemActionType.CHAT_CHANGED_PHOTO.ordinal}|$senderName"
-                }
-
-                is TdApi.MessageChatUpgradeTo -> {
-                    "${SystemActionType.CHAT_UPGRADED_TO.ordinal}|${systemContent.supergroupId}"
+                    MessageBlock.SystemActionBlock.SystemActionType.ChatChangedTitle(
+                        actorName = "${sender.firstName} ${sender.lastName}".trim(),
+                        newTitle = c.title
+                    )
                 }
 
                 is TdApi.MessagePinMessage -> {
-                    "${SystemActionType.PIN_MESSAGE.ordinal}|${senderName}|${systemContent.messageId}"
+                    MessageBlock.SystemActionBlock.SystemActionType.PinMessage(
+                        actorName = "${sender.firstName} ${sender.lastName}".trim(),
+                        messagePreview = c.messageId.toString()
+                    )
                 }
 
-                else -> domainMsg.content
+                // Other system types that we don't have typed variants for yet
+                is TdApi.MessageChatDeleteMember,
+                is TdApi.MessageChatChangePhoto,
+                is TdApi.MessageChatUpgradeTo -> return null // fall through to generic parsing
+                else -> return null
             }
-            return domainMsg.copy(content = encodedContent)
-        }
 
-        return domainMsg
+        return MessageBlock.SystemActionBlock(
+            id = msg.id,
+            timestamp = msg.date.toLong(),
+            type = actionType
+        )
     }
 
-    private suspend fun resolveReplyInfo(msg: TdApi.Message): ReplyInfo? {
+    // ── Reply resolution ─────────────────────────────────────────────────
+
+    private suspend fun resolveReplyMessage(msg: TdApi.Message): Message? {
         val reply = msg.replyTo as? TdApi.MessageReplyToMessage ?: return null
         val replyChatId = if (reply.chatId != 0L) reply.chatId else msg.chatId
         val replyMsgId = reply.messageId
         if (replyMsgId == 0L) return null
 
-        // Try to get the original message for sender info
         val originalMsg = sendSafe(TdApi.GetMessage(replyChatId, replyMsgId)).getOrNull()
 
-        val replySenderName = if (originalMsg != null) {
-            when (originalMsg.senderId) {
-                is TdApi.MessageSenderUser -> {
-                    val u =
-                        sendSafe(TdApi.GetUser((originalMsg.senderId as TdApi.MessageSenderUser).userId)).getOrNull()
-                    u?.let {
-                        buildString {
-                            append(it.firstName)
-                            if (it.lastName.isNotEmpty()) append(' ').append(it.lastName)
-                        }
-                    } ?: "User"
-                }
-
-                is TdApi.MessageSenderChat -> {
-                    val c =
-                        sendSafe(TdApi.GetChat((originalMsg.senderId as TdApi.MessageSenderChat).chatId)).getOrNull()
-                    c?.title ?: "Chat"
-                }
-
-                else -> "Unknown"
-            }
-        } else {
-            // If message is from another chat, try origin
-            when (reply.origin) {
-                is TdApi.MessageOriginUser -> {
-                    val u =
-                        sendSafe(TdApi.GetUser((reply.origin as TdApi.MessageOriginUser).senderUserId)).getOrNull()
-                    u?.let {
-                        buildString {
-                            append(it.firstName)
-                            if (it.lastName.isNotEmpty()) append(' ').append(it.lastName)
-                        }
-                    } ?: "User"
-                }
-
-                is TdApi.MessageOriginHiddenUser -> (reply.origin as TdApi.MessageOriginHiddenUser).senderName
-                is TdApi.MessageOriginChat -> {
-                    val c =
-                        sendSafe(TdApi.GetChat((reply.origin as TdApi.MessageOriginChat).senderChatId)).getOrNull()
-                    c?.title ?: "Chat"
-                }
-
-                is TdApi.MessageOriginChannel -> {
-                    val c =
-                        sendSafe(TdApi.GetChat((reply.origin as TdApi.MessageOriginChannel).chatId)).getOrNull()
-                    c?.title ?: "Channel"
-                }
-
-                else -> "Unknown"
-            }
-        }
-
-        // Preview text: prefer quote text, then original message content summary
-        val previewText = reply.quote?.text?.text
-            ?: if (originalMsg != null) {
-                val p = MessageDto.parseMessageContent(originalMsg.content)
-                p.text
+        val replySender =
+            if (originalMsg != null) {
+                resolveSender(originalMsg)
             } else {
-                reply.content?.let { MessageDto.parseMessageContent(it).text } ?: ""
+                // If message is from another chat, try origin
+                val name =
+                    when (reply.origin) {
+                        is TdApi.MessageOriginUser -> {
+                            val u =
+                                sendSafe(
+                                    TdApi.GetUser(
+                                        (reply.origin as
+                                                TdApi.MessageOriginUser)
+                                            .senderUserId
+                                    )
+                                )
+                                    .getOrNull()
+                            u?.let { "${it.firstName} ${it.lastName}".trim() } ?: "User"
+                        }
+
+                        is TdApi.MessageOriginHiddenUser ->
+                            (reply.origin as TdApi.MessageOriginHiddenUser).senderName
+
+                        is TdApi.MessageOriginChat -> {
+                            val c =
+                                sendSafe(
+                                    TdApi.GetChat(
+                                        (reply.origin as
+                                                TdApi.MessageOriginChat)
+                                            .senderChatId
+                                    )
+                                )
+                                    .getOrNull()
+                            c?.title ?: "Chat"
+                        }
+
+                        is TdApi.MessageOriginChannel -> {
+                            val c =
+                                sendSafe(
+                                    TdApi.GetChat(
+                                        (reply.origin as
+                                                TdApi.MessageOriginChannel)
+                                            .chatId
+                                    )
+                                )
+                                    .getOrNull()
+                            c?.title ?: "Channel"
+                        }
+
+                        else -> "Unknown"
+                    }
+                User(id = 0L, firstName = name, lastName = "", username = "")
             }
 
-        return ReplyInfo(
-            messageId = replyMsgId,
-            senderName = replySenderName,
-            text = previewText
+        val previewText =
+            reply.quote?.text?.text
+                ?: if (originalMsg != null) {
+                    val block =
+                        MessageDto.parseMessageContent(
+                            originalMsg.content,
+                            replyMsgId,
+                            0
+                        )
+                    when (block) {
+                        is MessageBlock.TextBlock -> block.content.content
+                        is MessageBlock.MediaBlock -> block.caption?.content ?: "Photo"
+                        is MessageBlock.StickerBlock -> "Sticker"
+                        is MessageBlock.DocumentBlock -> block.document.fileName
+                        is MessageBlock.SystemActionBlock -> "System message"
+                        is MessageBlock.VenueBlock -> block.venue.name
+                    }
+                } else {
+                    reply.content?.let {
+                        val block = MessageDto.parseMessageContent(it, 0, 0)
+                        when (block) {
+                            is MessageBlock.TextBlock -> block.content.content
+                            else -> ""
+                        }
+                    }
+                        ?: ""
+                }
+
+        val replyBlock =
+            MessageBlock.TextBlock(
+                id = replyMsgId,
+                timestamp = originalMsg?.date?.toLong() ?: 0L,
+                content = Text(previewText),
+            )
+
+        return Message(
+            sender = replySender,
+            chatId = replyChatId,
+            isOutgoing = originalMsg?.isOutgoing ?: false,
+            blocks = listOf(replyBlock),
         )
     }
 }

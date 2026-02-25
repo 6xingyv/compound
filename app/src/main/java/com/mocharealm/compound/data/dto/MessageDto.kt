@@ -1,294 +1,278 @@
 package com.mocharealm.compound.data.dto
 
-import com.mocharealm.compound.domain.model.Message
-import com.mocharealm.compound.domain.model.MessageType
-import com.mocharealm.compound.domain.model.ReplyInfo
-import com.mocharealm.compound.domain.model.StickerFormat
-import com.mocharealm.compound.domain.model.TextEntity
-import com.mocharealm.compound.domain.model.TextEntityType
-import com.mocharealm.compound.domain.util.ShareProtocol
+import com.mocharealm.compound.domain.model.Document
+import com.mocharealm.compound.domain.model.File
+import com.mocharealm.compound.domain.model.MessageBlock
+import com.mocharealm.compound.domain.model.Text
+import com.mocharealm.compound.domain.model.Venue
 import org.drinkless.tdlib.TdApi
 
-data class MessageDto(
-    val id: Long,
-    val chatId: Long,
-    val senderId: Long,
-    val senderName: String,
-    val content: String,
-    val timestamp: Long,
-    val isOutgoing: Boolean = false,
-    val messageType: MessageType = MessageType.TEXT,
-    val fileId: Int? = null,
-    val avatarUrl: String? = null,
-    val stickerFormat: StickerFormat? = null,
-    val entities: List<TextEntity> = emptyList(),
-    val replyTo: ReplyInfo? = null,
-    val mediaAlbumId: Long = 0L,
-    val hasSpoiler: Boolean = false,
-    val thumbnailFileId: Int? = null,
-    val mediaWidth: Int = 0,
-    val mediaHeight: Int = 0
-) {
-    fun toDomain(): Message {
-        val shareInfo = ShareProtocol.decode(content, entities)
-        if (shareInfo != null) {
-            android.util.Log.d("ShareProtocol", "Decoded ShareInfo: $shareInfo")
-        } else {
-            // Look for ANY compound share URL to see if it exists but decode failed
-            val rawUrl =
-                entities.find { (it.type as? TextEntityType.TextUrl)?.url?.startsWith("https://compound.mocharealm.com/share") == true }
-            if (rawUrl != null) {
-                android.util.Log.d(
-                    "ShareProtocol",
-                    "Found raw URL entity but decode returned null: ${(rawUrl.type as TextEntityType.TextUrl).url}"
-                )
-            }
-        }
-        val (strippedContent, strippedEntities) = ShareProtocol.strip(content, entities)
-        return Message(
-            id = id,
-            chatId = chatId,
-            senderId = senderId,
-            senderName = senderName,
-            content = strippedContent,
-            timestamp = timestamp,
-            isOutgoing = isOutgoing,
-            messageType = messageType,
-            fileUrl = null,
-            fileId = fileId,
-            avatarUrl = avatarUrl,
-            stickerFormat = stickerFormat,
-            entities = strippedEntities,
-            replyTo = replyTo,
-            mediaAlbumId = mediaAlbumId,
-            hasSpoiler = hasSpoiler,
-            thumbnailFileId = thumbnailFileId,
-            mediaWidth = mediaWidth,
-            mediaHeight = mediaHeight,
-            shareInfo = shareInfo
-        )
-    }
+/**
+ * Stateless helpers that convert TDLib API objects into domain [MessageBlock] instances.
+ *
+ * Album aggregation (merging multiple TdApi.Messages into one domain Message) is performed in the
+ * repository layer, not here.
+ */
+object MessageDto {
 
-    companion object {
-        data class ParsedContent(
-            val text: String,
-            val type: MessageType,
-            val fileId: Int? = null,
-            val stickerFormat: StickerFormat? = null,
-            val entities: List<TextEntity> = emptyList(),
-            val hasSpoiler: Boolean = false,
-            val thumbnailFileId: Int? = null,
-            val mediaWidth: Int = 0,
-            val mediaHeight: Int = 0,
-        )
+    // ── TdApi.MessageContent → MessageBlock ──────────────────────────────
 
-        fun fromTdApi(
-            msg: TdApi.Message,
-            senderId: Long,
-            senderName: String,
-            avatarPath: String?,
-            replyInfo: ReplyInfo?
-        ): MessageDto {
-            val parsed = parseMessageContent(msg.content)
-            return MessageDto(
-                id = msg.id,
-                chatId = msg.chatId,
-                senderId = senderId,
-                senderName = senderName,
-                content = parsed.text,
-                timestamp = msg.date.toLong(),
-                isOutgoing = msg.isOutgoing,
-                messageType = parsed.type,
-                fileId = parsed.fileId,
-                avatarUrl = avatarPath,
-                stickerFormat = parsed.stickerFormat,
-                entities = parsed.entities,
-                replyTo = replyInfo,
-                mediaAlbumId = msg.mediaAlbumId,
-                hasSpoiler = parsed.hasSpoiler,
-                thumbnailFileId = parsed.thumbnailFileId,
-                mediaWidth = parsed.mediaWidth,
-                mediaHeight = parsed.mediaHeight
-            )
-        }
-
-        fun parseMessageContent(content: TdApi.MessageContent): ParsedContent =
+    fun parseMessageContent(
+            content: TdApi.MessageContent,
+            messageId: Long,
+            timestamp: Long,
+            mediaAlbumId: Long = 0L,
+    ): MessageBlock =
             when (content) {
-                is TdApi.MessageText -> ParsedContent(
-                    content.text.text,
-                    MessageType.TEXT,
-                    null,
-                    entities = mapFormattedTextEntities(content.text)
-                )
-
+                is TdApi.MessageText ->
+                        MessageBlock.TextBlock(
+                                id = messageId,
+                                timestamp = timestamp,
+                                content = mapFormattedText(content.text),
+                        )
                 is TdApi.MessagePhoto -> {
-                    val caption = content.caption.text
                     val photoFileId = content.photo.sizes.lastOrNull()?.photo?.id
-                    ParsedContent(
-                        if (caption.isNotEmpty()) "Photo: $caption" else "Photo",
-                        MessageType.PHOTO,
-                        photoFileId,
-                        entities = if (caption.isNotEmpty()) mapFormattedTextEntities(content.caption) else emptyList(),
-                        hasSpoiler = content.hasSpoiler
+                    MessageBlock.MediaBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
+                            file = File(fileId = photoFileId),
+                            caption = mapFormattedTextOrNull(content.caption),
+                            hasSpoiler = content.hasSpoiler,
+                            mediaAlbumId = mediaAlbumId,
                     )
                 }
-
                 is TdApi.MessageVideo -> {
-                    val caption = content.caption.text
                     val videoFileId = content.video.video.id
                     val thumbFileId = content.video.thumbnail?.file?.id
-                    ParsedContent(
-                        if (caption.isNotEmpty()) "Video: $caption" else "Video",
-                        MessageType.VIDEO,
-                        videoFileId,
-                        hasSpoiler = content.hasSpoiler,
-                        thumbnailFileId = thumbFileId,
-                        mediaWidth = content.video.width,
-                        mediaHeight = content.video.height
+                    MessageBlock.MediaBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
+                            file = File(fileId = videoFileId),
+                            thumbnail = thumbFileId?.let { File(fileId = it) },
+                            caption = mapFormattedTextOrNull(content.caption),
+                            hasSpoiler = content.hasSpoiler,
+                            width = content.video.width,
+                            height = content.video.height,
+                            mediaAlbumId = mediaAlbumId,
                     )
                 }
-
                 is TdApi.MessageAnimatedEmoji -> {
                     val sticker = content.animatedEmoji.sticker
-                    val format = when (sticker?.format) {
-                        is TdApi.StickerFormatWebp -> StickerFormat.WEBP
-                        is TdApi.StickerFormatTgs -> StickerFormat.TGS
-                        is TdApi.StickerFormatWebm -> StickerFormat.WEBM
-                        else -> StickerFormat.WEBP
-                    }
-                    ParsedContent(
-                        content.emoji,
-                        MessageType.STICKER,
-                        sticker?.sticker?.id,
-                        format
+                    val format = mapStickerFormat(sticker?.format)
+                    MessageBlock.StickerBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            stickerFormat = format,
+                            file = File(fileId = sticker?.sticker?.id),
+                            caption = Text(content.emoji),
                     )
                 }
-
                 is TdApi.MessageAnimation -> {
-                    val format = when (content.animation.mimeType) {
-                        "image/gif" -> StickerFormat.GIF
-                        "video/mp4" -> StickerFormat.MP4
-                        else -> StickerFormat.WEBP
-                    }
-                    ParsedContent(
-                        "Sticker",
-                        MessageType.STICKER,
-                        content.animation.animation.id,
-                        format
+                    val format =
+                            when (content.animation.mimeType) {
+                                "image/gif" -> MessageBlock.StickerBlock.StickerFormat.GIF
+                                "video/mp4" -> MessageBlock.StickerBlock.StickerFormat.MP4
+                                else -> MessageBlock.StickerBlock.StickerFormat.WEBP
+                            }
+                    MessageBlock.StickerBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            stickerFormat = format,
+                            file = File(fileId = content.animation.animation.id),
+                            caption = Text("Sticker"),
                     )
                 }
-
                 is TdApi.MessageSticker -> {
-                    val format = when (content.sticker.format) {
-                        is TdApi.StickerFormatWebp -> StickerFormat.WEBP
-                        is TdApi.StickerFormatTgs -> StickerFormat.TGS
-                        is TdApi.StickerFormatWebm -> StickerFormat.WEBM
-                        else -> StickerFormat.WEBP
-                    }
-                    ParsedContent(
-                        "Sticker",
-                        MessageType.STICKER,
-                        content.sticker.sticker.id,
-                        format
+                    val format = mapStickerFormat(content.sticker.format)
+                    MessageBlock.StickerBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            stickerFormat = format,
+                            file = File(fileId = content.sticker.sticker.id),
+                            caption = Text("Sticker"),
                     )
                 }
-
                 is TdApi.MessageDocument -> {
                     when {
-                        content.document.mimeType.startsWith("image/") -> ParsedContent(
-                            content.caption.text,
-                            MessageType.PHOTO,
-                            content.document.document.id,
-                            entities = mapFormattedTextEntities(content.caption)
-                        )
-
-                        content.document.mimeType.startsWith("video/") -> ParsedContent(
-                            content.caption.text,
-                            MessageType.VIDEO,
-                            content.document.document.id,
-                            entities = mapFormattedTextEntities(content.caption)
-                        )
-
-                        else -> ParsedContent(
-                            content.caption.text,
-                            MessageType.DOCUMENT,
-                            null,
-                            entities = mapFormattedTextEntities(content.caption)
-                        )
+                        content.document.mimeType.startsWith("image/") ->
+                                MessageBlock.MediaBlock(
+                                        id = messageId,
+                                        timestamp = timestamp,
+                                        mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
+                                        file = File(fileId = content.document.document.id),
+                                        caption = mapFormattedTextOrNull(content.caption),
+                                        mediaAlbumId = mediaAlbumId,
+                                )
+                        content.document.mimeType.startsWith("video/") ->
+                                MessageBlock.MediaBlock(
+                                        id = messageId,
+                                        timestamp = timestamp,
+                                        mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
+                                        file = File(fileId = content.document.document.id),
+                                        caption = mapFormattedTextOrNull(content.caption),
+                                        mediaAlbumId = mediaAlbumId,
+                                )
+                        else -> {
+                            val thumbFileId = content.document.thumbnail?.file?.id
+                            MessageBlock.DocumentBlock(
+                                    id = messageId,
+                                    timestamp = timestamp,
+                                    document =
+                                            Document(
+                                                    file =
+                                                            File(
+                                                                    fileId =
+                                                                            content.document
+                                                                                    .document
+                                                                                    .id
+                                                            ),
+                                                    fileName = content.document.fileName,
+                                                    mimeType = content.document.mimeType,
+                                                    thumbnail =
+                                                            thumbFileId?.let { File(fileId = it) },
+                                            ),
+                                    caption = mapFormattedTextOrNull(content.caption),
+                                    mediaAlbumId = mediaAlbumId,
+                            )
+                        }
                     }
                 }
+                is TdApi.MessageAudio ->
+                        MessageBlock.TextBlock(
+                                id = messageId,
+                                timestamp = timestamp,
+                                content = Text("Audio"),
+                        )
+                is TdApi.MessageVoiceNote ->
+                        MessageBlock.TextBlock(
+                                id = messageId,
+                                timestamp = timestamp,
+                                content = Text("Voice message"),
+                        )
 
-                is TdApi.MessageAudio -> ParsedContent("Audio", MessageType.AUDIO, null)
-                is TdApi.MessageVoiceNote -> ParsedContent("Voice message", MessageType.VOICE, null)
+                // System messages – these are handled by the repo layer which creates
+                // SystemActionBlock with typed SystemActionType. We return a placeholder here.
                 is TdApi.MessageChatAddMembers,
                 is TdApi.MessageChatJoinByLink,
                 is TdApi.MessageChatDeleteMember,
                 is TdApi.MessageChatChangeTitle,
                 is TdApi.MessageChatChangePhoto,
                 is TdApi.MessagePinMessage,
-                is TdApi.MessageChatUpgradeTo -> ParsedContent(
-                    "System message",
-                    MessageType.SYSTEM,
-                    null
-                )
-
+                is TdApi.MessageChatUpgradeTo ->
+                        MessageBlock.TextBlock(
+                                id = messageId,
+                                timestamp = timestamp,
+                                content = Text("System message"),
+                        )
                 is TdApi.MessageVenue -> {
-                    ParsedContent("Venue", MessageType.VENUE, null)
-                    TODO()
+                    MessageBlock.VenueBlock(
+                            id = messageId,
+                            timestamp = timestamp,
+                            venue =
+                                    com.mocharealm.compound.domain.model.Venue(
+                                            longitude = content.venue.location.longitude.toLong(),
+                                            latitude = content.venue.location.latitude.toLong(),
+                                            name = content.venue.title,
+                                    ),
+                                Venue(
+                                    name = content.venue.title,
+                                ),
+                    )
                 }
-
-                else -> ParsedContent("Message $content", MessageType.TEXT, null)
+                else ->
+                        MessageBlock.TextBlock(
+                                id = messageId,
+                                timestamp = timestamp,
+                                content = Text("Message $content"),
+                        )
             }
 
-        fun mapFormattedTextEntities(formattedText: TdApi.FormattedText): List<TextEntity> {
-            if (formattedText.entities.isNullOrEmpty()) return emptyList()
-            return formattedText.entities.mapNotNull { entity ->
-                val type = when (entity.type) {
-                    is TdApi.TextEntityTypeBold -> TextEntityType.Bold
-                    is TdApi.TextEntityTypeItalic -> TextEntityType.Italic
-                    is TdApi.TextEntityTypeUnderline -> TextEntityType.Underline
-                    is TdApi.TextEntityTypeStrikethrough -> TextEntityType.Strikethrough
-                    is TdApi.TextEntityTypeCode -> TextEntityType.Code
-                    is TdApi.TextEntityTypePre -> TextEntityType.Pre
-                    is TdApi.TextEntityTypePreCode -> TextEntityType.PreCode(
-                        (entity.type as TdApi.TextEntityTypePreCode).language
-                    )
+    // ── FormattedText mapping ────────────────────────────────────────────
 
-                    is TdApi.TextEntityTypeTextUrl -> TextEntityType.TextUrl(
-                        (entity.type as TdApi.TextEntityTypeTextUrl).url
-                    )
+    fun mapFormattedText(formattedText: TdApi.FormattedText): Text {
+        return Text(
+                content = formattedText.text,
+                entities = mapFormattedTextEntities(formattedText),
+        )
+    }
 
-                    is TdApi.TextEntityTypeUrl -> TextEntityType.Url
-                    is TdApi.TextEntityTypeMention -> TextEntityType.Mention
-                    is TdApi.TextEntityTypeMentionName -> TextEntityType.Mention
-                    is TdApi.TextEntityTypeSpoiler -> TextEntityType.Spoiler
-                    is TdApi.TextEntityTypeEmailAddress -> TextEntityType.EmailAddress
-                    is TdApi.TextEntityTypePhoneNumber -> TextEntityType.PhoneNumber
-                    else -> null
-                } ?: return@mapNotNull null
-                TextEntity(offset = entity.offset, length = entity.length, type = type)
-            }
-        }
+    private fun mapFormattedTextOrNull(formattedText: TdApi.FormattedText): Text? {
+        if (formattedText.text.isBlank() && formattedText.entities.isNullOrEmpty()) return null
+        return mapFormattedText(formattedText)
+    }
 
-        fun mapToTdApiEntities(entities: List<TextEntity>): Array<TdApi.TextEntity> {
-            return entities.map { entity ->
-                val type = when (entity.type) {
-                    is TextEntityType.Bold -> TdApi.TextEntityTypeBold()
-                    is TextEntityType.Italic -> TdApi.TextEntityTypeItalic()
-                    is TextEntityType.Underline -> TdApi.TextEntityTypeUnderline()
-                    is TextEntityType.Strikethrough -> TdApi.TextEntityTypeStrikethrough()
-                    is TextEntityType.Code -> TdApi.TextEntityTypeCode()
-                    is TextEntityType.Pre -> TdApi.TextEntityTypePre()
-                    is TextEntityType.PreCode -> TdApi.TextEntityTypePreCode(entity.type.language)
-                    is TextEntityType.TextUrl -> TdApi.TextEntityTypeTextUrl(entity.type.url)
-                    is TextEntityType.Url -> TdApi.TextEntityTypeUrl()
-                    is TextEntityType.Mention -> TdApi.TextEntityTypeMention()
-                    is TextEntityType.Spoiler -> TdApi.TextEntityTypeSpoiler()
-                    is TextEntityType.EmailAddress -> TdApi.TextEntityTypeEmailAddress()
-                    is TextEntityType.PhoneNumber -> TdApi.TextEntityTypePhoneNumber()
-                }
-                TdApi.TextEntity(entity.offset, entity.length, type)
-            }.toTypedArray()
+    fun mapFormattedTextEntities(formattedText: TdApi.FormattedText): List<Text.TextEntity> {
+        if (formattedText.entities.isNullOrEmpty()) return emptyList()
+        return formattedText.entities.mapNotNull { entity ->
+            val type =
+                    when (entity.type) {
+                        is TdApi.TextEntityTypeBold -> Text.TextEntityType.Bold
+                        is TdApi.TextEntityTypeItalic -> Text.TextEntityType.Italic
+                        is TdApi.TextEntityTypeUnderline -> Text.TextEntityType.Underline
+                        is TdApi.TextEntityTypeStrikethrough -> Text.TextEntityType.Strikethrough
+                        is TdApi.TextEntityTypeCode -> Text.TextEntityType.Code
+                        is TdApi.TextEntityTypePre -> Text.TextEntityType.Pre
+                        is TdApi.TextEntityTypePreCode ->
+                                Text.TextEntityType.PreCode(
+                                        (entity.type as TdApi.TextEntityTypePreCode).language
+                                )
+                        is TdApi.TextEntityTypeTextUrl ->
+                                Text.TextEntityType.TextUrl(
+                                        (entity.type as TdApi.TextEntityTypeTextUrl).url
+                                )
+                        is TdApi.TextEntityTypeUrl -> Text.TextEntityType.Url
+                        is TdApi.TextEntityTypeMention -> Text.TextEntityType.Mention
+                        is TdApi.TextEntityTypeMentionName -> Text.TextEntityType.Mention
+                        is TdApi.TextEntityTypeSpoiler -> Text.TextEntityType.Spoiler
+                        is TdApi.TextEntityTypeEmailAddress -> Text.TextEntityType.EmailAddress
+                        is TdApi.TextEntityTypePhoneNumber -> Text.TextEntityType.PhoneNumber
+                        else -> null
+                    }
+                            ?: return@mapNotNull null
+            Text.TextEntity(offset = entity.offset, length = entity.length, type = type)
         }
     }
+
+    fun mapToTdApiEntities(entities: List<Text.TextEntity>): Array<TdApi.TextEntity> {
+        return entities
+                .map { entity ->
+                    val type =
+                            when (entity.type) {
+                                is Text.TextEntityType.Bold -> TdApi.TextEntityTypeBold()
+                                is Text.TextEntityType.Italic -> TdApi.TextEntityTypeItalic()
+                                is Text.TextEntityType.Underline -> TdApi.TextEntityTypeUnderline()
+                                is Text.TextEntityType.Strikethrough ->
+                                        TdApi.TextEntityTypeStrikethrough()
+                                is Text.TextEntityType.Code -> TdApi.TextEntityTypeCode()
+                                is Text.TextEntityType.Pre -> TdApi.TextEntityTypePre()
+                                is Text.TextEntityType.PreCode ->
+                                        TdApi.TextEntityTypePreCode(entity.type.language)
+                                is Text.TextEntityType.TextUrl ->
+                                        TdApi.TextEntityTypeTextUrl(entity.type.url)
+                                is Text.TextEntityType.Url -> TdApi.TextEntityTypeUrl()
+                                is Text.TextEntityType.Mention -> TdApi.TextEntityTypeMention()
+                                is Text.TextEntityType.Spoiler -> TdApi.TextEntityTypeSpoiler()
+                                is Text.TextEntityType.EmailAddress ->
+                                        TdApi.TextEntityTypeEmailAddress()
+                                is Text.TextEntityType.PhoneNumber ->
+                                        TdApi.TextEntityTypePhoneNumber()
+                            }
+                    TdApi.TextEntity(entity.offset, entity.length, type)
+                }
+                .toTypedArray()
+    }
+
+    // ── Helpers ──────────────────────────────────────────────────────────
+
+    private fun mapStickerFormat(
+            format: TdApi.StickerFormat?
+    ): MessageBlock.StickerBlock.StickerFormat =
+            when (format) {
+                is TdApi.StickerFormatWebp -> MessageBlock.StickerBlock.StickerFormat.WEBP
+                is TdApi.StickerFormatTgs -> MessageBlock.StickerBlock.StickerFormat.TGS
+                is TdApi.StickerFormatWebm -> MessageBlock.StickerBlock.StickerFormat.WEBM
+                else -> MessageBlock.StickerBlock.StickerFormat.WEBP
+            }
 }

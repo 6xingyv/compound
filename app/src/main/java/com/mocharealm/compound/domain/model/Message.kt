@@ -1,7 +1,7 @@
 package com.mocharealm.compound.domain.model
 
-//Old Code
-//data class Message(
+// Old Code
+// data class Message(
 //    val id: Long,
 //    val chatId: Long,
 //    val senderId: Long,
@@ -23,9 +23,9 @@ package com.mocharealm.compound.domain.model
 //    val mediaWidth: Int = 0,
 //    val mediaHeight: Int = 0,
 //    val shareInfo: ShareInfo? = null
-//)
+// )
 //
-//enum class MessageType {
+// enum class MessageType {
 //    TEXT,
 //    PHOTO,
 //    VIDEO,
@@ -35,10 +35,10 @@ package com.mocharealm.compound.domain.model
 //    STICKER,
 //    SYSTEM,
 //    VENUE
-//}
+// }
 //
 //// TODO: Support all types
-//enum class SystemActionType {
+// enum class SystemActionType {
 //    MEMBER_JOINED,         // un1 (who added), un2 (who was added)
 //    MEMBER_JOINED_BY_LINK, // un1 (who joined)
 //    MEMBER_LEFT,           // un1 (who left/was removed)
@@ -46,29 +46,29 @@ package com.mocharealm.compound.domain.model
 //    CHAT_CHANGED_PHOTO,    // un1 (who changed)
 //    CHAT_UPGRADED_TO,      // supergroupId
 //    PIN_MESSAGE
-//}
+// }
 //
-//enum class StickerFormat {
+// enum class StickerFormat {
 //    WEBP,
 //    TGS,
 //    WEBM,
 //    MP4,
 //    GIF
-//}
+// }
 //
-//data class ReplyInfo(
+// data class ReplyInfo(
 //    val messageId: Long,
 //    val senderName: String,
 //    val text: String
-//)
+// )
 //
-//data class TextEntity(
+// data class TextEntity(
 //    val offset: Int,
 //    val length: Int,
 //    val type: TextEntityType
-//)
+// )
 //
-//sealed class TextEntityType {
+// sealed class TextEntityType {
 //    data object Bold : TextEntityType()
 //    data object Italic : TextEntityType()
 //    data object Underline : TextEntityType()
@@ -82,71 +82,96 @@ package com.mocharealm.compound.domain.model
 //    data object Spoiler : TextEntityType()
 //    data object EmailAddress : TextEntityType()
 //    data object PhoneNumber : TextEntityType()
-//}
-
+// }
 
 data class Message(
-    val senderId: Long,
-    val chatId: Long,
-    val blocks: List<MessageBlock>,
-    val replyTo: Message? = null,
-    val shareInfo: ShareInfo? = null
-)
+        val sender: User,
+        val chatId: Long,
+        val isOutgoing: Boolean = false,
+        val blocks: List<MessageBlock>,
+        val replyTo: Message? = null,
+        val shareInfo: ShareInfo? = null
+) {
+    val id: Long
+        get() = blocks.firstOrNull()?.id ?: 0L
+    val timestamp: Long
+        get() = blocks.firstOrNull()?.timestamp ?: 0L
+}
 
 sealed interface MessageBlock {
     val id: Long
     val timestamp: Long
 
     data class TextBlock(
-        override val id: Long,
-        override val timestamp: Long,
-        val content: Text,
+            override val id: Long,
+            override val timestamp: Long,
+            val content: Text,
     ) : MessageBlock
 
     data class MediaBlock(
         override val id: Long,
         override val timestamp: Long,
         val mediaType: MediaType,
-        val mediaWidth: Int = 0,
-        val mediaHeight: Int = 0,
+        val width: Int = 0,
+        val height: Int = 0,
         val file: File,
         val thumbnail: File? = null,
         val caption: Text? = null,
+        val hasSpoiler: Boolean = false,
+        val mediaAlbumId: Long = 0L,
     ) : MessageBlock {
         enum class MediaType {
-            PHOTO, VIDEO
+            PHOTO,
+            VIDEO
         }
     }
 
+    data class DocumentBlock(
+            override val id: Long,
+            override val timestamp: Long,
+            val document: Document,
+            val caption: Text? = null,
+            val mediaAlbumId: Long = 0L,
+    ) : MessageBlock
+
     data class StickerBlock(
-        override val id: Long,
-        override val timestamp: Long,
-        val stickerFormat: StickerFormat? = null,
-        val file: File,
-        val caption: Text
+            override val id: Long,
+            override val timestamp: Long,
+            val stickerFormat: StickerFormat? = null,
+            val file: File,
+            val caption: Text
     ) : MessageBlock {
         enum class StickerFormat {
-            WEBP, TGS, WEBM, MP4, GIF
+            WEBP,
+            TGS,
+            WEBM,
+            MP4,
+            GIF
         }
     }
 
     data class SystemActionBlock(
-        override val id: Long,
-        override val timestamp: Long,
-        val type: SystemActionType
-    ): MessageBlock {
+            override val id: Long,
+            override val timestamp: Long,
+            val type: SystemActionType
+    ) : MessageBlock {
         // TODO: Support all types
         sealed interface SystemActionType {
-            data class MemberJoined(val actorId: Long, val actorName: String, val targetId: Long, val targetName: String) : SystemActionType
-            data class MemberJoinedByLink(val userId: Long, val userName: String) : SystemActionType
-            data class ChatChangedTitle(val actorName: String, val newTitle: String) : SystemActionType
-            data class PinMessage(val actorName: String, val messagePreview: String?) : SystemActionType
+            data class MemberJoined(
+                    val actorId: Long,
+                    val actorName: String,
+                    val targetId: Long,
+                    val targetName: String
+            ) : SystemActionType
+            data class MemberJoinedByLink(val userId: Long, val userName: String) :
+                    SystemActionType
+            data class ChatChangedTitle(val actorName: String, val newTitle: String) :
+                    SystemActionType
+            data class PinMessage(val actorName: String, val messagePreview: String?) :
+                    SystemActionType
         }
     }
 
-    data class VenueBlock(
-        override val id: Long,
-        override val timestamp: Long,
-        val venue: Venue
-    ): MessageBlock
+    data class VenueBlock(override val id: Long, override val timestamp: Long, val venue: Venue) :
+            MessageBlock
 }

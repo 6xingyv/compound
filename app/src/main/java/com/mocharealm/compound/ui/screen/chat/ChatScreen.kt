@@ -69,7 +69,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.domain.model.ChatType
-import com.mocharealm.compound.domain.model.MessageType
+import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
@@ -88,10 +88,7 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
 import com.mocharealm.gaze.ui.composable.PopupMenu
-import com.mocharealm.gaze.ui.composable.RevealDirection
-import com.mocharealm.gaze.ui.composable.RevealSwipe
 import com.mocharealm.gaze.ui.composable.TextField
-import com.mocharealm.gaze.ui.composable.rememberRevealState
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.tci18n.core.tdString
@@ -112,9 +109,7 @@ val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
 @OptIn(ExperimentalLayoutApi::class)
 @Composable
-fun ChatScreen(
-    viewModel: ChatViewModel = koinViewModel()
-) {
+fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val listState = rememberLazyListState()
@@ -138,7 +133,7 @@ fun ChatScreen(
 
     val containerWidth = LocalWindowInfo.current.containerDpSize.width
     val layoutDirection = LocalLayoutDirection.current
-    val directionFactor = if (layoutDirection== LayoutDirection.Ltr) 1f else -1f
+    val directionFactor = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
     val density = LocalDensity.current
     val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
     val focusRequester = remember { FocusRequester() }
@@ -151,370 +146,404 @@ fun ChatScreen(
     }
 
     Scaffold(
-        modifier = Modifier.fillMaxSize(),
-        topBar = {
-            Box(
-                Modifier
-                    .drawWithCache {
-                        onDrawBehind {
-                            drawRect(
-                                Brush.verticalGradient(
-                                    0f to surfaceColor.copy(0.4f),
-                                    1f to surfaceColor.copy(0f),
-                                    startY = statusBarHeightPx.toFloat()
-                                )
-                            )
-                        }
-                    }
-                    .statusBarsPadding()) {
-                Row(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    LiquidSurface(
-                        layerBackdrop, Modifier.size(48.dp),
-                        Modifier.clickable {
-                            navigator.pop()
-                        },
-                        effects = {
-                            vibrancy()
-                            blur(1.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
-                        },
-                        shadow = {
-                            Shadow(
-                                radius = 24f.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Black.copy(alpha = 0.1f),
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        },
-                    ) {
-                        Icon(
-                            SFIcons.Chevron_Left,
-                            null,
-                            Modifier
-                                .align(Alignment.Center)
-                                .graphicsLayer {
-                                    if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
-                                })
-                    }
-                    LiquidSurface(
-                        layerBackdrop, Modifier.size(48.dp),
-                        effects = {
-                            vibrancy()
-                            blur(1.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
-                        },
-                        shadow = {
-                            Shadow(
-                                radius = 24f.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Black.copy(alpha = 0.1f),
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        },
-                    ) {
-                        Icon(
-                            SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)
-                        )
-                    }
-                }
-                state.chatInfo?.let { chatInfo ->
-                    Column(
-                        Modifier.align(Alignment.Center),
-                        verticalArrangement = Arrangement.spacedBy((-6).dp),
-                        horizontalAlignment = Alignment.CenterHorizontally
-                    ) {
-                        Avatar(
-                            initials = chatInfo.title.take(2),
-                            modifier = Modifier
-                                .size(48.dp)
-                                .zIndex(20f),
-                            photoPath = chatInfo.photoUrl
-                        )
-                        LiquidSurface(
-                            layerBackdrop,
-                            Modifier.widthIn(max = (containerWidth - 160.dp).coerceAtLeast(0.dp))
-                        ) {
-                            Row(
-                                Modifier.padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
-                            ) {
-                                Text(
-                                    chatInfo.title,
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    fontWeight = FontWeight.Bold,
-                                    maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        },
-        bottomBar = {
-            Row(
-                Modifier
-                    .imePadding()
-                    .drawWithCache {
-                        onDrawBehind {
-                            drawRect(
-                                Brush.verticalGradient(
-                                    0f to surfaceColor.copy(0f), 1f to surfaceColor.copy(1f)
-                                )
-                            )
-                        }
-                    }
-                    .navigationBarsPadding()
-                    .captionBarPadding()
-                    .padding(bottom = 16.dp)
-                    .fillMaxWidth(),
-                verticalAlignment = Alignment.Bottom
-            ) {
-                Spacer(Modifier.width(16.dp))
-                Box(Modifier.size(48.dp)) {
-                    androidx.compose.animation.AnimatedVisibility(
-                        !menuOpened.value, Modifier.dropShadow(CircleShape) {
-                            radius = 24f.dp.toPx()
-                            offset = Offset(0.dp.toPx(), 0.dp.toPx())
-                            color = Color.Black.copy(alpha = 0.1f)
-                        }, enter = fadeIn(), exit = fadeOut()
-                    ) {
-                        LiquidSurface(
-                            layerBackdrop, Modifier.fillMaxSize(), Modifier.clickable {
-                                menuOpened.value = true
-                            }, effects = {
-                                vibrancy()
-                                blur(1.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx())
-                            }, shadow = {
-                                Shadow(
-                                    radius = 0.dp,
-                                    offset = DpOffset(0.dp, 0.dp),
-                                    color = Color.Transparent,
-                                    alpha = 1f,
-                                    blendMode = DrawScope.DefaultBlendMode
-                                )
-                            }, surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
-                        ) {
-                            Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center))
-                        }
-                    }
-                    PopupMenu(
-                        menuOpened,
-                        layerBackdrop,
-                        popupPositionProvider = OverlayPositionProvider,
-                        alignment = PopupPositionProvider.Align.BottomStart,
-                        surfaceColor = surfaceContainerColor.copy(0.4f),
-                        onDismissRequest = {
-                            menuOpened.value = false
-                        },
-                        effects = {
-                            blur(8.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
-                        }
-                    ) {
-                        Column(
-                            Modifier.padding(16.dp),
-                            verticalArrangement = Arrangement.spacedBy(16.dp)
-                        ) {
-                            val list = listOf(
-                                tdString("AttachSticker") to SFIcons.Face_Smiling,
-                                tdString("ChatGallery") to SFIcons.Photo_On_Rectangle_Angled,
-                                tdString("ChatDocument") to SFIcons.Document,
-                                tdString("ChatLocation") to SFIcons.Mappin_And_Ellipse
-                            )
-                            list.forEach { item ->
-                                Row(
-                                    verticalAlignment = Alignment.CenterVertically,
-                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                ) {
-                                    Icon(
-                                        item.second,
-                                        null,
-                                        Modifier
-                                            .clip(CircleShape)
-                                            .background(
+            modifier = Modifier.fillMaxSize(),
+            topBar = {
+                Box(
+                        Modifier.drawWithCache {
+                                    onDrawBehind {
+                                        drawRect(
                                                 Brush.verticalGradient(
-                                                    0f to Color.Gray,
-                                                    1f to Color.DarkGray
+                                                        0f to surfaceColor.copy(0.4f),
+                                                        1f to surfaceColor.copy(0f),
+                                                        startY = statusBarHeightPx.toFloat()
                                                 )
-                                            )
-                                            .padding(8.dp)
-                                            .size(20.dp),
-                                        tint = Color.White
+                                        )
+                                    }
+                                }
+                                .statusBarsPadding()
+                ) {
+                    Row(
+                            Modifier.align(Alignment.CenterStart)
+                                    .padding(horizontal = 16.dp)
+                                    .fillMaxWidth(),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        LiquidSurface(
+                                layerBackdrop,
+                                Modifier.size(48.dp),
+                                Modifier.clickable { navigator.pop() },
+                                effects = {
+                                    vibrancy()
+                                    blur(1.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                },
+                                shadow = {
+                                    Shadow(
+                                            radius = 24f.dp,
+                                            offset = DpOffset(0.dp, 0.dp),
+                                            color = Color.Black.copy(alpha = 0.1f),
+                                            alpha = 1f,
+                                            blendMode = DrawScope.DefaultBlendMode
                                     )
-                                    Text(item.first)
+                                },
+                        ) {
+                            Icon(
+                                    SFIcons.Chevron_Left,
+                                    null,
+                                    Modifier.align(Alignment.Center).graphicsLayer {
+                                        if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
+                                    }
+                            )
+                        }
+                        LiquidSurface(
+                                layerBackdrop,
+                                Modifier.size(48.dp),
+                                effects = {
+                                    vibrancy()
+                                    blur(1.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                },
+                                shadow = {
+                                    Shadow(
+                                            radius = 24f.dp,
+                                            offset = DpOffset(0.dp, 0.dp),
+                                            color = Color.Black.copy(alpha = 0.1f),
+                                            alpha = 1f,
+                                            blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                },
+                        ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
+                    }
+                    state.chatInfo?.let { chatInfo ->
+                        Column(
+                                Modifier.align(Alignment.Center),
+                                verticalArrangement = Arrangement.spacedBy((-6).dp),
+                                horizontalAlignment = Alignment.CenterHorizontally
+                        ) {
+                            Avatar(
+                                    initials = chatInfo.title.take(2),
+                                    modifier = Modifier.size(48.dp).zIndex(20f),
+                                    photoPath = chatInfo.photoUrl
+                            )
+                            LiquidSurface(
+                                    layerBackdrop,
+                                    Modifier.widthIn(
+                                            max = (containerWidth - 160.dp).coerceAtLeast(0.dp)
+                                    )
+                            ) {
+                                Row(
+                                        Modifier.padding(8.dp),
+                                        verticalAlignment = Alignment.CenterVertically,
+                                        horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                ) {
+                                    Text(
+                                            chatInfo.title,
+                                            style = MiuixTheme.textStyles.footnote1,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            textAlign = TextAlign.Center
+                                    )
                                 }
                             }
                         }
                     }
                 }
-                Spacer(Modifier.width(16.dp))
-                CompositionLocalProvider(LocalIndication provides EmptyIndication) {
-                    LiquidSurface(
-                        layerBackdrop,
-                        Modifier.weight(1f),
-                        shape = { ContinuousRoundedRectangle(24.dp) },
-                        effects = {
-                            vibrancy()
-                            blur(2.dp.toPx())
-                            lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
-                        },
-                        surfaceColor = surfaceContainerColor.copy(alpha = 0.2f),
-                        shadow = {
-                            Shadow(
-                                radius = 24f.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Black.copy(alpha = 0.1f),
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        }) {
-                        Row(
-                            Modifier
-                                .padding(start = 12.dp)
-                                .padding(vertical = 12.dp),
-                            verticalAlignment = Alignment.CenterVertically
+            },
+            bottomBar = {
+                Row(
+                        Modifier.imePadding()
+                                .drawWithCache {
+                                    onDrawBehind {
+                                        drawRect(
+                                                Brush.verticalGradient(
+                                                        0f to surfaceColor.copy(0f),
+                                                        1f to surfaceColor.copy(1f)
+                                                )
+                                        )
+                                    }
+                                }
+                                .navigationBarsPadding()
+                                .captionBarPadding()
+                                .padding(bottom = 16.dp)
+                                .fillMaxWidth(),
+                        verticalAlignment = Alignment.Bottom
+                ) {
+                    Spacer(Modifier.width(16.dp))
+                    Box(Modifier.size(48.dp)) {
+                        androidx.compose.animation.AnimatedVisibility(
+                                !menuOpened.value,
+                                Modifier.dropShadow(CircleShape) {
+                                    radius = 24f.dp.toPx()
+                                    offset = Offset(0.dp.toPx(), 0.dp.toPx())
+                                    color = Color.Black.copy(alpha = 0.1f)
+                                },
+                                enter = fadeIn(),
+                                exit = fadeOut()
                         ) {
-                            var inAudioMode by remember { mutableStateOf(false) }
-                            Box(
-                                modifier = Modifier
-                                    .weight(1f)
-                                    .heightIn(min = 24.dp),
-                                contentAlignment = Alignment.CenterStart
+                            LiquidSurface(
+                                    layerBackdrop,
+                                    Modifier.fillMaxSize(),
+                                    Modifier.clickable { menuOpened.value = true },
+                                    effects = {
+                                        vibrancy()
+                                        blur(1.dp.toPx())
+                                        lens(16.dp.toPx(), 32.dp.toPx())
+                                    },
+                                    shadow = {
+                                        Shadow(
+                                                radius = 0.dp,
+                                                offset = DpOffset(0.dp, 0.dp),
+                                                color = Color.Transparent,
+                                                alpha = 1f,
+                                                blendMode = DrawScope.DefaultBlendMode
+                                        )
+                                    },
+                                    surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
+                            ) { Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center)) }
+                        }
+                        PopupMenu(
+                                menuOpened,
+                                layerBackdrop,
+                                popupPositionProvider = OverlayPositionProvider,
+                                alignment = PopupPositionProvider.Align.BottomStart,
+                                surfaceColor = surfaceContainerColor.copy(0.4f),
+                                onDismissRequest = { menuOpened.value = false },
+                                effects = {
+                                    blur(8.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                }
+                        ) {
+                            Column(
+                                    Modifier.padding(16.dp),
+                                    verticalArrangement = Arrangement.spacedBy(16.dp)
                             ) {
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = inAudioMode,
-                                    enter = fadeIn() + slideInHorizontally { it },
-                                    exit = fadeOut() + slideOutHorizontally { it }) {
-                                    Row(verticalAlignment = Alignment.CenterVertically) {
+                                val list =
+                                        listOf(
+                                                tdString("AttachSticker") to SFIcons.Face_Smiling,
+                                                tdString("ChatGallery") to
+                                                        SFIcons.Photo_On_Rectangle_Angled,
+                                                tdString("ChatDocument") to SFIcons.Document,
+                                                tdString("ChatLocation") to
+                                                        SFIcons.Mappin_And_Ellipse
+                                        )
+                                list.forEach { item ->
+                                    Row(
+                                            verticalAlignment = Alignment.CenterVertically,
+                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                    ) {
                                         Icon(
-                                            SFIcons.Microphone,
-                                            null,
-                                            modifier = Modifier.clickable {})
-                                        Spacer(Modifier.width(8.dp))
-                                        Text(
-                                            text = tdString("AccDescrVoiceMessage"),
-                                            Modifier.weight(1f),
-                                            style = MiuixTheme.textStyles.body1,
-                                            maxLines = 1,
-                                            softWrap = false,
+                                                item.second,
+                                                null,
+                                                Modifier.clip(CircleShape)
+                                                        .background(
+                                                                Brush.verticalGradient(
+                                                                        0f to Color.Gray,
+                                                                        1f to Color.DarkGray
+                                                                )
+                                                        )
+                                                        .padding(8.dp)
+                                                        .size(20.dp),
+                                                tint = Color.White
+                                        )
+                                        Text(item.first)
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Spacer(Modifier.width(16.dp))
+                    CompositionLocalProvider(LocalIndication provides EmptyIndication) {
+                        LiquidSurface(
+                                layerBackdrop,
+                                Modifier.weight(1f),
+                                shape = { ContinuousRoundedRectangle(24.dp) },
+                                effects = {
+                                    vibrancy()
+                                    blur(2.dp.toPx())
+                                    lens(15.dp.toPx(), 30.dp.toPx(), chromaticAberration = false)
+                                },
+                                surfaceColor = surfaceContainerColor.copy(alpha = 0.2f),
+                                shadow = {
+                                    Shadow(
+                                            radius = 24f.dp,
+                                            offset = DpOffset(0.dp, 0.dp),
+                                            color = Color.Black.copy(alpha = 0.1f),
+                                            alpha = 1f,
+                                            blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                }
+                        ) {
+                            Row(
+                                    Modifier.padding(start = 12.dp).padding(vertical = 12.dp),
+                                    verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                var inAudioMode by remember { mutableStateOf(false) }
+                                Box(
+                                        modifier = Modifier.weight(1f).heightIn(min = 24.dp),
+                                        contentAlignment = Alignment.CenterStart
+                                ) {
+                                    androidx.compose.animation.AnimatedVisibility(
+                                            visible = inAudioMode,
+                                            enter = fadeIn() + slideInHorizontally { it },
+                                            exit = fadeOut() + slideOutHorizontally { it }
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Icon(
+                                                    SFIcons.Microphone,
+                                                    null,
+                                                    modifier = Modifier.clickable {}
+                                            )
+                                            Spacer(Modifier.width(8.dp))
+                                            Text(
+                                                    text = tdString("AccDescrVoiceMessage"),
+                                                    Modifier.weight(1f),
+                                                    style = MiuixTheme.textStyles.body1,
+                                                    maxLines = 1,
+                                                    softWrap = false,
+                                            )
+                                        }
+                                    }
+
+                                    androidx.compose.animation.AnimatedVisibility(
+                                            visible = !inAudioMode,
+                                            enter = fadeIn() + slideInHorizontally { -it },
+                                            exit = fadeOut() + slideOutHorizontally { -it }
+                                    ) {
+                                        TextField(
+                                                modifier =
+                                                        Modifier.fillMaxWidth()
+                                                                .focusRequester(focusRequester),
+                                                state = viewModel.inputState,
+                                                outputTransformation = MarkdownTransformation,
+                                                lineLimits = TextFieldLineLimits.MultiLine(),
+                                                padding = 0.dp,
+                                                clipRadius = 0.dp,
+                                                activeBackgroundColor = Color.Transparent,
+                                                inactiveBackgroundColor = Color.Transparent,
+                                                activeBorderSize = 0.dp,
+                                                inactiveBorderSize = 0.dp,
+                                                textStyle = MiuixTheme.textStyles.body1,
+                                                decorator = { innerTextField ->
+                                                    if (viewModel.inputState.text.isEmpty()) {
+                                                        Box {
+                                                            innerTextField()
+                                                            Text(
+                                                                    tdString(
+                                                                            "TypeMessage",
+                                                                            "default"
+                                                                    ),
+                                                                    color =
+                                                                            LocalContentColor
+                                                                                    .current
+                                                                                    .copy(0.4f),
+                                                                    style =
+                                                                            MiuixTheme.textStyles
+                                                                                    .body1,
+                                                            )
+                                                        }
+                                                    } else innerTextField()
+                                                }
                                         )
                                     }
                                 }
 
-                                androidx.compose.animation.AnimatedVisibility(
-                                    visible = !inAudioMode,
-                                    enter = fadeIn() + slideInHorizontally { -it },
-                                    exit = fadeOut() + slideOutHorizontally { -it }) {
-                                    TextField(
-                                        modifier = Modifier
-                                            .fillMaxWidth()
-                                            .focusRequester(focusRequester),
-                                        state = viewModel.inputState,
-                                        outputTransformation = MarkdownTransformation,
-                                        lineLimits = TextFieldLineLimits.MultiLine(),
-                                        padding = 0.dp,
-                                        clipRadius = 0.dp,
-                                        activeBackgroundColor = Color.Transparent,
-                                        inactiveBackgroundColor = Color.Transparent,
-                                        activeBorderSize = 0.dp,
-                                        inactiveBorderSize = 0.dp,
-                                        textStyle = MiuixTheme.textStyles.body1,
-                                        decorator = { innerTextField ->
-                                            if (viewModel.inputState.text.isEmpty()) {
-                                                Box {
-                                                    innerTextField()
-                                                    Text(
-                                                        tdString("TypeMessage", "default"),
-                                                        color = LocalContentColor.current.copy(0.4f),
-                                                        style = MiuixTheme.textStyles.body1,
+                                AnimatedVisibility(
+                                        visible =
+                                                (viewModel.inputState.text.lines().size <= 1 ||
+                                                        inAudioMode) && !state.loading,
+                                        enter = fadeIn(),
+                                        exit = fadeOut()
+                                ) {
+                                    Box(
+                                            modifier =
+                                                    Modifier.padding(horizontal = 12.dp).clickable {
+                                                        inAudioMode = !inAudioMode
+                                                    }
+                                    ) {
+                                        AnimatedContent(
+                                                targetState = inAudioMode,
+                                                transitionSpec = {
+                                                    (fadeIn() + scaleIn()).togetherWith(
+                                                            fadeOut() + scaleOut()
                                                     )
-                                                }
-                                            } else innerTextField()
-                                        })
-                                }
-                            }
-
-                            AnimatedVisibility(
-                                visible = (viewModel.inputState.text.lines().size <= 1 || inAudioMode) && !state.loading,
-                                enter = fadeIn(),
-                                exit = fadeOut()
-                            ) {
-                                Box(
-                                    modifier = Modifier
-                                        .padding(horizontal = 12.dp)
-                                        .clickable {
-                                            inAudioMode = !inAudioMode
-                                        }) {
-                                    AnimatedContent(
-                                        targetState = inAudioMode, transitionSpec = {
-                                            (fadeIn() + scaleIn()).togetherWith(fadeOut() + scaleOut())
-                                        }, label = "IconSwitch"
-                                    ) { isAudio ->
-                                        if (isAudio) {
-                                            Icon(SFIcons.Xmark, contentDescription = "Close Audio")
-                                        } else {
-                                            Icon(
-                                                SFIcons.Microphone,
-                                                contentDescription = "Open Audio"
-                                            )
+                                                },
+                                                label = "IconSwitch"
+                                        ) { isAudio ->
+                                            if (isAudio) {
+                                                Icon(
+                                                        SFIcons.Xmark,
+                                                        contentDescription = "Close Audio"
+                                                )
+                                            } else {
+                                                Icon(
+                                                        SFIcons.Microphone,
+                                                        contentDescription = "Open Audio"
+                                                )
+                                            }
                                         }
                                     }
                                 }
                             }
                         }
                     }
-                }
-                Spacer(Modifier.width(16.dp))
-                AnimatedVisibility(
-                    !state.loading && viewModel.inputState.text.isNotBlank(),
-                    Modifier,
-                    enter = fadeIn() + slideInHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + expandHorizontally(),
-                    exit = fadeOut() + slideOutHorizontally { if (layoutDirection == LayoutDirection.Ltr) it else -it } + shrinkHorizontally()) {
-                    LiquidSurface(
-                        layerBackdrop,
-                        Modifier
-                            .padding(end = 16.dp)
-                            .size(48.dp),
-                        Modifier.clickable(onClick = viewModel::sendMessage),
-                        effects = {
-                            vibrancy()
-                            blur(4.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
-                        },
-                        tint = primaryColor,
-                        shadow = {
-                            Shadow(
-                                radius = 16.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        },
+                    Spacer(Modifier.width(16.dp))
+                    AnimatedVisibility(
+                            !state.loading && viewModel.inputState.text.isNotBlank(),
+                            Modifier,
+                            enter =
+                                    fadeIn() +
+                                            slideInHorizontally {
+                                                if (layoutDirection == LayoutDirection.Ltr) it
+                                                else -it
+                                            } +
+                                            expandHorizontally(),
+                            exit =
+                                    fadeOut() +
+                                            slideOutHorizontally {
+                                                if (layoutDirection == LayoutDirection.Ltr) it
+                                                else -it
+                                            } +
+                                            shrinkHorizontally()
                     ) {
-                        Icon(
-                            SFIcons.Paperplane, null, Modifier.align(Alignment.Center), Color.White
-                        )
+                        LiquidSurface(
+                                layerBackdrop,
+                                Modifier.padding(end = 16.dp).size(48.dp),
+                                Modifier.clickable(onClick = viewModel::sendMessage),
+                                effects = {
+                                    vibrancy()
+                                    blur(4.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx())
+                                },
+                                tint = primaryColor,
+                                shadow = {
+                                    Shadow(
+                                            radius = 16.dp,
+                                            offset = DpOffset(0.dp, 0.dp),
+                                            alpha = 1f,
+                                            blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                },
+                        ) {
+                            Icon(
+                                    SFIcons.Paperplane,
+                                    null,
+                                    Modifier.align(Alignment.Center),
+                                    Color.White
+                            )
+                        }
                     }
                 }
-            }
-        },
+            },
     ) { innerPadding ->
         CompositionLocalProvider(
-            LocalVideoDownloadProgress provides state.videoDownloadProgress,
-            LocalOnDownloadVideo provides { messageId: Long -> viewModel.downloadVideo(messageId) }) {
+                LocalVideoDownloadProgress provides state.videoDownloadProgress,
+                LocalOnDownloadVideo provides
+                        { messageId: Long ->
+                            viewModel.downloadVideo(messageId)
+                        }
+        ) {
             val onReplyClick: (Long) -> Unit = { replyMessageId ->
                 viewModel.scrollToMessage(replyMessageId)
             }
@@ -522,9 +551,11 @@ fun ChatScreen(
             val scrollTarget = state.scrollToMessageId
             LaunchedEffect(scrollTarget, state.chatItems) {
                 if (scrollTarget != null) {
-                    val targetIdx = state.chatItems.indexOfFirst {
-                        it is MessageItem && it.messages.any { m -> m.id == scrollTarget }
-                    }
+                    val targetIdx =
+                            state.chatItems.indexOfFirst {
+                                it is MessageItem &&
+                                        it.message.blocks.any { b -> b.id == scrollTarget }
+                            }
                     if (targetIdx >= 0) {
                         listState.animateScrollToItem(targetIdx)
                         viewModel.clearScrollTarget()
@@ -533,30 +564,28 @@ fun ChatScreen(
             }
 
             LazyColumn(
-                state = listState,
-                reverseLayout = true,
-                modifier = Modifier
-                    .layerBackdrop(layerBackdrop)
-                    .fillMaxSize()
-                    .imeNestedScroll(focusRequester)
-                    .scrollEndHaptic(),
-                contentPadding = innerPadding,
-                verticalArrangement = Arrangement.Top,
-                overscrollEffect = null,
+                    state = listState,
+                    reverseLayout = true,
+                    modifier =
+                            Modifier.layerBackdrop(layerBackdrop)
+                                    .fillMaxSize()
+                                    .imeNestedScroll(focusRequester)
+                                    .scrollEndHaptic(),
+                    contentPadding = innerPadding,
+                    verticalArrangement = Arrangement.Top,
+                    overscrollEffect = null,
             ) {
                 if (state.loading && state.messages.isEmpty()) {
                     item {
                         Row(
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(vertical = 8.dp),
-                            horizontalArrangement = Arrangement.Center
+                                modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center
                         ) {
                             Text(
-                                text = tdString("Loading"),
-                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                textAlign = TextAlign.Center,
-                                style = MiuixTheme.textStyles.footnote1
+                                    text = tdString("Loading"),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                    textAlign = TextAlign.Center,
+                                    style = MiuixTheme.textStyles.footnote1
                             )
                         }
                     }
@@ -564,38 +593,42 @@ fun ChatScreen(
                     item {
                         Card(modifier = Modifier.padding(12.dp)) {
                             BasicComponent(
-                                title = tdString("ErrorOccurred"),
-                                summary = state.error,
+                                    title = tdString("ErrorOccurred"),
+                                    summary = state.error,
                             )
                             TextButton(
-                                text = tdString("Retry"),
-                                onClick = { viewModel.loadMessages() },
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                    text = tdString("Retry"),
+                                    onClick = { viewModel.loadMessages() },
+                                    modifier =
+                                            Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                             )
                         }
                     }
                 } else {
                     items(
-                        count = state.chatItems.size,
-                        key = { state.chatItems[it].key },
-                        contentType = { state.chatItems[it]::class.simpleName }) { index ->
+                            count = state.chatItems.size,
+                            key = { state.chatItems[it].key },
+                            contentType = { state.chatItems[it]::class.simpleName }
+                    ) { index ->
                         when (val item = state.chatItems[index]) {
                             is TimestampItem -> {
                                 TimestampLabel(timestamp = item.timestamp)
                             }
-
                             is MessageItem -> {
-                                val primaryMessage = item.primaryMessage
-                                if (primaryMessage.messageType == MessageType.SYSTEM) {
-                                    SystemMessage(primaryMessage)
+                                val message = item.message
+                                if (message.blocks.firstOrNull() is MessageBlock.SystemActionBlock
+                                ) {
+                                    SystemMessage(
+                                            message.blocks.first() as MessageBlock.SystemActionBlock
+                                    )
+                                } else {
+                                    MessageBubble(
+                                            message = message,
+                                            groupPosition = item.groupPosition,
+                                            showAvatar = state.chatInfo?.type == ChatType.GROUP,
+                                            onReplyClick = onReplyClick,
+                                    )
                                 }
-                                MessageBubble(
-                                    message = primaryMessage,
-                                    groupPosition = item.groupPosition,
-                                    showAvatar = state.chatInfo?.type == ChatType.GROUP,
-                                    albumMessages = if (item.isAlbum) item.messages else null,
-                                    onReplyClick = onReplyClick,
-                                )
                             }
                         }
                     }
@@ -603,16 +636,14 @@ fun ChatScreen(
                     if (state.loadingMore) {
                         item {
                             Row(
-                                modifier = Modifier
-                                    .fillMaxWidth()
-                                    .padding(vertical = 8.dp),
-                                horizontalArrangement = Arrangement.Center
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp),
+                                    horizontalArrangement = Arrangement.Center
                             ) {
                                 Text(
-                                    text = tdString("Loading"),
-                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                                    textAlign = TextAlign.Center,
-                                    style = MiuixTheme.textStyles.footnote1
+                                        text = tdString("Loading"),
+                                        color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                        textAlign = TextAlign.Center,
+                                        style = MiuixTheme.textStyles.footnote1
                                 )
                             }
                         }

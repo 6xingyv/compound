@@ -2,16 +2,15 @@ package com.mocharealm.compound.domain.util
 
 import android.net.Uri
 import com.mocharealm.compound.domain.model.ShareInfo
-import com.mocharealm.compound.domain.model.TextEntity
-import com.mocharealm.compound.domain.model.TextEntityType
+import com.mocharealm.compound.domain.model.Text
 
 /**
  * Encodes / decodes Compound share source metadata into Telegram message entities.
  *
- * The metadata is carried as a [TextEntityType.TextUrl] whose URL uses the private
- * `compound://share_info` scheme. The entity is attached to a single zero-width space
- * (`\u200B`) appended to the caption so that official Telegram clients display nothing
- * visible, while Compound can recognise and render a source card.
+ * The metadata is carried as a [Text.TextEntityType.TextUrl] whose URL uses the private
+ * `compound://share_info` scheme. The entity is attached to a single zero-width space (`\u200B`)
+ * appended to the caption so that official Telegram clients display nothing visible, while Compound
+ * can recognise and render a source card.
  */
 object ShareProtocol {
 
@@ -21,37 +20,40 @@ object ShareProtocol {
     // ── Encoding (send side) ─────────────────────────────────────────────
 
     /**
-     * Appends a ZWS to [caption] and returns the new caption together with a
-     * [TextEntity] that should be added to the entity list.
+     * Appends a ZWS to [caption] and returns the new caption together with a [Text.TextEntity] that
+     * should be added to the entity list.
      */
-    fun encode(caption: String, info: ShareInfo): Pair<String, TextEntity> {
-        val url = Uri.Builder()
-            .encodedPath(BASE_URL)
-            .appendQueryParameter("name", info.name)
-            .appendQueryParameter("icon", info.iconUrl)
-            .appendQueryParameter("link", info.appUrl)
-            .build()
-            .toString()
+    fun encode(caption: String, info: ShareInfo): Pair<String, Text.TextEntity> {
+        val url =
+                Uri.Builder()
+                        .encodedPath(BASE_URL)
+                        .appendQueryParameter("name", info.name)
+                        .appendQueryParameter("icon", info.iconUrl)
+                        .appendQueryParameter("link", info.appUrl)
+                        .build()
+                        .toString()
 
         val offset = caption.length
         val finalCaption = caption + ZWS
-        val entity = TextEntity(offset, 1, TextEntityType.TextUrl(url))
+        val entity = Text.TextEntity(offset, 1, Text.TextEntityType.TextUrl(url))
         return finalCaption to entity
     }
 
     // ── Decoding (receive side) ──────────────────────────────────────────
 
     /**
-     * Scans [entities] for a Compound share URL entity and extracts
-     * the [ShareInfo]. Returns `null` if none is found.
+     * Scans [entities] for a Compound share URL entity and extracts the [ShareInfo]. Returns `null`
+     * if none is found.
      */
-    fun decode(text: String, entities: List<TextEntity>): ShareInfo? {
-        val entity = entities.firstOrNull { e ->
-            val type = e.type
-            type is TextEntityType.TextUrl && type.url.startsWith(BASE_URL)
-        } ?: return null
+    fun decode(text: String, entities: List<Text.TextEntity>): ShareInfo? {
+        val entity =
+                entities.firstOrNull { e ->
+                    val type = e.type
+                    type is Text.TextEntityType.TextUrl && type.url.startsWith(BASE_URL)
+                }
+                        ?: return null
 
-        val uri = Uri.parse((entity.type as TextEntityType.TextUrl).url)
+        val uri = Uri.parse((entity.type as Text.TextEntityType.TextUrl).url)
         val name = uri.getQueryParameter("name") ?: return null
         val icon = uri.getQueryParameter("icon") ?: ""
         val link = uri.getQueryParameter("link") ?: ""
@@ -59,17 +61,23 @@ object ShareProtocol {
     }
 
     /**
-     * Returns [text] with the protocol ZWS character removed, plus a filtered
-     * entity list that excludes the protocol entity. Offsets of subsequent
-     * entities are **not** adjusted because the ZWS is always at the very end.
+     * Returns [text] with the protocol ZWS character removed, plus a filtered entity list that
+     * excludes the protocol entity. Offsets of subsequent entities are **not** adjusted because the
+     * ZWS is always at the very end.
      */
-    fun strip(text: String, entities: List<TextEntity>): Pair<String, List<TextEntity>> {
-        val protocolEntity = entities.firstOrNull { e ->
-            val type = e.type
-            type is TextEntityType.TextUrl && type.url.startsWith(BASE_URL)
-        } ?: return text to entities
+    fun strip(text: String, entities: List<Text.TextEntity>): Pair<String, List<Text.TextEntity>> {
+        val protocolEntity =
+                entities.firstOrNull { e ->
+                    val type = e.type
+                    type is Text.TextEntityType.TextUrl && type.url.startsWith(BASE_URL)
+                }
+                        ?: return text to entities
 
-        val strippedText = text.removeRange(protocolEntity.offset, protocolEntity.offset + protocolEntity.length)
+        val strippedText =
+                text.removeRange(
+                        protocolEntity.offset,
+                        protocolEntity.offset + protocolEntity.length
+                )
         val filteredEntities = entities.filter { it !== protocolEntity }
         return strippedText to filteredEntities
     }

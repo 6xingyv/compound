@@ -1,6 +1,5 @@
 package com.mocharealm.compound.ui.composable.chat
 
-import android.net.Uri
 import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.AnimationVector1D
 import androidx.compose.animation.core.LinearEasing
@@ -12,6 +11,7 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -58,17 +58,15 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.net.toUri
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
-import com.mocharealm.compound.domain.model.Message
-import com.mocharealm.compound.domain.model.StickerFormat
-import com.mocharealm.compound.domain.model.SystemActionType
+import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.base.SpoilerImage
-import com.mocharealm.compound.ui.composable.base.VideoPlayer
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
 import com.mocharealm.compound.ui.util.SpoilerShader
@@ -91,8 +89,6 @@ import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.util.zip.GZIPInputStream
 import kotlin.math.hypot
-import androidx.core.net.toUri
-
 
 @Composable
 fun ReplyPreview(
@@ -103,21 +99,21 @@ fun ReplyPreview(
     onClick: () -> Unit = {},
 ) {
     Row(
-        modifier = modifier
-            .clip(ContinuousRoundedRectangle(8.dp))
-            .background(MiuixTheme.colorScheme.onSurfaceContainer.copy(0.1f))
-            .clickable(onClick = onClick)
-            .drawWithCache {
-                onDrawBehind {
-                    drawRect(accentColor, size = Size(4.dp.toPx(), size.height))
-                }
-            }, verticalAlignment = Alignment.CenterVertically
+        modifier =
+            modifier
+                .clip(ContinuousRoundedRectangle(8.dp))
+                .background(MiuixTheme.colorScheme.onSurfaceContainer.copy(0.1f))
+                .clickable(onClick = onClick)
+                .drawWithCache {
+                    onDrawBehind {
+                        drawRect(accentColor, size = Size(4.dp.toPx(), size.height))
+                    }
+                },
+        verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(
-            modifier = Modifier
-                .padding(start = 4.dp)
-                .padding(8.dp)
-        ) {
+        Column(modifier = Modifier
+            .padding(start = 4.dp)
+            .padding(8.dp)) {
             Text(
                 text = senderName,
                 style = MiuixTheme.textStyles.footnote1,
@@ -137,12 +133,14 @@ fun ReplyPreview(
 }
 
 @Composable
-fun PhotoBlock(message: Message) {
-    if (!message.fileUrl.isNullOrEmpty()) {
-        SpoilerImage(hasSpoiler = message.hasSpoiler, modifier = Modifier.wrapContentWidth()) {
+fun PhotoBlock(block: MessageBlock.MediaBlock) {
+    if (!block.file.fileUrl.isNullOrEmpty()) {
+        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = Modifier.wrapContentWidth()) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(message.fileUrl).build(),
+                model =
+                    ImageRequest.Builder(LocalContext.current)
+                        .data(block.file.fileUrl)
+                        .build(),
                 contentDescription = "Photo",
                 modifier = Modifier
                     .heightIn(max = 300.dp)
@@ -154,39 +152,55 @@ fun PhotoBlock(message: Message) {
 }
 
 @Composable
-fun VideoBlock(message: Message) {
+fun VideoBlock(block: MessageBlock.MediaBlock) {
     val maxWidth = 280.dp
     val aspectRatio =
-        if (message.mediaWidth > 0 && message.mediaHeight > 0) message.mediaWidth.toFloat() / message.mediaHeight.toFloat() else 16f / 9f
+        if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
+        else 16f / 9f
     val videoModifier = Modifier
         .width(maxWidth)
         .height(maxWidth / aspectRatio)
 
-    SpoilerImage(hasSpoiler = message.hasSpoiler, modifier = Modifier.wrapContentSize()) {
-        if (!message.fileUrl.isNullOrEmpty()) {
-            MessageVideoPlayer(filePath = message.fileUrl, modifier = videoModifier)
+    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = Modifier.wrapContentSize()) {
+        if (!block.file.fileUrl.isNullOrEmpty()) {
+            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = videoModifier)
         } else {
-            VideoThumbnailOverlay(message = message, modifier = videoModifier)
+            VideoThumbnailOverlay(block = block, modifier = videoModifier)
         }
     }
 }
 
 @Composable
-fun StickerBlock(message: Message, modifier: Modifier = Modifier) {
-    if (!message.fileUrl.isNullOrEmpty()) {
-        when (message.stickerFormat) {
-            StickerFormat.WEBM, StickerFormat.MP4 -> VideoPlayer(
-                filePath = message.fileUrl,
-                modifier = modifier
-            )
+fun StickerBlock(block: MessageBlock.StickerBlock, modifier: Modifier = Modifier) {
+    if (!block.file.fileUrl.isNullOrEmpty()) {
+        AsyncImage(
+            model =
+                ImageRequest.Builder(LocalContext.current)
+                    .data(java.io.File(block.file.fileUrl))
+                    .build(),
+            contentDescription = "Sticker",
+            modifier = modifier,
+            contentScale = ContentScale.Fit
+        )
+    }
+}
 
-            StickerFormat.TGS -> LottieSticker(filePath = message.fileUrl, modifier = modifier)
-            else -> AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(java.io.File(message.fileUrl)).build(),
-                contentDescription = "Sticker",
-                modifier = modifier,
-                contentScale = ContentScale.Fit
+@Composable
+fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifier) {
+    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+        Icon(SFIcons.Document_Fill, null, Modifier.size(32.dp), MiuixTheme.colorScheme.primary)
+        Spacer(Modifier.width(12.dp))
+        Column(Modifier.weight(1f)) {
+            Text(
+                text = block.document.fileName,
+                style = MiuixTheme.textStyles.body2,
+                fontWeight = FontWeight.Bold,
+                maxLines = 1,
+                overflow = TextOverflow.Ellipsis
+            )
+            Text(
+                text = block.document.mimeType,
+                style = MiuixTheme.textStyles.footnote1,
             )
         }
     }
@@ -226,150 +240,192 @@ fun RichTextContent(
 
     val shader = remember { SpoilerShader.getShader() }
     val brush = remember(shader) { ShaderBrush(shader) }
-    val revealingSpoilers =
-        remember { mutableStateMapOf<Int, Animatable<Float, AnimationVector1D>>() }
+    val revealingSpoilers = remember {
+        mutableStateMapOf<Int, Animatable<Float, AnimationVector1D>>()
+    }
     val revealingOrigins = remember { mutableStateMapOf<Int, Offset>() }
     val coroutineScope = rememberCoroutineScope()
 
-    val spoilerPaths = remember(text, layoutResult.value) {
-        val layout = layoutResult.value ?: return@remember emptyMap<Int, Path>()
-        val paths = mutableMapOf<Int, Path>()
-        text.getStringAnnotations("SPOILER", 0, text.length).forEach { range ->
-            range.item.toIntOrNull()?.let { index ->
-                paths[index] = layout.multiParagraph.getPathForRange(range.start, range.end)
+    val spoilerPaths =
+        remember(text, layoutResult.value) {
+            val layout = layoutResult.value ?: return@remember emptyMap<Int, Path>()
+            val paths = mutableMapOf<Int, Path>()
+            text.getStringAnnotations("SPOILER", 0, text.length).forEach { range ->
+                range.item.toIntOrNull()?.let { index ->
+                    paths[index] = layout.multiParagraph.getPathForRange(range.start, range.end)
+                }
             }
+            paths
         }
-        paths
-    }
     SelectionContainer {
         Text(
             text = text,
             color = contentColor,
             onTextLayout = { layoutResult.value = it },
-            modifier = modifier
-                .drawWithContent {
-                    val obscuredPath = Path()
-                    var hasObscured = false
-                    spoilerPaths.forEach { (index, path) ->
-                        if (index !in revealedEntityIndices || index in revealingSpoilers) {
-                            obscuredPath.addPath(path)
-                            hasObscured = true
+            modifier =
+                modifier
+                    .drawWithContent {
+                        val obscuredPath = Path()
+                        var hasObscured = false
+                        spoilerPaths.forEach { (index, path) ->
+                            if (index !in revealedEntityIndices ||
+                                index in revealingSpoilers
+                            ) {
+                                obscuredPath.addPath(path)
+                                hasObscured = true
+                            }
                         }
-                    }
 
-                    if (!hasObscured) {
-                        drawContent()
-                        return@drawWithContent
-                    }
+                        if (!hasObscured) {
+                            drawContent()
+                            return@drawWithContent
+                        }
 
-                    clipPath(obscuredPath, clipOp = ClipOp.Difference) {
-                        this@drawWithContent.drawContent()
-                    }
+                        clipPath(obscuredPath, clipOp = ClipOp.Difference) {
+                            this@drawWithContent.drawContent()
+                        }
 
-                    val hasRipples = revealingSpoilers.isNotEmpty()
-                    if (hasRipples) {
+                        val hasRipples = revealingSpoilers.isNotEmpty()
+                        if (hasRipples) {
+                            clipPath(obscuredPath) {
+                                val canvas = drawContext.canvas
+                                canvas.saveLayer(
+                                    Rect(0f, 0f, size.width, size.height),
+                                    Paint()
+                                )
+
+                                revealingSpoilers.forEach { (index, anim) ->
+                                    revealingOrigins[index]?.let { origin ->
+                                        val radius = anim.value
+                                        if (radius > 0f) {
+                                            drawCircle(
+                                                brush =
+                                                    Brush.radialGradient(
+                                                        0.0f to Color.Black,
+                                                        0.5f to Color.Black,
+                                                        1.0f to
+                                                                Color.Transparent,
+                                                        center = origin,
+                                                        radius = radius
+                                                    ),
+                                                center = origin,
+                                                radius = radius
+                                            )
+                                        }
+                                    }
+                                }
+
+                                canvas.saveLayer(
+                                    Rect(0f, 0f, size.width, size.height),
+                                    Paint().apply { blendMode = BlendMode.SrcIn }
+                                )
+                                this@drawWithContent.drawContent()
+                                canvas.restore()
+                                canvas.restore()
+                            }
+                        }
+
                         clipPath(obscuredPath) {
                             val canvas = drawContext.canvas
-                            canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
-
-                            revealingSpoilers.forEach { (index, anim) ->
-                                revealingOrigins[index]?.let { origin ->
-                                    val radius = anim.value
-                                    if (radius > 0f) {
-                                        drawCircle(
-                                            brush = Brush.radialGradient(
-                                                0.0f to Color.Black,
-                                                0.5f to Color.Black,
-                                                1.0f to Color.Transparent,
-                                                center = origin,
-                                                radius = radius
-                                            ), center = origin, radius = radius
-                                        )
-                                    }
-                                }
-                            }
-
                             canvas.saveLayer(
                                 Rect(0f, 0f, size.width, size.height),
-                                Paint().apply { blendMode = BlendMode.SrcIn })
-                            this@drawWithContent.drawContent()
-                            canvas.restore()
-                            canvas.restore()
-                        }
-                    }
+                                Paint()
+                            )
 
-                    clipPath(obscuredPath) {
-                        val canvas = drawContext.canvas
-                        canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+                            shader.setFloatUniform(
+                                "particleColor",
+                                contentColor.red,
+                                contentColor.green,
+                                contentColor.blue,
+                                contentColor.alpha
+                            )
+                            shader.setFloatUniform("time", time)
+                            shader.setFloatUniform(
+                                "resolution",
+                                size.width,
+                                size.height
+                            )
+                            drawRect(brush = brush)
 
-                        shader.setFloatUniform(
-                            "particleColor",
-                            contentColor.red,
-                            contentColor.green,
-                            contentColor.blue,
-                            contentColor.alpha
-                        )
-                        shader.setFloatUniform("time", time)
-                        shader.setFloatUniform("resolution", size.width, size.height)
-                        drawRect(brush = brush)
-
-                        if (hasRipples) {
-                            revealingSpoilers.forEach { (index, anim) ->
-                                revealingOrigins[index]?.let { origin ->
-                                    val radius = anim.value
-                                    if (radius > 0f) {
-                                        drawCircle(
-                                            brush = Brush.radialGradient(
-                                                0.0f to Color.Black,
-                                                0.5f to Color.Black,
-                                                1.0f to Color.Transparent,
+                            if (hasRipples) {
+                                revealingSpoilers.forEach { (index, anim) ->
+                                    revealingOrigins[index]?.let { origin ->
+                                        val radius = anim.value
+                                        if (radius > 0f) {
+                                            drawCircle(
+                                                brush =
+                                                    Brush.radialGradient(
+                                                        0.0f to Color.Black,
+                                                        0.5f to Color.Black,
+                                                        1.0f to
+                                                                Color.Transparent,
+                                                        center = origin,
+                                                        radius = radius
+                                                    ),
                                                 center = origin,
-                                                radius = radius
-                                            ),
-                                            center = origin,
-                                            radius = radius,
-                                            blendMode = BlendMode.DstOut
-                                        )
+                                                radius = radius,
+                                                blendMode = BlendMode.DstOut
+                                            )
+                                        }
                                     }
                                 }
                             }
-                        }
-                        canvas.restore()
-                    }
-                }
-                .pointerInput(text, layoutResult, revealedEntityIndices) {
-                    detectTapGestures { pos ->
-                        val layout = layoutResult.value ?: return@detectTapGestures
-                        if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
-                        val offset = layout.getOffsetForPosition(pos)
-
-                        text.getStringAnnotations("URL", offset, offset).firstOrNull()
-                            ?.let { uriHandler.openUri(it.item) }
-
-                        text.getStringAnnotations("SPOILER", offset, offset).firstOrNull()?.let {
-                            val index = it.item.toIntOrNull() ?: return@let
-                            if (index in revealedEntityIndices || revealingSpoilers.containsKey(index)) return@let
-
-                            val maxRadius = hypot(
-                                layout.size.width.toDouble(), layout.size.height.toDouble()
-                            ).toFloat()
-                            val anim = Animatable(0f)
-                            revealingSpoilers[index] = anim
-                            revealingOrigins[index] = pos
-
-                            coroutineScope.launch {
-                                anim.animateTo(
-                                    targetValue = maxRadius,
-                                    animationSpec = tween(durationMillis = 400, easing = LinearEasing)
-                                )
-                                onSpoilerClick(index)
-                                yield()
-                                revealingSpoilers.remove(index)
-                                revealingOrigins.remove(index)
-                            }
+                            canvas.restore()
                         }
                     }
-                }
+                    .pointerInput(text, layoutResult, revealedEntityIndices) {
+                        detectTapGestures { pos ->
+                            val layout = layoutResult.value ?: return@detectTapGestures
+                            if (pos.y < 0 || pos.y > layout.size.height)
+                                return@detectTapGestures
+                            val offset = layout.getOffsetForPosition(pos)
+
+                            text.getStringAnnotations("URL", offset, offset)
+                                .firstOrNull()
+                                ?.let { uriHandler.openUri(it.item) }
+
+                            text.getStringAnnotations("SPOILER", offset, offset)
+                                .firstOrNull()
+                                ?.let {
+                                    val index = it.item.toIntOrNull() ?: return@let
+                                    if (index in revealedEntityIndices ||
+                                        revealingSpoilers.containsKey(
+                                            index
+                                        )
+                                    )
+                                        return@let
+
+                                    val maxRadius =
+                                        hypot(
+                                            layout.size.width
+                                                .toDouble(),
+                                            layout.size.height
+                                                .toDouble()
+                                        )
+                                            .toFloat()
+                                    val anim = Animatable(0f)
+                                    revealingSpoilers[index] = anim
+                                    revealingOrigins[index] = pos
+
+                                    coroutineScope.launch {
+                                        anim.animateTo(
+                                            targetValue = maxRadius,
+                                            animationSpec =
+                                                tween(
+                                                    durationMillis =
+                                                        400,
+                                                    easing =
+                                                        LinearEasing
+                                                )
+                                        )
+                                        onSpoilerClick(index)
+                                        yield()
+                                        revealingSpoilers.remove(index)
+                                        revealingOrigins.remove(index)
+                                    }
+                                }
+                        }
+                    }
         )
     }
 }
@@ -378,25 +434,29 @@ fun RichTextContent(
 fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
 
-    val jsonString by produceState<String?>(initialValue = null, filePath) {
-        value = withContext(Dispatchers.IO) {
-            try {
-                val uri = filePath.toUri()
-                val inputStream = if (filePath.startsWith("file:///android_asset/")) {
-                    val assetPath = filePath.removePrefix("file:///android_asset/")
-                    context.assets.open(assetPath)
-                } else {
-                    context.contentResolver.openInputStream(uri)
-                }
+    val jsonString by
+    produceState<String?>(initialValue = null, filePath) {
+        value =
+            withContext(Dispatchers.IO) {
+                try {
+                    val uri = filePath.toUri()
+                    val inputStream =
+                        if (filePath.startsWith("file:///android_asset/")) {
+                            val assetPath =
+                                filePath.removePrefix("file:///android_asset/")
+                            context.assets.open(assetPath)
+                        } else {
+                            context.contentResolver.openInputStream(uri)
+                        }
 
-                inputStream?.use { input ->
-                    GZIPInputStream(input).bufferedReader().use { it.readText() }
+                    inputStream?.use { input ->
+                        GZIPInputStream(input).bufferedReader().use { it.readText() }
+                    }
+                } catch (e: Exception) {
+                    e.printStackTrace()
+                    null
                 }
-            } catch (e: Exception) {
-                e.printStackTrace()
-                null
             }
-        }
     }
 
     if (jsonString != null) {
@@ -410,22 +470,28 @@ fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
 }
 
 @Composable
-fun VideoThumbnailOverlay(message: Message, modifier: Modifier = Modifier) {
-    val downloadPercent = LocalVideoDownloadProgress.current[message.id]
+fun VideoThumbnailOverlay(block: MessageBlock.MediaBlock, modifier: Modifier = Modifier) {
+    val downloadPercent = LocalVideoDownloadProgress.current[block.id]
     val onDownloadVideo = LocalOnDownloadVideo.current
-    val layerBackdrop = rememberLayerBackdrop { drawRect(Color.Black); drawContent() }
+    val layerBackdrop = rememberLayerBackdrop {
+        drawRect(Color.Black)
+        drawContent()
+    }
 
     Box(
-        modifier = modifier
-            .clip(RoundedCornerShape(4.dp))
-            .background(MiuixTheme.colorScheme.surfaceContainerHighest)
-            .clickable { if (downloadPercent == null) onDownloadVideo(message.id) },
+        modifier =
+            modifier
+                .clip(RoundedCornerShape(4.dp))
+                .background(MiuixTheme.colorScheme.surfaceContainerHighest)
+                .clickable { if (downloadPercent == null) onDownloadVideo(block.id) },
         contentAlignment = Alignment.Center
     ) {
-        if (!message.thumbnailUrl.isNullOrEmpty()) {
+        if (!block.thumbnail?.fileUrl.isNullOrEmpty()) {
             AsyncImage(
-                model = ImageRequest.Builder(LocalContext.current)
-                    .data(java.io.File(message.thumbnailUrl)).build(),
+                model =
+                    ImageRequest.Builder(LocalContext.current)
+                        .data(java.io.File(block.thumbnail!!.fileUrl!!))
+                        .build(),
                 contentDescription = "Video thumbnail",
                 modifier = Modifier
                     .matchParentSize()
@@ -436,14 +502,13 @@ fun VideoThumbnailOverlay(message: Message, modifier: Modifier = Modifier) {
 
         LiquidSurface(
             layerBackdrop,
-            if (downloadPercent != null) Modifier.padding(
-                horizontal = 12.dp, vertical = 6.dp
-            ) else Modifier.size(48.dp),
-            Modifier.clickable { onDownloadVideo(message.id) },
+            if (downloadPercent != null) Modifier.padding(horizontal = 12.dp, vertical = 6.dp)
+            else Modifier.size(48.dp),
+            Modifier.clickable { onDownloadVideo(block.id) },
             effects = {
                 vibrancy()
                 if (downloadPercent != null) blur(1.dp.toPx())
-                lens(if (downloadPercent != null) 16.dp.toPx() else 8.dp.toPx(), 32.dp.toPx())
+                lens(if (downloadPercent != null) 32.dp.toPx() else 16.dp.toPx(), 48.dp.toPx())
             },
             surfaceColor = MiuixTheme.colorScheme.surface.copy(alpha = 0.6f)
         ) {
@@ -487,52 +552,50 @@ fun TimestampLabel(timestamp: Long) {
 }
 
 @Composable
-fun SystemMessage(message: Message) {
+fun SystemMessage(block: MessageBlock.SystemActionBlock) {
     Row(
         modifier = Modifier
             .fillMaxWidth()
             .padding(12.dp),
         horizontalArrangement = Arrangement.Center
     ) {
-        val parts = remember(message.content) { message.content.split("|") }
-        val typeIdx = parts.getOrNull(0)?.toIntOrNull() ?: -1
-        val type = SystemActionType.entries.getOrNull(typeIdx)
+        val text =
+            when (val type = block.type) {
+                is MessageBlock.SystemActionBlock.SystemActionType.MemberJoined ->
+                    tdString(
+                        "NotificationGroupAddMember",
+                        "un1" to type.actorName,
+                        "un2" to type.targetName
+                    )
 
-        val text = when (type) {
-            SystemActionType.MEMBER_JOINED -> tdString(
-                "NotificationGroupAddMember",
-                "un1" to (parts.getOrNull(1) ?: ""),
-                "un2" to (parts.getOrNull(2) ?: "")
-            )
+                is MessageBlock.SystemActionBlock.SystemActionType.MemberJoinedByLink ->
+                    tdString("ActionInviteUser", "un1" to type.userName)
 
-            SystemActionType.MEMBER_JOINED_BY_LINK -> tdString(
-                "ActionInviteUser", "un1" to (parts.getOrNull(1) ?: "")
-            )
+//                is MessageBlock.SystemActionBlock.SystemActionType.MemberLeft ->
+//                    tdString("EventLogLeftGroup", "un1" to type.userName)
 
-            SystemActionType.MEMBER_LEFT -> tdString(
-                "EventLogLeftGroup", "un1" to (parts.getOrNull(1) ?: "")
-            )
+                is MessageBlock.SystemActionBlock.SystemActionType.ChatChangedTitle ->
+                    tdString(
+                        "ActionChatEditTitle",
+                        "un1" to type.actorName,
+                        "title" to type.newTitle
+                    )
 
-            SystemActionType.CHAT_CHANGED_TITLE -> tdString(
-                "ActionChatEditTitle",
-                "un1" to (parts.getOrNull(1) ?: ""),
-                "title" to (parts.getOrNull(2) ?: "")
-            )
+//                is MessageBlock.SystemActionBlock.SystemActionType.ChatChangedPhoto ->
+//                    tdString("ActionChatEditPhoto", "un1" to type.userName)
+//
+//                is MessageBlock.SystemActionBlock.SystemActionType.ChatUpgradedTo ->
+//                    tdString(
+//                        "ActionChatUpgradeTo",
+//                        "supergroupId" to type.supergroupId.toString()
+//                    )
 
-            SystemActionType.CHAT_CHANGED_PHOTO -> tdString(
-                "ActionChatEditPhoto", "un1" to (parts.getOrNull(1) ?: "")
-            )
+                is MessageBlock.SystemActionBlock.SystemActionType.PinMessage ->
+                    tdString("ActionPinnedText", "un1" to type.actorName)
 
-            SystemActionType.CHAT_UPGRADED_TO -> tdString(
-                "ActionChatUpgradeTo", "supergroupId" to (parts.getOrNull(1) ?: "")
-            )
-
-            SystemActionType.PIN_MESSAGE -> tdString(
-                "ActionPinnedText", "un1" to (parts.getOrNull(1) ?: "")
-            )
-
-            null -> message.content
-        }
+//                is MessageBlock.SystemActionBlock.SystemActionType.Unknown ->
+//                    "Unsupported system message"
+            }
 
         Text(
             text = text,

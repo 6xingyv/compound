@@ -6,35 +6,31 @@ import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextDecoration
-import com.mocharealm.compound.domain.model.TextEntityType
+import com.mocharealm.compound.domain.model.Text
 
 object TextEntityStyle {
     fun getStyle(
-        type: TextEntityType,
-        linkColor: Color = Color(0xFF5B9BD5),
-        codeBackgroundColor: Color = Color.Gray.copy(alpha = 0.15f)
+            type: Text.TextEntityType,
+            linkColor: Color = Color(0xFF5B9BD5),
+            codeBackgroundColor: Color = Color.Gray.copy(alpha = 0.15f)
     ): SpanStyle {
         return when (type) {
-            is TextEntityType.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
-            is TextEntityType.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
-            is TextEntityType.Underline -> SpanStyle(textDecoration = TextDecoration.Underline)
-            is TextEntityType.Strikethrough -> SpanStyle(textDecoration = TextDecoration.LineThrough)
-
-            is TextEntityType.Code,
-            is TextEntityType.Pre,
-            is TextEntityType.PreCode ->
-                SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackgroundColor)
-
-            is TextEntityType.TextUrl,
-            is TextEntityType.Url,
-            is TextEntityType.EmailAddress ->
-                SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
-
-            is TextEntityType.Mention,
-            is TextEntityType.PhoneNumber ->
-                SpanStyle(color = linkColor)
-
-            is TextEntityType.Spoiler -> SpanStyle()
+            is Text.TextEntityType.Bold -> SpanStyle(fontWeight = FontWeight.Bold)
+            is Text.TextEntityType.Italic -> SpanStyle(fontStyle = FontStyle.Italic)
+            is Text.TextEntityType.Underline -> SpanStyle(textDecoration = TextDecoration.Underline)
+            is Text.TextEntityType.Strikethrough ->
+                    SpanStyle(textDecoration = TextDecoration.LineThrough)
+            is Text.TextEntityType.Code,
+            is Text.TextEntityType.Pre,
+            is Text.TextEntityType.PreCode ->
+                    SpanStyle(fontFamily = FontFamily.Monospace, background = codeBackgroundColor)
+            is Text.TextEntityType.TextUrl,
+            is Text.TextEntityType.Url,
+            is Text.TextEntityType.EmailAddress ->
+                    SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
+            is Text.TextEntityType.Mention, is Text.TextEntityType.PhoneNumber ->
+                    SpanStyle(color = linkColor)
+            is Text.TextEntityType.Spoiler -> SpanStyle()
         }
     }
 }
