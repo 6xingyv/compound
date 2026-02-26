@@ -380,13 +380,15 @@ class ChatViewModel(
                     nextItem?.message?.sender?.id == primary.sender.id &&
                             nextItem.message.blocks.first() !is MessageBlock.SystemActionBlock
 
-            // Note: the list is reversed for reverseLayout = true,
-            // so visual FIRST (top, no tail) = logical LAST, and vice versa.
+            // FIRST = visually topmost in group (shows sender name)
+            // LAST  = visually bottommost in group (shows avatar & tail)
+            // The list is reversed at the end for reverseLayout, so use
+            // natural chronological order here: first in time = FIRST.
             val position =
                     when {
                         !sameAbove && !sameBelow -> GroupPosition.SINGLE
-                        !sameAbove -> GroupPosition.LAST
-                        !sameBelow -> GroupPosition.FIRST
+                        !sameAbove -> GroupPosition.FIRST
+                        !sameBelow -> GroupPosition.LAST
                         else -> GroupPosition.MIDDLE
                     }
             items[j] = current.copy(groupPosition = position)

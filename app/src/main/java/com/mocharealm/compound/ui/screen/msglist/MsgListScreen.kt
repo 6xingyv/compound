@@ -31,6 +31,7 @@ import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
+import com.mocharealm.compound.ui.util.toPreviewText
 import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -43,18 +44,16 @@ import top.yukonga.miuix.kmp.utils.scrollEndHaptic
 
 @Composable
 fun MsgListScreen(
-    padding: PaddingValues,
-    onChatClick: (Long) -> Unit = { _ -> },
-    viewModel: MsgListViewModel = koinViewModel()
+        padding: PaddingValues,
+        onChatClick: (Long) -> Unit = { _ -> },
+        viewModel: MsgListViewModel = koinViewModel()
 ) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val listState = rememberLazyListState()
 
     // 当滚动到无法再往下滚动时加载更多聊天
     val shouldLoadMore by remember {
-        derivedStateOf {
-            !listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0
-        }
+        derivedStateOf { !listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0 }
     }
 
     val density = LocalDensity.current
@@ -72,16 +71,14 @@ fun MsgListScreen(
     }
 
     LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxHeight()
-            .overScrollVertical()
-            .scrollEndHaptic(),
-        contentPadding = PaddingValues(
-            top = padding.calculateTopPadding(),
-            bottom = padding.calculateBottomPadding() + 12.dp,
-        ),
-        overscrollEffect = null,
+            state = listState,
+            modifier = Modifier.fillMaxHeight().overScrollVertical().scrollEndHaptic(),
+            contentPadding =
+                    PaddingValues(
+                            top = padding.calculateTopPadding(),
+                            bottom = padding.calculateBottomPadding() + 12.dp,
+                    ),
+            overscrollEffect = null,
     ) {
         if (state.loading && state.chats.isEmpty()) {
             item {
@@ -93,13 +90,13 @@ fun MsgListScreen(
             item {
                 Card(modifier = Modifier.padding(12.dp)) {
                     BasicComponent(
-                        title = tdString("ErrorOccurred"),
-                        summary = state.error,
+                            title = tdString("ErrorOccurred"),
+                            summary = state.error,
                     )
                     TextButton(
-                        text = tdString("Retry"),
-                        onClick = viewModel::loadChats,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            text = tdString("Retry"),
+                            onClick = viewModel::loadChats,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
             }
@@ -108,87 +105,79 @@ fun MsgListScreen(
                 Card(modifier = Modifier.padding(12.dp)) {
                     BasicComponent(title = "No chats found")
                     TextButton(
-                        text = tdString("Refresh"),
-                        onClick = viewModel::loadChats,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                            text = tdString("Refresh"),
+                            onClick = viewModel::loadChats,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                     )
                 }
             }
         } else {
-            items(
-                state.chats,
-                key = { chat->
-                    chat.id
-                }
-            ) { chat ->
+            items(state.chats, key = { chat -> chat.id }) { chat ->
                 Row(
-                    Modifier
-                        .animateItem()
-                        .fillMaxWidth()
-                        .clickable {
-                            onChatClick(chat.id)
-                        }
-                        .drawWithCache {
-                            onDrawBehind {
-                                drawLine(
-                                    separatorColor,
-                                    start = Offset(paddingPx + avatarPx + spacePx, size.height),
-                                    end = Offset(size.width - paddingPx, size.height),
-                                    strokeWidth = 1f
-                                )
-                            }
-                        }
-                        .padding(28.dp, 16.dp),
-                    horizontalArrangement = Arrangement.spacedBy(12.dp),
-                    verticalAlignment = Alignment.CenterVertically
+                        Modifier.animateItem()
+                                .fillMaxWidth()
+                                .clickable { onChatClick(chat.id) }
+                                .drawWithCache {
+                                    onDrawBehind {
+                                        drawLine(
+                                                separatorColor,
+                                                start =
+                                                        Offset(
+                                                                paddingPx + avatarPx + spacePx,
+                                                                size.height
+                                                        ),
+                                                end = Offset(size.width - paddingPx, size.height),
+                                                strokeWidth = 1f
+                                        )
+                                    }
+                                }
+                                .padding(28.dp, 16.dp),
+                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        verticalAlignment = Alignment.CenterVertically
                 ) {
                     Avatar(
-                        modifier = Modifier.size(45.dp),
-                        photoPath = chat.photoUrl,
-                        initials = chat.title.take(2)
+                            modifier = Modifier.size(45.dp),
+                            photoPath = chat.photoUrl,
+                            initials = chat.title.take(2)
                     )
                     Column(Modifier.weight(1f)) {
                         Row {
                             Text(
-                                text = chat.title,
-                                style = MiuixTheme.textStyles.body1,
-                                fontWeight = FontWeight.Bold,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.weight(1f)
+                                    text = chat.title,
+                                    style = MiuixTheme.textStyles.body1,
+                                    fontWeight = FontWeight.Bold,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.weight(1f)
                             )
                             Text(
-                                text = chat.lastMessageDate.formatMessageTimestamp(),
-                                style = MiuixTheme.textStyles.body1,
-                                maxLines = 1,
-                                overflow = TextOverflow.Ellipsis,
-                                modifier = Modifier.alpha(0.6f)
+                                    text = chat.lastMessageDate.formatMessageTimestamp(),
+                                    style = MiuixTheme.textStyles.body1,
+                                    maxLines = 1,
+                                    overflow = TextOverflow.Ellipsis,
+                                    modifier = Modifier.alpha(0.6f)
                             )
                         }
                         Text(
-                            text = chat.lastMessage ?: "",
-                            style = MiuixTheme.textStyles.body1,
-                            minLines = 2,
-                            maxLines = 2,
-                            overflow = TextOverflow.Ellipsis,
-                            modifier = Modifier.alpha(0.6f)
+                                text = chat.lastMessage?.toPreviewText() ?: "",
+                                style = MiuixTheme.textStyles.body1,
+                                minLines = 2,
+                                maxLines = 2,
+                                overflow = TextOverflow.Ellipsis,
+                                modifier = Modifier.alpha(0.6f)
                         )
                     }
                 }
             }
-
-            // 加载更多指示器
             if (state.loadingMore) {
                 item {
                     Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.Center
+                            modifier = Modifier.fillMaxWidth().padding(12.dp),
+                            horizontalArrangement = Arrangement.Center
                     ) {
                         Text(
-                            text = tdString("Loading"),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                text = tdString("Loading"),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                         )
                     }
                 }
