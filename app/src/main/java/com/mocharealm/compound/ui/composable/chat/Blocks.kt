@@ -96,6 +96,7 @@ import kotlinx.coroutines.yield
 import org.maplibre.android.maps.MapLibreMapOptions
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
 import java.util.zip.GZIPInputStream
@@ -211,7 +212,7 @@ fun StickerBlock(block: MessageBlock.StickerBlock, modifier: Modifier = Modifier
 @Composable
 fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifier) {
     Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(SFIcons.Document_Fill, null, Modifier.size(32.dp), MiuixTheme.colorScheme.primary)
+        Icon(SFIcons.Document_Fill, null, Modifier.size(32.dp), LocalContentColor.current)
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(

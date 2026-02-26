@@ -440,8 +440,8 @@ class TelegramRepositoryImpl(
         val replyTo = resolveReplyMessage(msg)
 
         // System messages get a typed SystemActionBlock
-        val block =
-                resolveSystemBlock(msg, sender)
+        val blocks: List<MessageBlock> =
+                resolveSystemBlock(msg, sender)?.let { listOf(it) }
                         ?: MessageDto.parseMessageContent(
                                 content = msg.content,
                                 messageId = msg.id,
@@ -450,30 +450,35 @@ class TelegramRepositoryImpl(
                         )
 
         // ShareInfo decoding for text blocks
+        val textBlock = blocks.filterIsInstance<MessageBlock.TextBlock>().lastOrNull()
         val shareInfo =
-                if (block is MessageBlock.TextBlock) {
+                if (textBlock != null) {
                     com.mocharealm.compound.domain.util.ShareProtocol.decode(
-                            block.content.content,
-                            block.content.entities
+                            textBlock.content.content,
+                            textBlock.content.entities
                     )
                 } else null
 
         // Strip share protocol from text content if present
-        val finalBlock =
-                if (shareInfo != null && block is MessageBlock.TextBlock) {
+        val finalBlocks =
+                if (shareInfo != null && textBlock != null) {
                     val (strippedContent, strippedEntities) =
                             com.mocharealm.compound.domain.util.ShareProtocol.strip(
-                                    block.content.content,
-                                    block.content.entities
+                                    textBlock.content.content,
+                                    textBlock.content.entities
                             )
-                    block.copy(content = Text(strippedContent, strippedEntities))
-                } else block
+                    blocks.map { b ->
+                        if (b === textBlock)
+                                b.copy(content = Text(strippedContent, strippedEntities))
+                        else b
+                    }
+                } else blocks
 
         return Message(
                 sender = sender,
                 chatId = msg.chatId,
                 isOutgoing = msg.isOutgoing,
-                blocks = listOf(finalBlock),
+                blocks = finalBlocks,
                 replyTo = replyTo,
                 shareInfo = shareInfo,
         )
@@ -488,40 +493,43 @@ class TelegramRepositoryImpl(
         var i = 0
         while (i < messages.size) {
             val msg = messages[i]
-            val block = msg.blocks.first()
+            val firstBlock = msg.blocks.firstOrNull()
             val albumId =
-                    when (block) {
-                        is MessageBlock.MediaBlock -> block.mediaAlbumId
-                        is MessageBlock.DocumentBlock -> block.mediaAlbumId
+                    when (firstBlock) {
+                        is MessageBlock.MediaBlock -> firstBlock.mediaAlbumId
+                        is MessageBlock.DocumentBlock -> firstBlock.mediaAlbumId
                         else -> 0L
                     }
 
             if (albumId != 0L) {
-                val albumBlocks = mutableListOf(block)
+                val albumBlocks = mutableListOf<MessageBlock>()
+                albumBlocks.addAll(msg.blocks)
                 var j = i + 1
                 while (j < messages.size) {
-                    val nextBlock = messages[j].blocks.first()
+                    val nextMsg = messages[j]
+                    val nextFirstBlock = nextMsg.blocks.firstOrNull()
                     val nextAlbumId =
-                            when (nextBlock) {
-                                is MessageBlock.MediaBlock -> nextBlock.mediaAlbumId
-                                is MessageBlock.DocumentBlock -> nextBlock.mediaAlbumId
+                            when (nextFirstBlock) {
+                                is MessageBlock.MediaBlock -> nextFirstBlock.mediaAlbumId
+                                is MessageBlock.DocumentBlock -> nextFirstBlock.mediaAlbumId
                                 else -> 0L
                             }
                     if (nextAlbumId == albumId) {
-                        albumBlocks.add(nextBlock)
+                        albumBlocks.addAll(nextMsg.blocks)
                         j++
                     } else break
                 }
+                // Sort to ensure TextBlock(s) are at the end of the album.
+                albumBlocks.sortBy { it is MessageBlock.TextBlock }
                 result.add(msg.copy(blocks = albumBlocks))
                 i = j
             } else {
-                result.add(msg)
+                result.add(msg.copy(blocks = msg.blocks.sortedBy { it is MessageBlock.TextBlock }))
                 i++
             }
         }
         return result
     }
-
 
     private suspend fun resolveSender(msg: TdApi.Message): User {
         return when (msg.senderId) {
@@ -688,25 +696,32 @@ class TelegramRepositoryImpl(
         val previewText =
                 reply.quote?.text?.text
                         ?: if (originalMsg != null) {
-                            val block =
+                            val blocks =
                                     MessageDto.parseMessageContent(
                                             originalMsg.content,
                                             replyMsgId,
                                             0
                                     )
-                            when (block) {
-                                is MessageBlock.TextBlock -> block.content.content
-                                is MessageBlock.MediaBlock -> block.caption?.content ?: "Photo"
+                            val first = blocks.first()
+                            when (first) {
+                                is MessageBlock.TextBlock -> first.content.content
+                                is MessageBlock.MediaBlock -> {
+                                    val caption =
+                                            blocks.filterIsInstance<MessageBlock.TextBlock>()
+                                                    .firstOrNull()
+                                    caption?.content?.content ?: "Photo"
+                                }
                                 is MessageBlock.StickerBlock -> "Sticker"
-                                is MessageBlock.DocumentBlock -> block.document.fileName
+                                is MessageBlock.DocumentBlock -> first.document.fileName
                                 is MessageBlock.SystemActionBlock -> "System message"
-                                is MessageBlock.VenueBlock -> block.venue.name
+                                is MessageBlock.VenueBlock -> first.venue.name
                             }
                         } else {
                             reply.content?.let {
-                                val block = MessageDto.parseMessageContent(it, 0, 0)
-                                when (block) {
-                                    is MessageBlock.TextBlock -> block.content.content
+                                val blocks = MessageDto.parseMessageContent(it, 0, 0)
+                                val first = blocks.first()
+                                when (first) {
+                                    is MessageBlock.TextBlock -> first.content.content
                                     else -> ""
                                 }
                             }
