@@ -72,10 +72,10 @@ import com.airbnb.lottie.compose.rememberLottieComposition
 import com.maplibre.compose.MapView
 import com.maplibre.compose.camera.CameraState
 import com.maplibre.compose.camera.MapViewCamera
-import com.maplibre.compose.camera.models.CameraPadding
 import com.maplibre.compose.rememberSaveableMapViewCamera
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.base.SpoilerImage
+import com.mocharealm.compound.ui.composable.base.VideoPlayer
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
 import com.mocharealm.compound.ui.util.SpoilerShader
@@ -186,15 +186,25 @@ fun VideoBlock(block: MessageBlock.MediaBlock) {
 @Composable
 fun StickerBlock(block: MessageBlock.StickerBlock, modifier: Modifier = Modifier) {
     if (!block.file.fileUrl.isNullOrEmpty()) {
-        AsyncImage(
-            model =
-                ImageRequest.Builder(LocalContext.current)
-                    .data(File(block.file.fileUrl))
-                    .build(),
-            contentDescription = "Sticker",
-            modifier = modifier,
-            contentScale = ContentScale.Fit
-        )
+        when (block.stickerFormat) {
+            MessageBlock.StickerBlock.StickerFormat.WEBM, MessageBlock.StickerBlock.StickerFormat.MP4 -> VideoPlayer(
+                filePath = block.file.fileUrl,
+                modifier = modifier
+            )
+
+            MessageBlock.StickerBlock.StickerFormat.TGS -> LottieSticker(
+                filePath = block.file.fileUrl,
+                modifier = modifier
+            )
+
+            else -> AsyncImage(
+                model = ImageRequest.Builder(LocalContext.current)
+                    .data(File(block.file.fileUrl)).build(),
+                contentDescription = "Sticker",
+                modifier = modifier,
+                contentScale = ContentScale.Fit
+            )
+        }
     }
 }
 
@@ -221,6 +231,7 @@ fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifi
 
 @Composable
 fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
+    val density = LocalDensity.current
     val camera = rememberSaveableMapViewCamera(
         MapViewCamera(
             CameraState.Centered(
