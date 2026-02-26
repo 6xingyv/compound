@@ -171,12 +171,9 @@ object MessageDto {
                             id = messageId,
                             timestamp = timestamp,
                             venue =
-                                    com.mocharealm.compound.domain.model.Venue(
-                                            longitude = content.venue.location.longitude.toLong(),
-                                            latitude = content.venue.location.latitude.toLong(),
-                                            name = content.venue.title,
-                                    ),
                                 Venue(
+                                    longitude = content.venue.location.longitude,
+                                    latitude = content.venue.location.latitude,
                                     name = content.venue.title,
                                 ),
                     )

@@ -295,7 +295,7 @@ fun MessageContent(
 
                 is MessageBlock.SystemActionBlock -> {}
                 is MessageBlock.VenueBlock -> {
-                    Text("Hola")
+                    VenueBlock(block)
                 }
             }
         }

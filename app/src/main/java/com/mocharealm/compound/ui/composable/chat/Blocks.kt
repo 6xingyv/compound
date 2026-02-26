@@ -12,6 +12,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
@@ -52,6 +53,9 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.UriHandler
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
@@ -65,6 +69,11 @@ import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
 import com.airbnb.lottie.compose.rememberLottieComposition
+import com.maplibre.compose.MapView
+import com.maplibre.compose.camera.CameraState
+import com.maplibre.compose.camera.MapViewCamera
+import com.maplibre.compose.camera.models.CameraPadding
+import com.maplibre.compose.rememberSaveableMapViewCamera
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.base.SpoilerImage
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
@@ -84,9 +93,11 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlinx.coroutines.yield
+import org.maplibre.android.maps.MapLibreMapOptions
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
+import java.io.File
 import java.util.zip.GZIPInputStream
 import kotlin.math.hypot
 
@@ -111,9 +122,11 @@ fun ReplyPreview(
                 },
         verticalAlignment = Alignment.CenterVertically
     ) {
-        Column(modifier = Modifier
-            .padding(start = 4.dp)
-            .padding(8.dp)) {
+        Column(
+            modifier = Modifier
+                .padding(start = 4.dp)
+                .padding(8.dp)
+        ) {
             Text(
                 text = senderName,
                 style = MiuixTheme.textStyles.footnote1,
@@ -176,7 +189,7 @@ fun StickerBlock(block: MessageBlock.StickerBlock, modifier: Modifier = Modifier
         AsyncImage(
             model =
                 ImageRequest.Builder(LocalContext.current)
-                    .data(java.io.File(block.file.fileUrl))
+                    .data(File(block.file.fileUrl))
                     .build(),
             contentDescription = "Sticker",
             modifier = modifier,
@@ -207,11 +220,39 @@ fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifi
 }
 
 @Composable
+fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
+    val camera = rememberSaveableMapViewCamera(
+        MapViewCamera(
+            CameraState.Centered(
+                block.venue.latitude,
+                block.venue.longitude,
+            ),
+        )
+    )
+    val mapOptions = remember {
+        MapLibreMapOptions().apply {
+            scrollGesturesEnabled(false)
+            zoomGesturesEnabled(false)
+            tiltGesturesEnabled(false)
+            rotateGesturesEnabled(false)
+            doubleTapGesturesEnabled(false)
+            textureMode(true)
+        }
+    }
+    MapView(
+        modifier = modifier.aspectRatio(0.8f),
+        camera = camera,
+        styleUrl = "https://tiles.openfreemap.org/styles/bright",
+        mapOptions = mapOptions
+    )
+}
+
+@Composable
 fun RichTextContent(
-    text: androidx.compose.ui.text.AnnotatedString,
+    text: AnnotatedString,
     contentColor: Color,
     modifier: Modifier,
-    uriHandler: androidx.compose.ui.platform.UriHandler,
+    uriHandler: UriHandler,
     revealedEntityIndices: Set<Int>,
     onSpoilerClick: (Int) -> Unit
 ) {
@@ -490,7 +531,7 @@ fun VideoThumbnailOverlay(block: MessageBlock.MediaBlock, modifier: Modifier = M
             AsyncImage(
                 model =
                     ImageRequest.Builder(LocalContext.current)
-                        .data(java.io.File(block.thumbnail!!.fileUrl!!))
+                        .data(File(block.thumbnail!!.fileUrl!!))
                         .build(),
                 contentDescription = "Video thumbnail",
                 modifier = Modifier
