@@ -508,13 +508,16 @@ fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
         value =
             withContext(Dispatchers.IO) {
                 try {
-                    val uri = filePath.toUri()
+                    val file = java.io.File(filePath)
                     val inputStream =
                         if (filePath.startsWith("file:///android_asset/")) {
                             val assetPath =
                                 filePath.removePrefix("file:///android_asset/")
                             context.assets.open(assetPath)
+                        } else if (file.exists()) {
+                            file.inputStream()
                         } else {
+                            val uri = filePath.toUri()
                             context.contentResolver.openInputStream(uri)
                         }
 
