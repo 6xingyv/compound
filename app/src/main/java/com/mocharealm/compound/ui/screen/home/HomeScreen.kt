@@ -147,7 +147,7 @@ fun HomeScreen(
                     MsgListScreen(
                         padding = innerPadding,
                         onChatClick = { chatId ->
-                            navigator.push(Screen.Chat(chatId))
+                            navigator.push(Screen.Chat(chatId), true)
                         },
                     )
                 }

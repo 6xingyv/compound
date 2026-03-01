@@ -134,8 +134,8 @@ dependencies {
     implementation(libs.koin.compose.navigation3)
 
     implementation(libs.bundles.miuix.android)
-    implementation(libs.androidx.nav3.runtime)
-    implementation(libs.bundles.miuix.nav3)
+    implementation(libs.bundles.androidx.nav3)
+    implementation(libs.androidx.window.core)
     implementation(libs.gaze.capsule)
     implementation(libs.gaze.glassy.liquid.effect)
 

@@ -1,5 +1,6 @@
 package com.mocharealm.compound
 
+import android.os.Build
 import android.os.Bundle
 import android.util.Log
 import androidx.activity.ComponentActivity
@@ -7,9 +8,9 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.text.intl.Locale
+import androidx.compose.ui.text.toLowerCase
 import androidx.core.view.WindowCompat
 import androidx.navigation3.runtime.NavKey
 import androidx.navigation3.runtime.rememberNavBackStack
@@ -21,6 +22,7 @@ import com.mocharealm.compound.ui.LocalNavigator
 import com.mocharealm.compound.ui.Navigator
 import com.mocharealm.compound.ui.Screen
 import com.mocharealm.compound.ui.theme.CompoundTheme
+import com.mocharealm.gaze.nav.rememberListDetailSceneStrategy
 import com.mocharealm.tci18n.core.LocalTdStringProvider
 import com.mocharealm.tci18n.core.TdStringProvider
 import com.mocharealm.tci18n.core.tdI18nNavEntryDecorator
@@ -34,6 +36,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         enableEdgeToEdge()
+        if (Build.MANUFACTURER.toLowerCase(Locale.current) == "xiaomi") {
+            window.isNavigationBarContrastEnforced = false
+        }
         WindowCompat.setDecorFitsSystemWindows(window, false)
         setContent {
             CompoundTheme {
@@ -51,12 +56,6 @@ class MainActivity : ComponentActivity() {
                 }
 
                 val onBack = remember(navigator) { { navigator.pop() } }
-
-                val rawEntryProvider = koinEntryProvider<NavKey>()
-                val currentEntryProvider by rememberUpdatedState(rawEntryProvider)
-                val entryProvider = remember {
-                    { key: NavKey -> currentEntryProvider(key) }
-                }
 
                 val tdStringProvider: TdStringProvider = koinInject()
                 val i18nDecorator = remember(tdStringProvider) {
@@ -77,7 +76,8 @@ class MainActivity : ComponentActivity() {
                             rememberSaveableStateHolderNavEntryDecorator(),
                             i18nDecorator,
                         ),
-                        entryProvider = entryProvider,
+                        entryProvider = koinEntryProvider(),
+                        sceneStrategy = rememberListDetailSceneStrategy()
                     )
                 }
             }
