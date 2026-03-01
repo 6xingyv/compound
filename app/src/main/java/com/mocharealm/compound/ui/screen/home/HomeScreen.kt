@@ -20,8 +20,8 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mocharealm.compound.ui.LocalNavigator
-import com.mocharealm.compound.ui.Screen
+import com.mocharealm.compound.ui.nav.LocalNavigator
+import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel

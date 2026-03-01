@@ -11,6 +11,7 @@ import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
+import com.mocharealm.compound.domain.usecase.GetInternalLinkUseCase
 import com.mocharealm.compound.domain.usecase.LogoutUseCase
 import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
@@ -70,5 +71,8 @@ val domainModule = module {
     }
     factory {
         FormatPersonNameUseCase(get())
+    }
+    factory {
+        GetInternalLinkUseCase(get())
     }
 }

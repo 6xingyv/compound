@@ -1,5 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-
-    <style name="Theme.Compound" parent="android:Theme.Material.Light.NoActionBar" />
+    <style name="Theme.Compound" parent="Theme.SplashScreen" >
+        <item name="windowSplashScreenAnimatedIcon">@drawable/ic_compound</item>
+    </style>
 </resources>

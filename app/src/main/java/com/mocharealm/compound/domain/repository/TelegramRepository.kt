@@ -3,6 +3,7 @@ package com.mocharealm.compound.domain.repository
 import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.DownloadProgress
+import com.mocharealm.compound.domain.model.InternalLink
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
@@ -76,4 +77,5 @@ interface TelegramRepository {
 
     /** 获取单个聊天详情 */
     suspend fun getChat(chatId: Long): Result<Chat>
+    suspend fun getInternalLink(link: String): Result<InternalLink>
 }

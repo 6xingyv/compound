@@ -24,7 +24,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.navigationBars
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.statusBars
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.text.input.KeyboardActionHandler
@@ -45,8 +44,8 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mocharealm.compound.domain.model.AuthState
-import com.mocharealm.compound.ui.LocalNavigator
-import com.mocharealm.compound.ui.Screen
+import com.mocharealm.compound.ui.nav.LocalNavigator
+import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.util.plus
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.ui.composable.TextField

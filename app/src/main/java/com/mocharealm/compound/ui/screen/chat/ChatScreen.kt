@@ -78,7 +78,7 @@ import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.EmptyIndication
-import com.mocharealm.compound.ui.LocalNavigator
+import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.chat.MessageBubble
 import com.mocharealm.compound.ui.composable.chat.SystemMessage

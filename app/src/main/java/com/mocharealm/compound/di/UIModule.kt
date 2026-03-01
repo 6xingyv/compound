@@ -1,7 +1,8 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.ui.nav.DeepLinkHandler
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
-import com.mocharealm.compound.ui.Screen
+import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
@@ -12,7 +13,6 @@ import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
-import com.mocharealm.gaze.nav.ListDetailScene.Companion.listPane
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.annotation.KoinExperimentalAPI
 import org.koin.core.module.dsl.viewModel
@@ -58,6 +58,10 @@ val uiModule = module {
 
     viewModel {
         HomeViewModel(get())
+    }
+
+    single {
+        DeepLinkHandler(get())
     }
 
     navigation<Screen.Home>(mapOf(LIST_KEY to true)) {

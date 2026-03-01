@@ -34,13 +34,11 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version = "1.1.1" }
 androidx-nav3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "nav3" }
 androidx-nav3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "nav3" }
+androidx-splashscreen = { module = "androidx.core:core-splashscreen", version = "1.0.1" }
 androidx-window-core = { module = "androidx.window:window-core", version = "1.5.1" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 koin-compose-navigation3 = { group = "io.insert-koin", name = "koin-compose-navigation3", version.ref = "koin" }
 miuix-android = { module = "top.yukonga.miuix.kmp:miuix-android", version.ref = "miuix" }
-miuix-icons-android = { module = "top.yukonga.miuix.kmp:miuix-icons-android", version.ref = "miuix" }
-miuix-nav3-ui = { module = "top.yukonga.miuix.kmp:miuix-navigation3-ui", version.ref = "miuix" }
-miuix-nav3-adaptive = { module = "top.yukonga.miuix.kmp:miuix-navigation3-adaptive", version.ref = "miuix" }
 coil-compose = { module = "io.coil-kt.coil3:coil-compose", version = "3.3.0" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version = "3.3.0" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version = "3.3.0" }
@@ -56,7 +54,7 @@ kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlin
 maplibre-compose = { module = "io.github.rallista:maplibre-compose", version = "1.4.1" }
 
 [bundles]
-miuix-android = ["miuix-android", "miuix-icons-android"]
+miuix-android = ["miuix-android"]
 androidx-nav3 = ["androidx-nav3-runtime","androidx-nav3-ui"]
 coil = ["coil-compose", "coil-gif", "coil-network-okhttp"]
 

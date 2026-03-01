@@ -20,8 +20,18 @@
             android:theme="@style/Theme.Compound">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
-
                 <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter android:autoVerify="true" tools:ignore="IntentFilterUniqueDataAttributes">
+                <action android:name="android.intent.action.VIEW"/>
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:host="telegram.me" android:scheme="http" />
+                <data android:host="telegram.me" android:scheme="https" />
+                <data android:host="telegram.dog" android:scheme="http" />
+                <data android:host="telegram.dog" android:scheme="https" />
+                <data android:host="t.me" android:scheme="http" />
+                <data android:host="t.me" android:scheme="https" />
             </intent-filter>
         </activity>
         <activity
@@ -41,5 +51,4 @@
             </intent-filter>
         </activity>
     </application>
-
 </manifest>
