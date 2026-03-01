@@ -268,12 +268,19 @@ object SFIcons {
     }
 
     private fun buildVector(name: String, pathData: String, fillType: PathFillType): ImageVector {
+        val mirrorKeywords = listOf(
+            "forward", "backward", "next", "previous",
+            "leading", "trailing", "reply", "text_align",
+            "indent",
+        )
+        val shouldAutoMirror = mirrorKeywords.any { name.contains(it, ignoreCase = true) }
         return ImageVector.Builder(
             name = name,
             defaultWidth = 24.dp,
             defaultHeight = 24.dp,
             viewportWidth = 1024.0f,
-            viewportHeight = 1024.0f
+            viewportHeight = 1024.0f,
+            autoMirror = shouldAutoMirror
         ).apply {
             path(fill = SolidColor(Color.Black), pathFillType = fillType) {
                 parsePathData(pathData)

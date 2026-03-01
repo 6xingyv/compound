@@ -1,19 +1,26 @@
 package com.mocharealm.compound.ui.shape
 
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.PathFillType
+import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mocharealm.gaze.capsule.Continuity
 import com.mocharealm.gaze.capsule.path.toPath
 
-enum class BubbleSide { Left, Right }
+enum class BubbleAlignment { Start, End }
+
 class BubbleContinuousShape(
-    private val side: BubbleSide,
+    private val alignment: BubbleAlignment,
     private val cornerRadius: CornerSize = CornerSize(20.dp),
     private val continuity: Continuity = Continuity.Default
 ) : Shape {
@@ -22,12 +29,17 @@ class BubbleContinuousShape(
         layoutDirection: LayoutDirection,
         density: Density
     ): Outline {
-        val path = Path()
+        val path = Path().apply { fillType = PathFillType.NonZero }
         val w = size.width
         val h = size.height
         val r = cornerRadius.toPx(size, density)
         val scale = r / 20f
         val bodyHeight = h - (7f * scale)
+
+        val isResolvedRight = when (alignment) {
+            BubbleAlignment.Start -> layoutDirection == LayoutDirection.Rtl
+            BubbleAlignment.End -> layoutDirection == LayoutDirection.Ltr
+        }
 
         val mainBox = continuity.createRoundedRectanglePathSegments(
             width = w.toDouble(),
@@ -38,19 +50,10 @@ class BubbleContinuousShape(
             bottomRight = r.toDouble()
         ).toPath()
 
-        if (side == BubbleSide.Right) {
-            // 右侧气泡：主体 + 右下角插入尾巴
-            path.addPath(mainBox)
-
-            // 关键：为了消除白色缺口，将 FillType 设为 NonZero
-            path.fillType = androidx.compose.ui.graphics.PathFillType.NonZero
-
-            val tail = Path().apply {
-                // 起点稍微进入主体内部一点，确保覆盖
+        val tail = Path().apply {
+            if (isResolvedRight) {
                 moveTo(w - r, bodyHeight)
-                // 绘制到尾巴起点 (w, bodyHeight - 20*scale)
                 lineTo(w, bodyHeight - (20f * scale))
-
                 cubicTo(w, bodyHeight - (13.55f * scale), w - (3.06f * scale), bodyHeight - (7.81f * scale), w - (7.8f * scale), bodyHeight - (4.15f * scale))
                 cubicTo(w - (7.91f * scale), bodyHeight - (4.07f * scale), w - (8.01f * scale), bodyHeight - (3.99f * scale), w - (8.08f * scale), bodyHeight - (3.92f * scale))
                 cubicTo(w - (9.12f * scale), bodyHeight - (3f * scale), w - (10.44f * scale), bodyHeight - (1.62f * scale), w - (10.44f * scale), bodyHeight + (0.24f * scale))
@@ -60,18 +63,9 @@ class BubbleContinuousShape(
                 cubicTo(w - (9.89f * scale), bodyHeight + (6.91f * scale), w - (11.57f * scale), bodyHeight + (6.17f * scale), w - (13.53f * scale), bodyHeight + (5.09f * scale))
                 cubicTo(w - (15.8f * scale), bodyHeight + (3.84f * scale), w - (18.54f * scale), bodyHeight + (1.74f * scale), w - (19.25f * scale), bodyHeight + (1.24f * scale))
                 cubicTo(w - (20.58f * scale), bodyHeight + (0.31f * scale), w - (21.23f * scale), bodyHeight, w - (22.22f * scale), bodyHeight)
-                close()
-            }
-            path.op(path, tail, androidx.compose.ui.graphics.PathOperation.Union)
-
-        } else {
-            path.addPath(mainBox)
-            path.fillType = androidx.compose.ui.graphics.PathFillType.NonZero
-
-            val tail = Path().apply {
+            } else {
                 moveTo(r, bodyHeight)
                 lineTo(0f, bodyHeight - (20f * scale))
-
                 cubicTo(0f, bodyHeight - (13.55f * scale), (3.06f * scale), bodyHeight - (7.81f * scale), (7.8f * scale), bodyHeight - (4.15f * scale))
                 cubicTo((7.91f * scale), bodyHeight - (4.07f * scale), (8.01f * scale), bodyHeight - (3.99f * scale), (8.08f * scale), bodyHeight - (3.92f * scale))
                 cubicTo((9.12f * scale), bodyHeight - (3f * scale), (10.44f * scale), bodyHeight - (1.62f * scale), (10.44f * scale), bodyHeight + (0.24f * scale))
@@ -81,11 +75,11 @@ class BubbleContinuousShape(
                 cubicTo((9.89f * scale), bodyHeight + (6.91f * scale), (11.57f * scale), bodyHeight + (6.17f * scale), (13.53f * scale), bodyHeight + (5.09f * scale))
                 cubicTo((15.8f * scale), bodyHeight + (3.84f * scale), (18.54f * scale), bodyHeight + (1.74f * scale), (19.25f * scale), bodyHeight + (1.24f * scale))
                 cubicTo((20.58f * scale), bodyHeight + (0.31f * scale), (21.23f * scale), bodyHeight, (22.22f * scale), bodyHeight)
-                close()
             }
-            path.op(path, tail, androidx.compose.ui.graphics.PathOperation.Union)
+            close()
         }
 
+        path.op(mainBox, tail, PathOperation.Union)
         return Outline.Generic(path)
     }
 }

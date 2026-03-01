@@ -12,6 +12,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.shape.CornerSize
+import androidx.compose.foundation.text.selection.LocalTextSelectionColors
+import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.mutableStateOf
@@ -31,9 +33,10 @@ import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.screen.chat.GroupPosition
 import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
+import com.mocharealm.compound.ui.shape.BubbleAlignment
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
-import com.mocharealm.compound.ui.shape.BubbleSide
 import com.mocharealm.compound.ui.util.buildAnnotatedString
+import com.mocharealm.compound.ui.util.copyRelativeLightness
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.ui.modifier.surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -87,7 +90,7 @@ fun MessageBubble(
             remember(isLast) {
                 if (isLast) {
                     BubbleContinuousShape(
-                        if (message.isOutgoing) BubbleSide.Right else BubbleSide.Left,
+                        if (message.isOutgoing) BubbleAlignment.End else BubbleAlignment.Start,
                         CornerSize(20.dp)
                     )
                 } else {
@@ -115,9 +118,15 @@ fun MessageBubble(
             }
 
             CompositionLocalProvider(
-                LocalContentColor provides
-                        if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
-                        else MiuixTheme.colorScheme.onSurfaceContainer,
+                LocalContentColor provides contentColor,
+                LocalTextSelectionColors provides TextSelectionColors(
+                    handleColor =
+                        if (message.isOutgoing)
+                            MiuixTheme.colorScheme.primary.copyRelativeLightness(relativeLightness = 0.2f)
+                        else
+                            MiuixTheme.colorScheme.primary,
+                    backgroundColor = contentColor.copy(0.2f)
+                )
             ) {
                 if (hasSticker) {
                     MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
@@ -204,7 +213,9 @@ fun MessageContent(
                         .padding(top = replyTop, bottom = replyBottom)
                         .then(
                             if (isOnlySticker) Modifier
-                            else Modifier.padding(horizontal = 12.dp)
+                            else Modifier
+                                .padding(horizontal = 12.dp)
+                                .fillMaxWidth()
                         )
             )
         }

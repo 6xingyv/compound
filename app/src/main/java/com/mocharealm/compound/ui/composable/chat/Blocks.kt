@@ -53,13 +53,14 @@ import androidx.compose.ui.graphics.drawscope.clipPath
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.UriHandler
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
@@ -110,6 +111,7 @@ fun ReplyPreview(
     modifier: Modifier = Modifier,
     onClick: () -> Unit = {},
 ) {
+    val isLtr = LocalLayoutDirection.current == LayoutDirection.Ltr
     Row(
         modifier =
             modifier
@@ -118,7 +120,11 @@ fun ReplyPreview(
                 .clickable(onClick = onClick)
                 .drawWithCache {
                     onDrawBehind {
-                        drawRect(accentColor, size = Size(4.dp.toPx(), size.height))
+                        drawRect(
+                            accentColor,
+                            topLeft = Offset(if (isLtr) 0f else size.width - 4.dp.toPx(), 0f),
+                            size = Size(4.dp.toPx(), size.height)
+                        )
                     }
                 },
         verticalAlignment = Alignment.CenterVertically
@@ -268,7 +274,9 @@ fun RichTextContent(
     onSpoilerClick: (Int) -> Unit
 ) {
     if (text.spanStyles.isEmpty() && text.getStringAnnotations(0, text.length).isEmpty()) {
-        Text(text = text.text, color = contentColor, modifier = modifier)
+        SelectionContainer {
+            Text(text = text.text, color = contentColor, modifier = modifier)
+        }
         return
     }
 

@@ -165,11 +165,12 @@ fun BottomTabs(
         InteractiveHighlight(
             animationScope = animationScope,
             position = { size, _ ->
-                Offset(
-                    if (isLtr) (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset
-                    else size.width - (dampedDragAnimation.value + 0.5f) * tabWidthPx + panelOffset,
-                    size.height / 2f
-                )
+                val xPos = if (isLtr) {
+                    (dampedDragAnimation.value + 0.5f) * tabWidthPx
+                } else {
+                    size.width - (dampedDragAnimation.value + 0.5f) * tabWidthPx
+                }
+                Offset(xPos + panelOffset, size.height / 2f)
             }
         )
     }
@@ -241,15 +242,12 @@ fun BottomTabs(
                 Modifier
                     .padding(horizontal = 4.dp)
                     .graphicsLayer {
-                        val contentWidth = totalWidthPx - with(density) { 8.dp.toPx() }
-                        val singleTabWidth = contentWidth / tabsCount
-
-                        val progressOffset = dampedDragAnimation.value * singleTabWidth
+                        val totalContentWidth = size.width
 
                         translationX = if (isLtr) {
-                            progressOffset + panelOffset
+                            dampedDragAnimation.value * tabWidthPx + panelOffset
                         } else {
-                            contentWidth - (dampedDragAnimation.value + 1f) * singleTabWidth + panelOffset
+                            totalContentWidth - (dampedDragAnimation.value + 1f) * tabWidthPx + panelOffset
                         }
                     }
                     .then(interactiveHighlight.gestureModifier)
