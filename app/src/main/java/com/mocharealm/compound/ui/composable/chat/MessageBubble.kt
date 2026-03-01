@@ -117,6 +117,13 @@ fun MessageBubble(
                 }
             }
 
+            val colorScheme = MiuixTheme.colorScheme
+
+            val contentColor = remember(message.isOutgoing) {
+                if (message.isOutgoing) colorScheme.onPrimary
+                else colorScheme.onSurfaceContainer
+            }
+
             CompositionLocalProvider(
                 LocalContentColor provides contentColor,
                 LocalTextSelectionColors provides TextSelectionColors(

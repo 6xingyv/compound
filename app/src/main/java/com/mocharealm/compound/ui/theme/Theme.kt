@@ -22,7 +22,7 @@ fun CompoundTheme(
             primary = Color(0xFF0087FD)
         )
 
-    return MiuixTheme(
+    MiuixTheme(
         colors = colorScheme,
         content = content
     )

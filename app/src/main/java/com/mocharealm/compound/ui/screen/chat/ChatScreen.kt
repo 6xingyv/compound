@@ -2,6 +2,7 @@ package com.mocharealm.compound.ui.screen.chat
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -14,6 +15,7 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -44,6 +46,7 @@ import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
@@ -54,6 +57,7 @@ import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
@@ -67,6 +71,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.util.fastCoerceAtMost
+import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.domain.model.ChatType
@@ -89,6 +95,7 @@ import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.nav.LocalBackButtonVisibility
+import com.mocharealm.gaze.ui.animation.InteractiveHighlight
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import com.mocharealm.gaze.ui.composable.PopupMenu
 import com.mocharealm.gaze.ui.composable.TextField
@@ -103,9 +110,13 @@ import top.yukonga.miuix.kmp.basic.PopupPositionProvider
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import kotlin.math.abs
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
+import kotlin.math.tanh
 
 val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
 val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
@@ -116,6 +127,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
     val navigator = LocalNavigator.current
     val listState = rememberLazyListState()
+
+    val isDark = isSystemInDarkTheme()
 
     val shouldLoadMore by remember {
         derivedStateOf {
@@ -185,7 +198,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             effects = {
                                 vibrancy()
                                 blur(1.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx())
+                                lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
                             },
                             shadow = {
                                 Shadow(
@@ -198,13 +211,10 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             },
                         ) {
                             Icon(
-                                SFIcons.Chevron_Left,
+                                SFIcons.Chevron_Backward,
                                 null,
                                 Modifier
                                     .align(Alignment.Center)
-                                    .graphicsLayer {
-                                        if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
-                                    }
                             )
                         }
                     } else {
@@ -217,7 +227,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         effects = {
                             vibrancy()
                             blur(1.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
                         },
                         shadow = {
                             Shadow(
@@ -231,8 +241,43 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
                 }
                 state.chatInfo?.let { chatInfo ->
+                    val animationScope = rememberCoroutineScope()
+
+                    val interactiveHighlight = remember(animationScope) {
+                        InteractiveHighlight(
+                            animationScope = animationScope
+                        )
+                    }
                     Column(
-                        Modifier.align(Alignment.Center),
+                        Modifier
+                            .align(Alignment.Center)
+                            .graphicsLayer {
+                                val width = size.width
+                                val height = size.height
+
+                                val progress = interactiveHighlight.pressProgress
+                                val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
+
+                                val maxOffset = size.minDimension
+                                val initialDerivative = 0.05f
+                                val offset = interactiveHighlight.offset
+                                translationX =
+                                    maxOffset * tanh(initialDerivative * offset.x / maxOffset)
+                                translationY =
+                                    maxOffset * tanh(initialDerivative * offset.y / maxOffset)
+
+                                val maxDragScale = 4f.dp.toPx() / size.height
+                                val offsetAngle = atan2(offset.y, offset.x)
+                                scaleX =
+                                    scale +
+                                            maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) *
+                                            (width / height).fastCoerceAtMost(1f)
+                                scaleY =
+                                    scale +
+                                            maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) *
+                                            (height / width).fastCoerceAtMost(1f)
+                            }
+                            .then(interactiveHighlight.gestureModifier),
                         verticalArrangement = Arrangement.spacedBy((-6).dp),
                         horizontalAlignment = Alignment.CenterHorizontally
                     ) {
@@ -240,7 +285,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             initials = chatInfo.title.take(2),
                             modifier = Modifier
                                 .size(48.dp)
-                                .zIndex(20f),
+                                .zIndex(20f)
+                                .dropShadow(CircleShape) {
+                                    radius = 24f.dp.toPx()
+                                    offset = Offset(0f, radius / 6f)
+                                    color = Color.Black.copy(alpha = 0.1f)
+                                },
                             photoPath = chatInfo.photoUrl
                         )
                         LiquidSurface(
@@ -252,7 +302,6 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             Row(
                                 Modifier.padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
-                                horizontalArrangement = Arrangement.spacedBy(8.dp)
                             ) {
                                 Text(
                                     chatInfo.title,
@@ -261,6 +310,17 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                     maxLines = 1,
                                     overflow = TextOverflow.Ellipsis,
                                     textAlign = TextAlign.Center
+                                )
+                                Icon(
+                                    SFIcons.Chevron_Compact_Forward,
+                                    null,
+                                    Modifier
+                                        .width(16.dp)
+                                        .graphicsLayer {
+                                            blendMode =
+                                                if (isDark) BlendMode.Plus else BlendMode.Multiply
+                                            alpha = 0.6f
+                                        }
                                 )
                             }
                         }
@@ -307,7 +367,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             effects = {
                                 vibrancy()
                                 blur(1.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx())
+                                lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
                             },
                             shadow = {
                                 Shadow(
@@ -329,7 +389,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         onDismissRequest = { menuOpened.value = false },
                         effects = {
                             blur(8.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
                         }
                     ) {
                         Column(
@@ -420,7 +480,13 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         Spacer(Modifier.width(8.dp))
                                         Text(
                                             text = tdString("AccDescrVoiceMessage"),
-                                            Modifier.weight(1f),
+                                            Modifier
+                                                .weight(1f)
+                                                .graphicsLayer {
+                                                    blendMode =
+                                                        if (isDark) BlendMode.Plus else BlendMode.Multiply
+                                                    alpha = 0.6f
+                                                },
                                             style = MiuixTheme.textStyles.body1,
                                             maxLines = 1,
                                             softWrap = false,
@@ -437,7 +503,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         modifier =
                                             Modifier
                                                 .fillMaxWidth()
-                                                .focusRequester(focusRequester),
+                                                .focusRequester(focusRequester)
+                                                .animateContentSize(),
                                         state = viewModel.inputState,
                                         outputTransformation = MarkdownTransformation,
                                         lineLimits = TextFieldLineLimits.MultiLine(),
@@ -457,10 +524,11 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                             "TypeMessage",
                                                             "default"
                                                         ),
-                                                        color =
-                                                            LocalContentColor
-                                                                .current
-                                                                .copy(0.4f),
+                                                        modifier = Modifier.graphicsLayer {
+                                                            blendMode =
+                                                                if (isDark) BlendMode.Plus else BlendMode.Multiply
+                                                            alpha = 0.6f
+                                                        },
                                                         style =
                                                             MiuixTheme.textStyles
                                                                 .body1,
@@ -541,7 +609,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         effects = {
                             vibrancy()
                             blur(4.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx())
+                            lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
                         },
                         tint = primaryColor,
                         shadow = {
