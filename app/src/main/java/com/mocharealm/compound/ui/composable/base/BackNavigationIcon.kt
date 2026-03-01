@@ -21,10 +21,7 @@ fun BackNavigationIcon(
         onClick = onClick,
     ) {
         Icon(
-            modifier = Modifier.graphicsLayer {
-                if (layoutDirection == LayoutDirection.Rtl) scaleX = -1f
-            },
-            imageVector = SFIcons.Chevron_Left,
+            imageVector = SFIcons.Chevron_Backward,
             contentDescription = null,
             tint = colorScheme.onBackground,
         )
