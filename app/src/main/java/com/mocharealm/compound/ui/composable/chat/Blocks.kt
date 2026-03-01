@@ -232,7 +232,6 @@ fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifi
 
 @Composable
 fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
-    val density = LocalDensity.current
     val camera = rememberSaveableMapViewCamera(
         MapViewCamera(
             CameraState.Centered(
@@ -252,7 +251,7 @@ fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
         }
     }
     MapView(
-        modifier = modifier.aspectRatio(0.8f),
+        modifier = modifier.aspectRatio(1.2f),
         camera = camera,
         styleUrl = "https://tiles.openfreemap.org/styles/bright",
         mapOptions = mapOptions
@@ -543,7 +542,7 @@ fun VideoThumbnailOverlay(block: MessageBlock.MediaBlock, modifier: Modifier = M
             AsyncImage(
                 model =
                     ImageRequest.Builder(LocalContext.current)
-                        .data(File(block.thumbnail!!.fileUrl!!))
+                        .data(File(block.thumbnail.fileUrl))
                         .build(),
                 contentDescription = "Video thumbnail",
                 modifier = Modifier
