@@ -20,7 +20,7 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 val dataModule = module {
-    single { MutableSharedFlow<TdApi.Update>(extraBufferCapacity = 64) }
+    single { MutableSharedFlow<TdApi.Update>(replay = 64, extraBufferCapacity = 64) }
     single<SharedFlow<TdApi.Update>> { get<MutableSharedFlow<TdApi.Update>>() }
     single {
         Client.create(

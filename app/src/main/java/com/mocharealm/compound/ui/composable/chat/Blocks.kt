@@ -153,39 +153,48 @@ fun ReplyPreview(
 }
 
 @Composable
-fun PhotoBlock(block: MessageBlock.MediaBlock) {
+fun PhotoBlock(
+    block: MessageBlock.MediaBlock, 
+    modifier: Modifier = Modifier.wrapContentWidth(),
+    imageModifier: Modifier = Modifier.heightIn(max = 300.dp).wrapContentWidth(),
+    contentScale: ContentScale = ContentScale.Fit
+) {
     if (!block.file.fileUrl.isNullOrEmpty()) {
-        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = Modifier.wrapContentWidth()) {
+        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = modifier) {
             AsyncImage(
                 model =
                     ImageRequest.Builder(LocalContext.current)
                         .data(block.file.fileUrl)
                         .build(),
                 contentDescription = "Photo",
-                modifier = Modifier
-                    .heightIn(max = 300.dp)
-                    .wrapContentWidth(),
-                contentScale = ContentScale.Fit
+                modifier = imageModifier,
+                contentScale = contentScale
             )
         }
     }
 }
 
 @Composable
-fun VideoBlock(block: MessageBlock.MediaBlock) {
-    val maxWidth = 280.dp
-    val aspectRatio =
-        if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
-        else 16f / 9f
-    val videoModifier = Modifier
-        .width(maxWidth)
-        .height(maxWidth / aspectRatio)
+fun VideoBlock(
+    block: MessageBlock.MediaBlock, 
+    modifier: Modifier = Modifier.wrapContentSize(),
+    videoModifier: Modifier? = null
+) {
+    val actualVideoModifier = videoModifier ?: run {
+        val maxWidth = 280.dp
+        val aspectRatio =
+            if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
+            else 16f / 9f
+        Modifier
+            .width(maxWidth)
+            .height(maxWidth / aspectRatio)
+    }
 
-    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = Modifier.wrapContentSize()) {
+    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = modifier) {
         if (!block.file.fileUrl.isNullOrEmpty()) {
-            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = videoModifier)
+            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = actualVideoModifier)
         } else {
-            VideoThumbnailOverlay(block = block, modifier = videoModifier)
+            VideoThumbnailOverlay(block = block, modifier = actualVideoModifier)
         }
     }
 }

@@ -6,18 +6,19 @@ import com.mocharealm.compound.domain.usecase.GetInternalLinkUseCase
 
 class DeepLinkHandler(
     private val getInternalLink: GetInternalLinkUseCase,
-    private val navigator: Navigator
 ) {
-    suspend fun handle(uri: Uri) {
+    /**
+     * Resolves a deep link URI to the target [Screen].
+     * Returns null if the URI cannot be resolved or is not a supported link type.
+     */
+    suspend fun resolve(uri: Uri): Screen? {
         val result = getInternalLink(uri.toString())
+        return result.getOrNull()?.toScreen()
+    }
 
-        result.onSuccess { link ->
-            val screen = when(link) {
-                is InternalLink.ChatInvite -> Screen.Chat(link.chat.id)
-                is InternalLink.Message -> Screen.Chat(link.chat.id)
-                else -> Screen.Home
-            }
-            navigator.push(screen)
-        }
+    private fun InternalLink.toScreen(): Screen = when (this) {
+        is InternalLink.ChatInvite -> Screen.Chat(chat.id)
+        is InternalLink.Message -> Screen.Chat(chat.id)
+        is InternalLink.Generic -> Screen.Home
     }
 }

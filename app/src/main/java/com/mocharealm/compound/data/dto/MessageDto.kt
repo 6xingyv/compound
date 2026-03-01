@@ -40,13 +40,16 @@ object MessageDto {
                                         )
                                 )
                         is TdApi.MessagePhoto -> {
-                                val photoFileId = content.photo.sizes.lastOrNull()?.photo?.id
+                                val largestSize = content.photo.sizes.maxByOrNull { it.width * it.height }
+                                val photoFileId = largestSize?.photo?.id
                                 val media =
                                         MessageBlock.MediaBlock(
                                                 id = messageId,
                                                 timestamp = timestamp,
                                                 mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
                                                 file = File(fileId = photoFileId),
+                                                width = largestSize?.width ?: 0,
+                                                height = largestSize?.height ?: 0,
                                                 hasSpoiler = content.hasSpoiler,
                                                 mediaAlbumId = mediaAlbumId,
                                         )

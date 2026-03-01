@@ -10,10 +10,7 @@ import org.koin.core.context.startKoin
 class App : Application() {
     override fun onCreate() {
         super.onCreate()
-        startKoin {
-            modules(domainModule, dataModule, uiModule)
-            androidContext(this@App)
-        }
+        // Koin is now initialized by AndroidX Startup (KoinInitializer.kt)
         Thread.setDefaultUncaughtExceptionHandler { thread, throwable ->
         }
     }

@@ -1,5 +1,6 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.ui.nav.AppNavViewModel
 import com.mocharealm.compound.ui.nav.DeepLinkHandler
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.nav.Screen
@@ -9,6 +10,7 @@ import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.intro.IntroScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
+import com.mocharealm.compound.ui.screen.share.SharePickerScreen
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
@@ -64,6 +66,10 @@ val uiModule = module {
         DeepLinkHandler(get())
     }
 
+    viewModel {
+        AppNavViewModel(get(), get())
+    }
+
     navigation<Screen.Home>(mapOf(LIST_KEY to true)) {
         HomeScreen()
     }
@@ -74,6 +80,9 @@ val uiModule = module {
     }
     navigation<Screen.SignIn> {
         SignInScreen()
+    }
+    navigation<Screen.SharePicker>(mapOf(LIST_KEY to true)) { route ->
+        SharePickerScreen(payload = route.payload)
     }
     navigation<Screen.Intro> {
         IntroScreen()

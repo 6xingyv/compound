@@ -39,7 +39,9 @@ fun SpoilerImage(
     modifier: Modifier = Modifier, hasSpoiler: Boolean, content: @Composable () -> Unit
 ) {
     if (!hasSpoiler) {
-        content()
+        Box(modifier = modifier) {
+            content()
+        }
         return
     }
 

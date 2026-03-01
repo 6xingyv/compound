@@ -27,8 +27,11 @@ interface TelegramRepository {
     /** 登出 */
     suspend fun logout(): Result<Unit>
 
-    /** 获取认证状态 */
+    /** 获取认证状态（立即查询，可能在冷启动时不准） */
     suspend fun getAuthenticationState(): AuthState
+
+    /** 等待 TDLib 推送稳定的认证状态（适用于冷启动场景） */
+    suspend fun awaitAuthState(): AuthState
 
     /**
      * 获取对话列表

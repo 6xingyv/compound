@@ -55,6 +55,9 @@ fun MessageBubble(
     val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
     val hasSticker =
         message.blocks.any { b -> b is MessageBlock.StickerBlock } && message.blocks.size == 1
+    
+    val hasTextBlock = message.blocks.any { it is MessageBlock.TextBlock }
+    val isOnlyAlbum = !hasTextBlock && message.shareInfo == null && message.blocks.all { it is MessageBlock.MediaBlock && it.mediaAlbumId != 0L }
 
     val topPad = if (isFirst) 8.dp else 2.dp
     val bottomPad = if (isLast) 8.dp else 2.dp
@@ -135,7 +138,7 @@ fun MessageBubble(
                     backgroundColor = contentColor.copy(0.2f)
                 )
             ) {
-                if (hasSticker) {
+                if (hasSticker || isOnlyAlbum) {
                     MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
                 } else {
                     Box(
@@ -255,7 +258,8 @@ fun MessageContent(
                             mediaBlocks.find { it.mediaAlbumId == albumId } == block
                         if (isFirstInAlbum) {
                             val albumBlocks = mediaBlocks.filter { it.mediaAlbumId == albumId }
-                            MediaAlbumGrid(albumBlocks, modifier = Modifier.widthIn(max = 280.dp))
+                            val hasTextBlockInside = message.blocks.any { it is MessageBlock.TextBlock }
+                            MediaAlbumGrid(albumBlocks, hasTextBlock = hasTextBlockInside, modifier = Modifier.widthIn(max = 280.dp))
                         }
                     } else {
                         if (block.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO) {

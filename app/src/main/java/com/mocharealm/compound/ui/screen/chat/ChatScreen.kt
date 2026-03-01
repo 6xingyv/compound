@@ -149,7 +149,6 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
 
     val containerWidth = LocalWindowInfo.current.containerDpSize.width
     val layoutDirection = LocalLayoutDirection.current
-    val directionFactor = if (layoutDirection == LayoutDirection.Ltr) 1f else -1f
     val density = LocalDensity.current
     val statusBarHeightPx = WindowInsets.statusBars.getTop(density)
     val focusRequester = remember { FocusRequester() }
@@ -297,7 +296,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             layerBackdrop,
                             Modifier.widthIn(
                                 max = (containerWidth - 160.dp).coerceAtLeast(0.dp)
-                            )
+                            ),
+                            isInteractive = false
                         ) {
                             Row(
                                 Modifier.padding(8.dp),
