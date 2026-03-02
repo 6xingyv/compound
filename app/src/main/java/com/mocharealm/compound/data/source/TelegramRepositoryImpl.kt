@@ -506,8 +506,6 @@ class TelegramRepositoryImpl(
         return UserDto.fromTdApi(user, photoPath).toDomain()
     }
 
-    // ── Core message mapping ─────────────────────────────────────────────
-
     /**
      * Maps a single TdApi.Message to a domain Message with a single block. Album aggregation
      * happens in [aggregateAlbums].
@@ -644,8 +642,6 @@ class TelegramRepositoryImpl(
         }
     }
 
-    // ── System action resolution ─────────────────────────────────────────
-
     private suspend fun resolveSystemBlock(
             msg: TdApi.Message,
             sender: User,
@@ -705,8 +701,6 @@ class TelegramRepositoryImpl(
                 type = actionType
         )
     }
-
-    // ── Reply resolution ─────────────────────────────────────────────────
 
     private suspend fun resolveReplyMessage(msg: TdApi.Message): Message? {
         val reply = msg.replyTo as? TdApi.MessageReplyToMessage ?: return null
