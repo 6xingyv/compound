@@ -1,6 +1,5 @@
 package com.mocharealm.tci18n.core
 
-import android.util.Log
 import java.util.Locale
 
 /**
@@ -16,16 +15,21 @@ fun tdLangPackId(locale: Locale): String {
     val script = locale.script
     val country = locale.country
 
-    return when {
-        script.isNotEmpty() -> "$lang-${script.lowercase()}"
+    return when (lang) {
         // Chinese
-        lang == "zh" -> when (country) {
-            "TW", "HK", "MO" -> "zh-hant-beta"
-            else -> "zh-hans-beta"
+        "zh" -> {
+            if (script.isNotEmpty()) {
+                "$lang-${script.lowercase()}-beta"
+            }
+
+            when (country) {
+                "TW", "HK", "MO" -> "zh-hant-beta"
+                else -> "zh-hans-beta"
+            }
         }
         // Portuguese: pt-BR vs pt
-        lang == "pt" -> when(country) {
-            "BR"-> "pt-br"
+        "pt" -> when (country) {
+            "BR" -> "pt-br"
             else -> "pt-pt"
         }
         // Default: use simple language code
