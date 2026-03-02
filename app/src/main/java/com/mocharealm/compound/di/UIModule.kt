@@ -54,7 +54,9 @@ val uiModule = module {
             downloadFileWithProgress = get(),
             sendMessage = get(),
             subscribeToMessageUpdates = get(),
-            getChat = get()
+            getChat = get(),
+            openChat = get(),
+            closeChat = get()
         )
     }
 

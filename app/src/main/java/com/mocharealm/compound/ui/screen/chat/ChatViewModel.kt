@@ -12,7 +12,9 @@ import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
+import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
+import com.mocharealm.compound.domain.usecase.OpenChatUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -64,7 +66,9 @@ class ChatViewModel(
     private val downloadFileWithProgress: DownloadFileWithProgressUseCase,
     private val sendMessage: SendMessageUseCase,
     private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
-    private val getChat: GetChatUseCase
+    private val getChat: GetChatUseCase,
+    private val openChat: OpenChatUseCase,
+    private val closeChat: CloseChatUseCase
 ) : ViewModel() {
 
     companion object {
@@ -77,6 +81,9 @@ class ChatViewModel(
     val inputState = TextFieldState()
 
     init {
+        viewModelScope.launch {
+            openChat(chatId)
+        }
         loadMessages()
         loadChatInfo()
         viewModelScope.launch {
@@ -233,7 +240,9 @@ class ChatViewModel(
     fun loadOlderMessages() {
         val state = _uiState.value
         if (state.loadingMore || state.loading || !state.hasMore) return
-        val oldestMessageId = state.messages.firstOrNull()?.primaryId ?: return
+        
+        // 修复 1：拿到真正的最老消息 ID（ID 最小的）
+        val oldestMessageId = state.messages.minOfOrNull { it.primaryId } ?: return
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
@@ -249,7 +258,10 @@ class ChatViewModel(
                 } else {
                     val existingIds = state.messages.map { it.primaryId }.toSet()
                     val newMessages = olderMessages.filter { it.primaryId !in existingIds }
-                    val combinedMessages = newMessages + state.messages
+                    
+                    // 修复 2：合并后重新按时间倒序排序，保证队列干净
+                    val combinedMessages = (state.messages + newMessages).sortedByDescending { it.primaryTimestamp }
+                    
                     _uiState.update {
                         it.copy(
                             messages = combinedMessages,
@@ -302,6 +314,13 @@ class ChatViewModel(
 
     fun clearScrollTarget() {
         _uiState.update { it.copy(scrollToMessageId = null) }
+    }
+
+    override fun onCleared() {
+        super.onCleared()
+        viewModelScope.launch {
+            closeChat(chatId)
+        }
     }
 
     private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {

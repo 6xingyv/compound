@@ -81,4 +81,10 @@ interface TelegramRepository {
     /** 获取单个聊天详情 */
     suspend fun getChat(chatId: Long): Result<Chat>
     suspend fun getInternalLink(link: String): Result<InternalLink>
+
+    /** 通知 TDLib 打开聊天 */
+    suspend fun openChat(chatId: Long): Result<Unit>
+
+    /** 通知 TDLib 关闭聊天 */
+    suspend fun closeChat(chatId: Long): Result<Unit>
 }

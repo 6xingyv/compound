@@ -190,6 +190,16 @@ class TelegramRepositoryImpl(
         send(TdApi.GetInternalLinkType(link)).toDomain()
     }
 
+    override suspend fun openChat(chatId: Long): Result<Unit> = runCatching {
+        send(TdApi.OpenChat(chatId))
+        Unit
+    }
+
+    override suspend fun closeChat(chatId: Long): Result<Unit> = runCatching {
+        send(TdApi.CloseChat(chatId))
+        Unit
+    }
+
     private suspend fun TdApi.InternalLinkType.toDomain(): InternalLink =
             when (this) {
                 is TdApi.InternalLinkTypeChatInvite -> {
