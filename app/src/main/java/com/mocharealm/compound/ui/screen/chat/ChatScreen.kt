@@ -97,6 +97,7 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.nav.LocalBackButtonVisibility
 import com.mocharealm.gaze.ui.animation.InteractiveHighlight
 import com.mocharealm.gaze.ui.composable.LiquidSurface
+import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
 import com.mocharealm.gaze.ui.composable.PopupMenu
 import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
@@ -384,6 +385,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     PopupMenu(
                         menuOpened,
                         layerBackdrop,
+                        popupPositionProvider = OverlayPositionProvider,
                         alignment = PopupPositionProvider.Align.BottomStart,
                         surfaceColor = surfaceContainerColor.copy(0.4f),
                         onDismissRequest = { menuOpened.value = false },
