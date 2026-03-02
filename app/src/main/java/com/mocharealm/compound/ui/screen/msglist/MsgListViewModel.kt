@@ -53,15 +53,14 @@ class MsgListViewModel(
                             val idx = state.chats.indexOfFirst { it.id == chatId }
                             if (idx != -1) {
                                 val updated = state.chats.toMutableList()
-                                updated[idx] =
-                                        updated[idx].copy(
-                                                lastMessage = message,
-                                                lastMessageDate = message.timestamp,
-                                                unreadCount =
-                                                        if (message.isOutgoing)
-                                                                updated[idx].unreadCount
-                                                        else updated[idx].unreadCount + 1
-                                        )
+                                val updatedChat = updated[idx].copy(
+                                    lastMessage = message,
+                                    lastMessageDate = message.timestamp,
+                                    unreadCount = if (message.isOutgoing) updated[idx].unreadCount else updated[idx].unreadCount + 1
+                                )
+                                // Move to top
+                                updated.removeAt(idx)
+                                updated.add(0, updatedChat)
                                 state.copy(chats = updated)
                             } else state
                         }
@@ -79,9 +78,6 @@ class MsgListViewModel(
                                 downloadMissingPhotos(listOf(chat))
                             }
                         }
-
-                        // Let TDLib tell us the correct ordering
-                        refreshChats()
                     }
                     else -> {}
                 }

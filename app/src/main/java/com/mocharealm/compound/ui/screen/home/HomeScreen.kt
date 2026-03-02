@@ -55,7 +55,7 @@ fun HomeScreen(
         drawContent()
     }
 
-    val navigationItems = remember {
+    val navigationItems = remember(state.user) {
         listOf(
             TopLevelNav(
                 "Compound",

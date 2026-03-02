@@ -42,7 +42,7 @@ class SignInViewModel(
         if (phoneText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = setAuthenticationPhoneNumber(phoneText as String)
+            val result = setAuthenticationPhoneNumber(phoneText.toString())
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
@@ -54,7 +54,7 @@ class SignInViewModel(
         if (codeText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = checkAuthenticationCode(codeText as String)
+            val result = checkAuthenticationCode(codeText.toString())
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
@@ -66,7 +66,7 @@ class SignInViewModel(
         if (passwordText.isBlank()) return
         viewModelScope.launch {
             _uiState.update { it.copy(loading = true, error = null) }
-            val result = checkAuthenticationPassword(passwordText as String)
+            val result = checkAuthenticationPassword(passwordText.toString())
             _uiState.update {
                 it.copy(authState = result, loading = false).withErrorIfNeeded(result)
             }
