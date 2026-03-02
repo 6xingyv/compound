@@ -340,7 +340,6 @@ fun MediaAlbumGrid(
         }
         
         if (!hasTextBlock && totalOriginal > 0) {
-            Spacer(Modifier.height(4.dp))
             Text(
                 text = tdString("Of","%1\$d" to startIndex+1, "%2\$d" to totalOriginal),
                 color = MiuixTheme.colorScheme.primary,

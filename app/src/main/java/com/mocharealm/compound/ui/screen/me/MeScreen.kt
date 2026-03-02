@@ -10,9 +10,10 @@ import androidx.compose.runtime.getValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
-import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.tci18n.core.tdLangPackId
 import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -107,7 +108,21 @@ fun MeScreen(
                         .padding(top = 12.dp),
                 ) {
                     SuperArrow(
-                        title = tdString("Intro"),
+                        title = tdString("Start"),
+                        onClick = {
+                            navigator.push(Screen.Intro)
+                        },
+                    )
+                }
+            }
+            item {
+                Card(
+                    modifier = Modifier
+                        .padding(horizontal = 12.dp)
+                        .padding(top = 12.dp),
+                ) {
+                    SuperArrow(
+                        title = tdLangPackId(java.util.Locale.getDefault()),
                         onClick = {
                             navigator.push(Screen.Intro)
                         },

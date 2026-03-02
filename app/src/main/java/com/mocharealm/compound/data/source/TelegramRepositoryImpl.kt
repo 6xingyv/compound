@@ -567,9 +567,8 @@ class TelegramRepositoryImpl(
         var i = 0
         while (i < messages.size) {
             val msg = messages[i]
-            val firstBlock = msg.blocks.firstOrNull()
             val albumId =
-                    when (firstBlock) {
+                    when (val firstBlock = msg.blocks.firstOrNull()) {
                         is MessageBlock.MediaBlock -> firstBlock.mediaAlbumId
                         is MessageBlock.DocumentBlock -> firstBlock.mediaAlbumId
                         else -> 0L
