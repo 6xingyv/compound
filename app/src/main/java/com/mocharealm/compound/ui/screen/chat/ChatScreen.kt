@@ -78,6 +78,7 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
+import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.BlendMode
 import androidx.compose.ui.graphics.Brush
@@ -200,11 +201,6 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         }
     }
 
-    LaunchedEffect(WindowInsets.isImeVisible) {
-        if (state.stickerPanelVisible) viewModel.hideStickerPanel()
-        if (state.locationPanelVisible) viewModel.hideLocationPanel()
-    }
-
     val galleryLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris: List<Uri> ->
@@ -232,6 +228,17 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         topBar = {
             Box(
                 Modifier
+                    .drawWithCache {
+                        onDrawBehind {
+                            drawRect(
+                                Brush.verticalGradient(
+                                    0f to surfaceColor.copy(1f),
+                                    1f to surfaceColor.copy(0f),
+                                    startY = statusBarHeightPx / 2f
+                                ),
+                            )
+                        }
+                    }
                     .statusBarsPadding()
                     .padding(captionBar.takeOnly(PaddingValuesSide.Top))
             ) {
@@ -580,6 +587,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                             modifier = Modifier
                                                 .fillMaxWidth()
                                                 .focusRequester(focusRequester)
+                                                .onFocusChanged {
+                                                    if (it.isFocused) {
+                                                        if (state.stickerPanelVisible) viewModel.hideStickerPanel()
+                                                        if (state.locationPanelVisible) viewModel.hideLocationPanel()
+                                                    }
+                                                }
                                                 .animateContentSize(),
                                             state = viewModel.inputState,
                                             outputTransformation = MarkdownTransformation,
@@ -706,6 +719,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             blur(4.dp.toPx())
                             lens(12.dp.toPx(), 24.dp.toPx(), chromaticAberration = false)
                         },
+                        shadow = {
+                            Shadow(0.dp, DpOffset.Zero, Color.Transparent)
+                        },
                         surfaceColor = surfaceContainerColor.copy(alpha = 0.4f)
                     ) {
                         AnimatedContent(
@@ -718,7 +734,10 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                     LazyRow(
                                         Modifier
                                             .fillMaxWidth(),
-                                        contentPadding = PaddingValues(horizontal = 16.dp, vertical = 16.dp),
+                                        contentPadding = PaddingValues(
+                                            horizontal = 16.dp,
+                                            vertical = 16.dp
+                                        ),
                                         horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         items(state.stickerSets, key = { it.id }) { setInfo ->
