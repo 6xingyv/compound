@@ -12,12 +12,16 @@ import com.mocharealm.compound.domain.usecase.auth.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
+import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
+import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
 import com.mocharealm.compound.domain.usecase.OpenChatUseCase
 import com.mocharealm.compound.domain.usecase.GetCurrentUserUseCase
 import com.mocharealm.compound.domain.usecase.GetInternalLinkUseCase
 import com.mocharealm.compound.domain.usecase.LogoutUseCase
 import com.mocharealm.compound.domain.usecase.SendFilesUseCase
+import com.mocharealm.compound.domain.usecase.SendLocationUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
+import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import com.mocharealm.compound.domain.usecase.phonenumber.ValidatePhoneNumberUseCase
@@ -86,5 +90,20 @@ val domainModule = module {
     }
     factory {
         CloseChatUseCase(get())
+    }
+    factory {
+        GetInstalledStickerSetsUseCase(get())
+    }
+    factory {
+        GetStickerSetStickersUseCase(get())
+    }
+    factory {
+        SendStickerUseCase(get())
+    }
+    factory {
+        SendLocationUseCase(get())
+    }
+    factory {
+        SendFilesUseCase(get())
     }
 }

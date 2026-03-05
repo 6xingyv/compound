@@ -9,13 +9,20 @@ import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
+import com.mocharealm.compound.domain.model.ShareFileInfo
+import com.mocharealm.compound.domain.model.StickerSetInfo
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
+import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
+import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
 import com.mocharealm.compound.domain.usecase.OpenChatUseCase
+import com.mocharealm.compound.domain.usecase.SendFilesUseCase
+import com.mocharealm.compound.domain.usecase.SendLocationUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
+import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -48,7 +55,15 @@ data class ChatUiState(
     val initialLoaded: Boolean = false,
     val error: String? = null,
     val scrollToMessageId: Long? = null,
-    val videoDownloadProgress: Map<Long, Int> = emptyMap()
+    val videoDownloadProgress: Map<Long, Int> = emptyMap(),
+    // ── Sticker panel ────────────────────────────────────────────────
+    val stickerSets: List<StickerSetInfo> = emptyList(),
+    val currentSetStickers: List<MessageBlock.StickerBlock> = emptyList(),
+    val selectedStickerSetId: Long? = null,
+    val stickerPanelVisible: Boolean = false,
+    val stickersLoading: Boolean = false,
+    // ── Location panel ───────────────────────────────────────────────
+    val locationPanelVisible: Boolean = false,
 )
 
 /** Helper: primary message ID (first block's id) */
@@ -68,7 +83,12 @@ class ChatViewModel(
     private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
     private val getChat: GetChatUseCase,
     private val openChat: OpenChatUseCase,
-    private val closeChat: CloseChatUseCase
+    private val closeChat: CloseChatUseCase,
+    private val getInstalledStickerSets: GetInstalledStickerSetsUseCase,
+    private val getStickerSetStickers: GetStickerSetStickersUseCase,
+    private val sendSticker: SendStickerUseCase,
+    private val sendLocation: SendLocationUseCase,
+    private val sendFiles: SendFilesUseCase,
 ) : ViewModel() {
 
     companion object {
@@ -501,6 +521,100 @@ class ChatViewModel(
                     }
                 }
             }
+        }
+    }
+
+    // ── Sticker panel ────────────────────────────────────────────────────
+
+    fun showStickerPanel() {
+        _uiState.update { it.copy(stickerPanelVisible = true, locationPanelVisible = false) }
+        if (_uiState.value.stickerSets.isEmpty()) {
+            loadStickerSets()
+        }
+    }
+
+    fun hideStickerPanel() {
+        _uiState.update { it.copy(stickerPanelVisible = false) }
+    }
+
+    private fun loadStickerSets() {
+        viewModelScope.launch {
+            _uiState.update { it.copy(stickersLoading = true) }
+            getInstalledStickerSets().onSuccess { sets ->
+                _uiState.update { it.copy(stickerSets = sets, stickersLoading = false) }
+                // Auto-select first set
+                if (sets.isNotEmpty()) {
+                    selectStickerSet(sets.first().id)
+                }
+            }.onFailure {
+                _uiState.update { it.copy(stickersLoading = false) }
+            }
+        }
+    }
+
+    fun selectStickerSet(setId: Long) {
+        if (_uiState.value.selectedStickerSetId == setId) return
+        _uiState.update { it.copy(selectedStickerSetId = setId, stickersLoading = true) }
+        viewModelScope.launch {
+            getStickerSetStickers(setId).onSuccess { stickers ->
+                // Download thumbnails for stickers that don't have local files
+                for (sticker in stickers) {
+                    val fId = sticker.file.fileId
+                    if (fId != null && sticker.file.fileUrl == null) {
+                        launch {
+                            downloadFile(fId).onSuccess { path ->
+                                _uiState.update { state ->
+                                    state.copy(
+                                        currentSetStickers = state.currentSetStickers.map { s ->
+                                            if (s.id == sticker.id) s.copy(
+                                                file = s.file.copy(fileUrl = path)
+                                            ) else s
+                                        }
+                                    )
+                                }
+                            }
+                        }
+                    }
+                }
+                _uiState.update {
+                    it.copy(currentSetStickers = stickers, stickersLoading = false)
+                }
+            }.onFailure {
+                _uiState.update { it.copy(stickersLoading = false) }
+            }
+        }
+    }
+
+    fun onStickerClick(sticker: MessageBlock.StickerBlock) {
+        viewModelScope.launch {
+            sendSticker(chatId, sticker)
+            hideStickerPanel()
+        }
+    }
+
+    // ── Location ─────────────────────────────────────────────────────────
+
+    fun showLocationPanel() {
+        _uiState.update { it.copy(locationPanelVisible = true, stickerPanelVisible = false) }
+    }
+
+    fun hideLocationPanel() {
+        _uiState.update { it.copy(locationPanelVisible = false) }
+    }
+
+    fun onSendLocation(latitude: Double, longitude: Double) {
+        viewModelScope.launch {
+            sendLocation(chatId, latitude, longitude)
+            hideLocationPanel()
+        }
+    }
+
+    // ── Gallery / Document ───────────────────────────────────────────────
+
+    fun sendSelectedFiles(files: List<ShareFileInfo>) {
+        if (files.isEmpty()) return
+        viewModelScope.launch {
+            sendFiles(chatId, files)
         }
     }
 }

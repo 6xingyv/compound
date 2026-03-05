@@ -5,8 +5,10 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.InternalLink
 import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
+import com.mocharealm.compound.domain.model.StickerSetInfo
 import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.model.User
 import kotlinx.coroutines.flow.Flow
@@ -87,4 +89,16 @@ interface TelegramRepository {
 
     /** 通知 TDLib 关闭聊天 */
     suspend fun closeChat(chatId: Long): Result<Unit>
+
+    /** 获取已安装的贴纸集列表 */
+    suspend fun getInstalledStickerSets(): Result<List<StickerSetInfo>>
+
+    /** 获取贴纸集中的贴纸（返回 StickerBlock 列表） */
+    suspend fun getStickerSetStickers(setId: Long): Result<List<MessageBlock.StickerBlock>>
+
+    /** 发送贴纸 */
+    suspend fun sendSticker(chatId: Long, sticker: MessageBlock.StickerBlock): Result<Message>
+
+    /** 发送位置 */
+    suspend fun sendLocation(chatId: Long, latitude: Double, longitude: Double): Result<Message>
 }

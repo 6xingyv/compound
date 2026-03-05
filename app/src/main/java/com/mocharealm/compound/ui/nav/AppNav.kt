@@ -4,6 +4,7 @@ import androidx.compose.runtime.Immutable
 import androidx.compose.runtime.Stable
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.navigation3.runtime.NavKey
+import com.mocharealm.compound.domain.model.SharePayload
 import kotlinx.serialization.Serializable
 
 @Immutable
@@ -22,7 +23,7 @@ sealed interface Screen : NavKey {
     data object SignIn : Screen
 
     @Serializable
-    data class SharePicker(val payload: com.mocharealm.compound.domain.model.SharePayload) : Screen
+    data class SharePicker(val payload: SharePayload) : Screen
 }
 
 @Stable

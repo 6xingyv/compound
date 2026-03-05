@@ -66,6 +66,7 @@ import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
+import com.airbnb.lottie.RenderMode
 import com.airbnb.lottie.compose.LottieAnimation
 import com.airbnb.lottie.compose.LottieCompositionSpec
 import com.airbnb.lottie.compose.LottieConstants
@@ -154,9 +155,11 @@ fun ReplyPreview(
 
 @Composable
 fun PhotoBlock(
-    block: MessageBlock.MediaBlock, 
+    block: MessageBlock.MediaBlock,
     modifier: Modifier = Modifier.wrapContentWidth(),
-    imageModifier: Modifier = Modifier.heightIn(max = 300.dp).wrapContentWidth(),
+    imageModifier: Modifier = Modifier
+        .heightIn(max = 300.dp)
+        .wrapContentWidth(),
     contentScale: ContentScale = ContentScale.Fit
 ) {
     if (!block.file.fileUrl.isNullOrEmpty()) {
@@ -176,7 +179,7 @@ fun PhotoBlock(
 
 @Composable
 fun VideoBlock(
-    block: MessageBlock.MediaBlock, 
+    block: MessageBlock.MediaBlock,
     modifier: Modifier = Modifier.wrapContentSize(),
     videoModifier: Modifier? = null
 ) {
@@ -200,17 +203,24 @@ fun VideoBlock(
 }
 
 @Composable
-fun StickerBlock(block: MessageBlock.StickerBlock, modifier: Modifier = Modifier) {
+fun StickerBlock(
+    block: MessageBlock.StickerBlock,
+    modifier: Modifier = Modifier,
+    useTextureView: Boolean = true,
+) {
     if (!block.file.fileUrl.isNullOrEmpty()) {
         when (block.stickerFormat) {
-            MessageBlock.StickerBlock.StickerFormat.WEBM, MessageBlock.StickerBlock.StickerFormat.MP4 -> VideoPlayer(
+            MessageBlock.StickerBlock.StickerFormat.WEBM,
+            MessageBlock.StickerBlock.StickerFormat.MP4 -> VideoPlayer(
                 filePath = block.file.fileUrl,
-                modifier = modifier
+                modifier = modifier,
+                useTextureView = useTextureView
             )
 
             MessageBlock.StickerBlock.StickerFormat.TGS -> LottieSticker(
                 filePath = block.file.fileUrl,
-                modifier = modifier
+                modifier = modifier,
+                useTextureView = useTextureView
             )
 
             else -> AsyncImage(
@@ -500,7 +510,11 @@ fun RichTextContent(
 }
 
 @Composable
-fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
+fun LottieSticker(
+    filePath: String,
+    modifier: Modifier = Modifier,
+    useTextureView: Boolean = true,
+) {
     val context = LocalContext.current
 
     val jsonString by
@@ -536,7 +550,8 @@ fun LottieSticker(filePath: String, modifier: Modifier = Modifier) {
         LottieAnimation(
             composition = composition,
             iterations = LottieConstants.IterateForever,
-            modifier = modifier
+            modifier = modifier,
+            renderMode = if (useTextureView) RenderMode.AUTOMATIC else RenderMode.HARDWARE
         )
     }
 }

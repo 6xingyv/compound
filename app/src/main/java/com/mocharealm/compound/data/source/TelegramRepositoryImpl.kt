@@ -15,6 +15,7 @@ import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
+import com.mocharealm.compound.domain.model.StickerSetInfo
 import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.model.User
 import com.mocharealm.compound.domain.repository.TelegramRepository
@@ -809,4 +810,66 @@ class TelegramRepositoryImpl(
                 blocks = listOf(replyBlock),
         )
     }
+
+    override suspend fun getInstalledStickerSets(): Result<List<StickerSetInfo>> =
+        runCatching {
+            val result = send(
+                TdApi.GetInstalledStickerSets(TdApi.StickerTypeRegular())
+            )
+            val stickerSets = result as TdApi.StickerSets
+            stickerSets.sets.map { setInfo ->
+                StickerSetInfo(
+                    id = setInfo.id,
+                    title = setInfo.title,
+                    name = setInfo.name,
+                    thumbnailFileId = setInfo.thumbnail?.file?.id,
+                )
+            }
+        }
+
+    override suspend fun getStickerSetStickers(setId: Long): Result<List<MessageBlock.StickerBlock>> =
+        runCatching {
+            val result = send(TdApi.GetStickerSet(setId))
+            val stickerSet = result as TdApi.StickerSet
+            stickerSet.stickers.map { sticker ->
+                val format = MessageDto.mapStickerFormat(sticker.format)
+                MessageBlock.StickerBlock(
+                    id = sticker.id,
+                    timestamp = 0L,
+                    stickerFormat = format,
+                    file = com.mocharealm.compound.domain.model.File(
+                        fileId = sticker.sticker.id,
+                        fileUrl = sticker.sticker.local?.takeIf { it.isDownloadingCompleted }?.path,
+                    ),
+                    caption = Text(sticker.emoji),
+                )
+            }
+        }
+
+    override suspend fun sendSticker(
+        chatId: Long,
+        sticker: MessageBlock.StickerBlock
+    ): Result<Message> = runCatching {
+        val fileId = sticker.file.fileId ?: error("Sticker has no fileId")
+        val content = TdApi.InputMessageSticker(
+            TdApi.InputFileId(fileId),
+            null,
+            0, 0,
+            sticker.caption.content
+        )
+        val msg = send(TdApi.SendMessage(chatId, null, null, null, null, content))
+        mapSingleTdMessage(msg)
+    }
+
+    override suspend fun sendLocation(
+        chatId: Long,
+        latitude: Double,
+        longitude: Double
+    ): Result<Message> = runCatching {
+        val location = TdApi.Location(latitude, longitude, 0.0)
+        val content = TdApi.InputMessageLocation(location, 0, 0, 0)
+        val msg = send(TdApi.SendMessage(chatId, null, null, null, null, content))
+        mapSingleTdMessage(msg)
+    }
 }
+

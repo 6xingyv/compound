@@ -56,7 +56,12 @@ val uiModule = module {
             subscribeToMessageUpdates = get(),
             getChat = get(),
             openChat = get(),
-            closeChat = get()
+            closeChat = get(),
+            getInstalledStickerSets = get(),
+            getStickerSetStickers = get(),
+            sendSticker = get(),
+            sendLocation = get(),
+            sendFiles = get()
         )
     }
 

@@ -354,7 +354,7 @@ object MessageDto {
                         .toTypedArray()
         }
 
-        private fun mapStickerFormat(
+        fun mapStickerFormat(
                 format: TdApi.StickerFormat?
         ): MessageBlock.StickerBlock.StickerFormat =
                 when (format) {
