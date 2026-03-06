@@ -62,25 +62,38 @@ public:
     std::atomic<bool> playing{false}, quit{false};
     std::atomic<int> surfaceWidth{0}, surfaceHeight{0};
 
-    // EGL 资源
+    // EGL 资源 — only touched by decode thread
     EGLDisplay display = EGL_NO_DISPLAY;
-    EGLSurface surface = EGL_NO_SURFACE;
+    EGLSurface eglSurface = EGL_NO_SURFACE;
     EGLContext context = EGL_NO_CONTEXT;
+    EGLConfig eglConfig = nullptr;
     GLuint program = 0;
     GLuint textures[4] = {0}; // Y, U, V, A
+    bool eglReady = false;
 
+    // Protects window pointer and surface changes
     std::mutex mtx;
     std::condition_variable cv;
+    // Tracks whether a surface change happened so the decode thread can recreate EGL surface
+    bool surfaceChanged = false;
 
     VpxDecoderContext(const char* path) : filePath(path) {}
-    ~VpxDecoderContext() { stop(); if (window) ANativeWindow_release(window); }
 
-    void setSurface(ANativeWindow* currWindow, int w, int h) {
+    ~VpxDecoderContext() {
+        stop();
         std::lock_guard<std::mutex> lock(mtx);
-        if (window) ANativeWindow_release(window);
-        window = currWindow;
+        if (window) { ANativeWindow_release(window); window = nullptr; }
+    }
+
+    void setSurface(ANativeWindow* newWindow, int w, int h) {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (window) { ANativeWindow_release(window); window = nullptr; }
+        if (newWindow) {
+            window = newWindow;
+            ANativeWindow_acquire(window);
+        }
         surfaceWidth = w; surfaceHeight = h;
-        if (window) ANativeWindow_acquire(window);
+        surfaceChanged = true;
         cv.notify_all();
     }
 
@@ -96,11 +109,18 @@ public:
         if (decodeThread.joinable()) decodeThread.join();
     }
 
+    // Called from decode thread only — safe because EGL is thread-local
+    bool canRender() {
+        return eglReady && !quit && display != EGL_NO_DISPLAY && eglSurface != EGL_NO_SURFACE;
+    }
+
     void render(vpx_image_t* img, vpx_image_t* alphaImg);
 
 private:
     bool initEGL();
+    void destroyEGLSurface();
     void destroyEGL();
+    bool recreateEGLSurface();
     void decodeLoop(bool loop);
 
     GLuint loadShader(GLenum type, const char* src) {
@@ -129,6 +149,7 @@ private:
 
 bool VpxDecoderContext::initEGL() {
     display = eglGetDisplay(EGL_DEFAULT_DISPLAY);
+    if (display == EGL_NO_DISPLAY) return false;
     eglInitialize(display, nullptr, nullptr);
 
     const EGLint attribs[] = {
@@ -137,21 +158,28 @@ bool VpxDecoderContext::initEGL() {
         EGL_RED_SIZE, 8, EGL_GREEN_SIZE, 8, EGL_BLUE_SIZE, 8, EGL_ALPHA_SIZE, 8,
         EGL_NONE
     };
-    EGLConfig config; EGLint nc;
-    eglChooseConfig(display, attribs, &config, 1, &nc);
+    EGLint nc;
+    eglChooseConfig(display, attribs, &eglConfig, 1, &nc);
+    if (nc == 0) return false;
 
     const EGLint ctxAttr[] = { EGL_CONTEXT_CLIENT_VERSION, 2, EGL_NONE };
-    context = eglCreateContext(display, config, EGL_NO_CONTEXT, ctxAttr);
+    context = eglCreateContext(display, eglConfig, EGL_NO_CONTEXT, ctxAttr);
+    if (context == EGL_NO_CONTEXT) return false;
 
-    { std::unique_lock<std::mutex> lk(mtx);
-      cv.wait(lk, [this]{ return window != nullptr || quit; }); }
-    if (quit) return false;
+    // Wait for first window
+    {
+        std::unique_lock<std::mutex> lk(mtx);
+        cv.wait(lk, [this]{ return window != nullptr || quit; });
+        if (quit) return false;
+        surfaceChanged = false;
+    }
 
-    surface = eglCreateWindowSurface(display, config, window, nullptr);
-    eglMakeCurrent(display, surface, surface, context);
+    if (!recreateEGLSurface()) return false;
 
+    // Compile shaders (only once — they survive surface recreation)
     GLuint vs = loadShader(GL_VERTEX_SHADER, VERTEX_SHADER);
     GLuint fs = loadShader(GL_FRAGMENT_SHADER, FRAGMENT_SHADER);
+    if (!vs || !fs) return false;
     program = glCreateProgram();
     glAttachShader(program, vs); glAttachShader(program, fs);
     glLinkProgram(program); glUseProgram(program);
@@ -171,27 +199,82 @@ bool VpxDecoderContext::initEGL() {
 
     glEnable(GL_BLEND);
     glBlendFunc(GL_ONE, GL_ONE_MINUS_SRC_ALPHA);
+    eglReady = true;
     return true;
 }
 
-void VpxDecoderContext::destroyEGL() {
-    if (display != EGL_NO_DISPLAY) {
+bool VpxDecoderContext::recreateEGLSurface() {
+    // Destroy old surface if any
+    destroyEGLSurface();
+
+    std::lock_guard<std::mutex> lock(mtx);
+    if (!window) {
+        eglReady = false;
+        return false;
+    }
+
+    eglSurface = eglCreateWindowSurface(display, eglConfig, window, nullptr);
+    if (eglSurface == EGL_NO_SURFACE) {
+        LOGE("eglCreateWindowSurface failed: 0x%x", eglGetError());
+        eglReady = false;
+        return false;
+    }
+
+    if (!eglMakeCurrent(display, eglSurface, eglSurface, context)) {
+        LOGE("eglMakeCurrent failed: 0x%x", eglGetError());
+        eglDestroySurface(display, eglSurface);
+        eglSurface = EGL_NO_SURFACE;
+        eglReady = false;
+        return false;
+    }
+
+    eglReady = true;
+    return true;
+}
+
+void VpxDecoderContext::destroyEGLSurface() {
+    if (display != EGL_NO_DISPLAY && eglSurface != EGL_NO_SURFACE) {
         eglMakeCurrent(display, EGL_NO_SURFACE, EGL_NO_SURFACE, EGL_NO_CONTEXT);
+        eglDestroySurface(display, eglSurface);
+        eglSurface = EGL_NO_SURFACE;
+    }
+    eglReady = false;
+}
+
+void VpxDecoderContext::destroyEGL() {
+    eglReady = false;
+    destroyEGLSurface();
+    if (display != EGL_NO_DISPLAY) {
         if (context != EGL_NO_CONTEXT) eglDestroyContext(display, context);
-        if (surface != EGL_NO_SURFACE) eglDestroySurface(display, surface);
         eglTerminate(display);
     }
-    display = EGL_NO_DISPLAY; context = EGL_NO_CONTEXT; surface = EGL_NO_SURFACE;
+    display = EGL_NO_DISPLAY; context = EGL_NO_CONTEXT;
 }
 
 // ==================== Render ====================
 
 void VpxDecoderContext::render(vpx_image_t* img, vpx_image_t* alphaImg) {
+    // Check for surface changes first
+    {
+        std::lock_guard<std::mutex> lock(mtx);
+        if (surfaceChanged) {
+            surfaceChanged = false;
+            if (window) {
+                recreateEGLSurface();
+            } else {
+                destroyEGLSurface();
+            }
+        }
+    }
+
+    if (!canRender()) return;
+
     int sw = surfaceWidth.load(), sh = surfaceHeight.load();
     if (sw <= 0 || sh <= 0) {
-        eglQuerySurface(display, surface, EGL_WIDTH, &sw);
-        eglQuerySurface(display, surface, EGL_HEIGHT, &sh);
+        eglQuerySurface(display, eglSurface, EGL_WIDTH, &sw);
+        eglQuerySurface(display, eglSurface, EGL_HEIGHT, &sh);
     }
+    if (sw <= 0 || sh <= 0) return;
 
     glViewport(0, 0, sw, sh);
     glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
@@ -237,7 +320,14 @@ void VpxDecoderContext::render(vpx_image_t* img, vpx_image_t* alphaImg) {
     glEnableVertexAttribArray(texLoc);
 
     glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
-    eglSwapBuffers(display, surface);
+
+    if (!eglSwapBuffers(display, eglSurface)) {
+        EGLint err = eglGetError();
+        if (err == EGL_BAD_SURFACE || err == EGL_BAD_NATIVE_WINDOW) {
+            LOGE("eglSwapBuffers lost surface, will recreate");
+            destroyEGLSurface();
+        }
+    }
 }
 
 // ==================== WebM Callback ====================
@@ -251,18 +341,15 @@ class WebmHandler : public webm::Callback {
     bool is_video_block = false;
     vpx_image_t* last_video_img = nullptr;
 
-    // Cluster-level absolute timecode (nanoseconds -> we store the raw cluster timecode)
     uint64_t cluster_timecode = 0;
-    uint64_t timecode_scale = 1000000; // default 1ms
+    uint64_t timecode_scale = 1000000;
 
-    // Frame pacing
     long long prev_abs_ns = -1;
 
 public:
     WebmHandler(VpxDecoderContext* c, vpx_codec_ctx_t* vc, vpx_codec_ctx_t* ac)
         : ctx(c), video_codec(vc), alpha_codec(ac) {}
 
-    // Capture timecode scale from Info
     webm::Status OnInfo(const webm::ElementMetadata& metadata,
                         const webm::Info& info) override {
         if (info.timecode_scale.is_present())
@@ -270,30 +357,26 @@ public:
         return webm::Status(webm::Status::kOkCompleted);
     }
 
-    // Capture video track number
     webm::Status OnTrackEntry(const webm::ElementMetadata& metadata,
                               const webm::TrackEntry& track_entry) override {
-        if (track_entry.track_type.value() == webm::TrackType::kVideo) {
+        if (track_entry.track_type.value() == webm::TrackType::kVideo)
             video_track_num = track_entry.track_number.value();
-        }
         return webm::Status(webm::Status::kOkCompleted);
     }
 
-    // Capture cluster timecode
     webm::Status OnClusterBegin(const webm::ElementMetadata& metadata,
                                 const webm::Cluster& cluster,
                                 webm::Action* action) override {
-        if (cluster.timecode.is_present())
-            cluster_timecode = cluster.timecode.value();
+        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
+        if (cluster.timecode.is_present()) cluster_timecode = cluster.timecode.value();
         *action = webm::Action::kRead;
         return webm::Status(webm::Status::kOkCompleted);
     }
 
-    // ---- SimpleBlock (no alpha) ----
-
     webm::Status OnSimpleBlockBegin(const webm::ElementMetadata& metadata,
                                     const webm::SimpleBlock& sb,
                                     webm::Action* action) override {
+        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
         is_video_block = (sb.track_number == video_track_num);
         *action = is_video_block ? webm::Action::kRead : webm::Action::kSkip;
         return webm::Status(webm::Status::kOkCompleted);
@@ -301,7 +384,7 @@ public:
 
     webm::Status OnSimpleBlockEnd(const webm::ElementMetadata& metadata,
                                   const webm::SimpleBlock& sb) override {
-        if (is_video_block && last_video_img) {
+        if (is_video_block && last_video_img && !ctx->quit) {
             ctx->render(last_video_img, nullptr);
             doPacing(sb.timecode);
             last_video_img = nullptr;
@@ -309,11 +392,10 @@ public:
         return webm::Status(webm::Status::kOkCompleted);
     }
 
-    // ---- BlockGroup (may have alpha in BlockAdditions) ----
-
     webm::Status OnBlockBegin(const webm::ElementMetadata& metadata,
                               const webm::Block& block,
                               webm::Action* action) override {
+        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
         is_video_block = (block.track_number == video_track_num);
         *action = is_video_block ? webm::Action::kRead : webm::Action::kSkip;
         return webm::Status(webm::Status::kOkCompleted);
@@ -321,29 +403,24 @@ public:
 
     webm::Status OnBlockEnd(const webm::ElementMetadata& metadata,
                             const webm::Block& block) override {
-        // Don't render here — wait for OnBlockGroupEnd which has the full BlockAdditions
         return webm::Status(webm::Status::kOkCompleted);
     }
 
     webm::Status OnBlockGroupEnd(const webm::ElementMetadata& metadata,
                                  const webm::BlockGroup& bg) override {
-        if (!is_video_block || !last_video_img)
+        if (!is_video_block || !last_video_img || ctx->quit)
             return webm::Status(webm::Status::kOkCompleted);
 
         vpx_image_t* alpha_img = nullptr;
 
-        // Extract alpha from BlockAdditions if present
         if (bg.additions.is_present()) {
             const auto& additions = bg.additions.value();
             for (const auto& more_elem : additions.block_mores) {
                 const auto& bm = more_elem.value();
-                // BlockAddID == 1 is the alpha channel by convention
                 if (bm.id.value() == 1 && bm.data.is_present()) {
                     const auto& alpha_data = bm.data.value();
                     if (!alpha_data.empty()) {
-                        vpx_codec_err_t err = vpx_codec_decode(
-                            alpha_codec, alpha_data.data(), alpha_data.size(), nullptr, 0);
-                        if (err == VPX_CODEC_OK) {
+                        if (vpx_codec_decode(alpha_codec, alpha_data.data(), alpha_data.size(), nullptr, 0) == VPX_CODEC_OK) {
                             vpx_codec_iter_t it = nullptr;
                             alpha_img = vpx_codec_get_frame(alpha_codec, &it);
                         }
@@ -359,12 +436,10 @@ public:
         return webm::Status(webm::Status::kOkCompleted);
     }
 
-    // ---- Frame data (shared for SimpleBlock and Block) ----
-
     webm::Status OnFrame(const webm::FrameMetadata& metadata,
                          webm::Reader* reader,
                          std::uint64_t* bytes_remaining) override {
-        if (!is_video_block || !bytes_remaining || *bytes_remaining == 0) {
+        if (!is_video_block || !bytes_remaining || *bytes_remaining == 0 || ctx->quit) {
             return webm::Status(webm::Status::kOkCompleted);
         }
 
@@ -374,8 +449,7 @@ public:
         if (!st.ok()) return st;
         *bytes_remaining -= read;
 
-        vpx_codec_err_t err = vpx_codec_decode(video_codec, buf.data(), buf.size(), nullptr, 0);
-        if (err == VPX_CODEC_OK) {
+        if (vpx_codec_decode(video_codec, buf.data(), buf.size(), nullptr, 0) == VPX_CODEC_OK) {
             vpx_codec_iter_t it = nullptr;
             vpx_image_t* img;
             while ((img = vpx_codec_get_frame(video_codec, &it)) != nullptr) {
@@ -387,7 +461,6 @@ public:
 
 private:
     void doPacing(int16_t block_timecode) {
-        // Absolute time in nanoseconds
         long long abs_ns = (long long)(cluster_timecode + block_timecode) * (long long)timecode_scale;
         if (prev_abs_ns >= 0 && abs_ns > prev_abs_ns) {
             long long delta_ms = (abs_ns - prev_abs_ns) / 1000000LL;
@@ -402,7 +475,10 @@ private:
 // ==================== Decode Loop ====================
 
 void VpxDecoderContext::decodeLoop(bool loop) {
-    if (!initEGL()) return;
+    if (!initEGL()) {
+        playing = false;
+        return;
+    }
 
     do {
         FILE* f = fopen(filePath.c_str(), "rb");
@@ -430,6 +506,7 @@ void VpxDecoderContext::decodeLoop(bool loop) {
     } while (loop && !quit);
 
     destroyEGL();
+    playing = false;
 }
 
 // ==================== JNI ====================

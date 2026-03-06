@@ -11,40 +11,48 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
+import java.util.concurrent.atomic.AtomicBoolean
+import java.util.concurrent.atomic.AtomicLong
 
 class VpxDecoder(private val filePath: String) {
-    private var nativePtr: Long = 0
+    private val nativePtr = AtomicLong(0L)
+    private val released = AtomicBoolean(false)
 
     init {
         try {
-            nativePtr = nativeInit(filePath)
+            nativePtr.set(nativeInit(filePath))
         } catch (e: UnsatisfiedLinkError) {
             Log.e("VpxDecoder", "Native library not loaded", e)
         }
     }
 
     fun setSurface(surface: Surface?, width: Int = 0, height: Int = 0) {
-        if (nativePtr != 0L) {
-            nativeSetSurface(nativePtr, surface, width, height)
+        val ptr = nativePtr.get()
+        if (ptr != 0L && !released.get()) {
+            nativeSetSurface(ptr, surface, width, height)
         }
     }
 
     fun play(loop: Boolean) {
-        if (nativePtr != 0L) {
-            nativePlay(nativePtr, loop)
+        val ptr = nativePtr.get()
+        if (ptr != 0L && !released.get()) {
+            nativePlay(ptr, loop)
         }
     }
 
     fun stop() {
-        if (nativePtr != 0L) {
-            nativeStop(nativePtr)
+        val ptr = nativePtr.get()
+        if (ptr != 0L && !released.get()) {
+            nativeStop(ptr)
         }
     }
 
     fun release() {
-        if (nativePtr != 0L) {
-            nativeRelease(nativePtr)
-            nativePtr = 0
+        if (released.compareAndSet(false, true)) {
+            val ptr = nativePtr.getAndSet(0L)
+            if (ptr != 0L) {
+                nativeRelease(ptr)
+            }
         }
     }
 
@@ -80,6 +88,7 @@ fun VpxVideoPlayer(
 
     DisposableEffect(decoder) {
         onDispose {
+            // Stop first (blocks until decode thread exits), then release native resources
             decoder.stop()
             decoder.release()
         }
@@ -91,19 +100,25 @@ fun VpxVideoPlayer(
                 TextureView(context).apply {
                     isOpaque = false // Required for transparent background
                     surfaceTextureListener = object : TextureView.SurfaceTextureListener {
+                        private var currentSurface: Surface? = null
+
                         override fun onSurfaceTextureAvailable(st: SurfaceTexture, width: Int, height: Int) {
+                            currentSurface?.release()
                             val surface = Surface(st)
+                            currentSurface = surface
                             decoder.setSurface(surface, width, height)
                             decoder.play(loop)
                         }
 
                         override fun onSurfaceTextureSizeChanged(st: SurfaceTexture, width: Int, height: Int) {
-                            val surface = Surface(st)
-                            decoder.setSurface(surface, width, height)
+                            // Surface object doesn't change on resize, just update dimensions
+                            currentSurface?.let { decoder.setSurface(it, width, height) }
                         }
 
                         override fun onSurfaceTextureDestroyed(st: SurfaceTexture): Boolean {
                             decoder.setSurface(null, 0, 0)
+                            currentSurface?.release()
+                            currentSurface = null
                             return true
                         }
 
