@@ -61,6 +61,13 @@ android {
         }
     }
 
+    externalNativeBuild {
+        cmake {
+            path = file("src/main/cpp/CMakeLists.txt")
+            version = "3.22.1"
+        }
+    }
+
     signingConfigs {
         val sFile = getSecretProperty("RELEASE_STORE_FILE")
         val sPassword = getSecretProperty("RELEASE_STORE_PASSWORD")
@@ -111,6 +118,7 @@ android {
             include("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
         }
     }
+    ndkVersion = "29.0.14206865"
 }
 
 base {

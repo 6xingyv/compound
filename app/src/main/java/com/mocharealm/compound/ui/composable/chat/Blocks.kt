@@ -78,6 +78,7 @@ import com.maplibre.compose.rememberSaveableMapViewCamera
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.base.SpoilerImage
 import com.mocharealm.compound.ui.composable.base.VideoPlayer
+import com.mocharealm.compound.ui.composable.base.VpxVideoPlayer
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
 import com.mocharealm.compound.ui.util.SpoilerShader
@@ -210,11 +211,14 @@ fun StickerBlock(
 ) {
     if (!block.file.fileUrl.isNullOrEmpty()) {
         when (block.stickerFormat) {
-            MessageBlock.StickerBlock.StickerFormat.WEBM,
+            MessageBlock.StickerBlock.StickerFormat.WEBM -> VpxVideoPlayer(
+                filePath = block.file.fileUrl,
+                modifier = modifier
+            )
+
             MessageBlock.StickerBlock.StickerFormat.MP4 -> VideoPlayer(
                 filePath = block.file.fileUrl,
-                modifier = modifier,
-                useTextureView = useTextureView
+                modifier = modifier
             )
 
             MessageBlock.StickerBlock.StickerFormat.TGS -> LottieSticker(
@@ -309,8 +313,9 @@ fun RichTextContent(
 
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     var time by remember { mutableFloatStateOf(0f) }
-    
-    val hasSpoilers = remember(text) { text.getStringAnnotations("SPOILER", 0, text.length).isNotEmpty() }
+
+    val hasSpoilers =
+        remember(text) { text.getStringAnnotations("SPOILER", 0, text.length).isNotEmpty() }
 
     LaunchedEffect(hasSpoilers) {
         if (!hasSpoilers) return@LaunchedEffect
