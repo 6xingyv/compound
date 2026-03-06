@@ -51,7 +51,8 @@ class VpxDecoder(private val filePath: String) {
         if (released.compareAndSet(false, true)) {
             val ptr = nativePtr.getAndSet(0L)
             if (ptr != 0L) {
-                nativeRelease(ptr)
+                // Async: sets quit flag, detaches decode thread, deletes on background
+                nativeRelease(ptr, true)
             }
         }
     }
@@ -60,7 +61,7 @@ class VpxDecoder(private val filePath: String) {
     private external fun nativeSetSurface(ptr: Long, surface: Surface?, width: Int, height: Int)
     private external fun nativePlay(ptr: Long, loop: Boolean)
     private external fun nativeStop(ptr: Long)
-    private external fun nativeRelease(ptr: Long)
+    private external fun nativeRelease(ptr: Long, async: Boolean)
 
     companion object {
         init {
@@ -88,8 +89,7 @@ fun VpxVideoPlayer(
 
     DisposableEffect(decoder) {
         onDispose {
-            // Stop first (blocks until decode thread exits), then release native resources
-            decoder.stop()
+            // Non-blocking: signals quit and cleans up on a background thread
             decoder.release()
         }
     }

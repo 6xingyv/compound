@@ -22,6 +22,9 @@
 #define LOG_TAG "VpxPlayerNative"
 #define LOGE(...) __android_log_print(ANDROID_LOG_ERROR, LOG_TAG, __VA_ARGS__)
 
+// Custom status code to force the WebM parser to abort immediately
+static const webm::Status kAbortStatus(webm::Status::kNotEnoughMemory);
+
 
 static const char* VERTEX_SHADER = R"(
     attribute vec4 aPosition;
@@ -107,6 +110,13 @@ public:
         quit = true; playing = false;
         cv.notify_all();
         if (decodeThread.joinable()) decodeThread.join();
+    }
+
+    // Non-blocking stop: detaches thread and lets it self-terminate
+    void stopAsync() {
+        quit = true; playing = false;
+        cv.notify_all();
+        if (decodeThread.joinable()) decodeThread.detach();
     }
 
     // Called from decode thread only — safe because EGL is thread-local
@@ -350,8 +360,14 @@ public:
     WebmHandler(VpxDecoderContext* c, vpx_codec_ctx_t* vc, vpx_codec_ctx_t* ac)
         : ctx(c), video_codec(vc), alpha_codec(ac) {}
 
+    // Quick check — returns abort status if we should stop
+    inline webm::Status checkQuit() {
+        return ctx->quit ? kAbortStatus : webm::Status(webm::Status::kOkCompleted);
+    }
+
     webm::Status OnInfo(const webm::ElementMetadata& metadata,
                         const webm::Info& info) override {
+        if (ctx->quit) return kAbortStatus;
         if (info.timecode_scale.is_present())
             timecode_scale = info.timecode_scale.value();
         return webm::Status(webm::Status::kOkCompleted);
@@ -359,6 +375,7 @@ public:
 
     webm::Status OnTrackEntry(const webm::ElementMetadata& metadata,
                               const webm::TrackEntry& track_entry) override {
+        if (ctx->quit) return kAbortStatus;
         if (track_entry.track_type.value() == webm::TrackType::kVideo)
             video_track_num = track_entry.track_number.value();
         return webm::Status(webm::Status::kOkCompleted);
@@ -367,7 +384,7 @@ public:
     webm::Status OnClusterBegin(const webm::ElementMetadata& metadata,
                                 const webm::Cluster& cluster,
                                 webm::Action* action) override {
-        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
+        if (ctx->quit) { *action = webm::Action::kSkip; return kAbortStatus; }
         if (cluster.timecode.is_present()) cluster_timecode = cluster.timecode.value();
         *action = webm::Action::kRead;
         return webm::Status(webm::Status::kOkCompleted);
@@ -376,7 +393,7 @@ public:
     webm::Status OnSimpleBlockBegin(const webm::ElementMetadata& metadata,
                                     const webm::SimpleBlock& sb,
                                     webm::Action* action) override {
-        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
+        if (ctx->quit) { *action = webm::Action::kSkip; return kAbortStatus; }
         is_video_block = (sb.track_number == video_track_num);
         *action = is_video_block ? webm::Action::kRead : webm::Action::kSkip;
         return webm::Status(webm::Status::kOkCompleted);
@@ -384,7 +401,8 @@ public:
 
     webm::Status OnSimpleBlockEnd(const webm::ElementMetadata& metadata,
                                   const webm::SimpleBlock& sb) override {
-        if (is_video_block && last_video_img && !ctx->quit) {
+        if (ctx->quit) return kAbortStatus;
+        if (is_video_block && last_video_img) {
             ctx->render(last_video_img, nullptr);
             doPacing(sb.timecode);
             last_video_img = nullptr;
@@ -395,7 +413,7 @@ public:
     webm::Status OnBlockBegin(const webm::ElementMetadata& metadata,
                               const webm::Block& block,
                               webm::Action* action) override {
-        if (ctx->quit) { *action = webm::Action::kSkip; return webm::Status(webm::Status::kOkCompleted); }
+        if (ctx->quit) { *action = webm::Action::kSkip; return kAbortStatus; }
         is_video_block = (block.track_number == video_track_num);
         *action = is_video_block ? webm::Action::kRead : webm::Action::kSkip;
         return webm::Status(webm::Status::kOkCompleted);
@@ -408,7 +426,8 @@ public:
 
     webm::Status OnBlockGroupEnd(const webm::ElementMetadata& metadata,
                                  const webm::BlockGroup& bg) override {
-        if (!is_video_block || !last_video_img || ctx->quit)
+        if (ctx->quit) return kAbortStatus;
+        if (!is_video_block || !last_video_img)
             return webm::Status(webm::Status::kOkCompleted);
 
         vpx_image_t* alpha_img = nullptr;
@@ -439,7 +458,8 @@ public:
     webm::Status OnFrame(const webm::FrameMetadata& metadata,
                          webm::Reader* reader,
                          std::uint64_t* bytes_remaining) override {
-        if (!is_video_block || !bytes_remaining || *bytes_remaining == 0 || ctx->quit) {
+        if (ctx->quit) return kAbortStatus;
+        if (!is_video_block || !bytes_remaining || *bytes_remaining == 0) {
             return webm::Status(webm::Status::kOkCompleted);
         }
 
@@ -545,7 +565,19 @@ Java_com_mocharealm_compound_ui_composable_base_VpxDecoder_nativeStop(
 
 extern "C" JNIEXPORT void JNICALL
 Java_com_mocharealm_compound_ui_composable_base_VpxDecoder_nativeRelease(
-        JNIEnv *env, jobject thiz, jlong ptr) {
+        JNIEnv *env, jobject thiz, jlong ptr, jboolean async) {
     auto* ctx = reinterpret_cast<VpxDecoderContext*>(ptr);
-    if (ctx) delete ctx;
+    if (!ctx) return;
+    if (async) {
+        // Stop + delete on a background thread to avoid blocking the UI
+        ctx->stopAsync();
+        std::thread([ctx]{ 
+            // Wait a bit for the detached decode thread to notice quit flag
+            // then delete (destructor calls stop() which is a no-op if already stopped)
+            std::this_thread::sleep_for(std::chrono::milliseconds(50));
+            delete ctx;
+        }).detach();
+    } else {
+        delete ctx;
+    }
 }
