@@ -11,6 +11,8 @@ jobs:
   build:
     runs-on: ubuntu-latest
     environment: "Android CI/CD - Release"
+    outputs:
+      apk_files: ${{ steps.get-filenames.outputs.files }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -23,8 +25,7 @@ jobs:
           cache: 'gradle'
 
       - name: Decode Keystore
-        run: |
-          echo "${{ secrets.RELEASE_STORE_FILE }}" | base64 --decode > release.jks
+        run: echo "${{ secrets.RELEASE_STORE_FILE }}" | base64 --decode > release.jks
 
       - name: Create local.properties
         run: |
@@ -42,13 +43,19 @@ jobs:
           RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
-      - name: Upload APKs
+      - name: Get APK filenames
+        id: get-filenames
+        run: |
+          cd app/build/outputs/apk/release/
+          FILES_JSON=$(ls *.apk | jq -R -s -c 'split("\n")[:-1]')
+          echo "files=$FILES_JSON" >> $GITHUB_OUTPUT
+
+      - name: Stash APKs
         uses: actions/upload-artifact@v7
         with:
-          name: release-apk
+          name: all-apks-temp
           path: app/build/outputs/apk/release/*.apk
-          retention-days: 15
-          archive: false
+          retention-days: 1
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
@@ -58,3 +65,22 @@ jobs:
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  upload-to-action-artfict:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        apk_name: ${{ fromJson(needs.build.outputs.apk_files) }}
+    steps:
+      - name: Download all APKs
+        uses: actions/download-artifact@v4
+        with:
+          name: all-apks-temp
+          path: apks
+      - name: Upload ${{ matrix.apk_name }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: ${{ matrix.apk_name }}
+          path: apks/${{ matrix.apk_name }}
+          archive: false
