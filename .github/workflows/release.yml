@@ -43,10 +43,12 @@ jobs:
           RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: Upload APKs
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: release-apks
+          name: release-apk
           path: app/build/outputs/apk/release/*.apk
+          retention-days: 15
+          archive: false
 
       - name: Create Release
         uses: softprops/action-gh-release@v2
