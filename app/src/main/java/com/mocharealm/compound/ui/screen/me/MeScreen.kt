@@ -97,7 +97,10 @@ fun MeScreen(
                 ) {
                     SuperArrow(
                         title = tdString("LogOut"),
-                        onClick = viewModel::logoutUser,
+                        onClick = {
+                            viewModel.logoutUser()
+                            navigator.replaceAll(Screen.Intro)
+                        }
                     )
                 }
             }
@@ -121,11 +124,8 @@ fun MeScreen(
                         .padding(horizontal = 12.dp)
                         .padding(top = 12.dp),
                 ) {
-                    SuperArrow(
-                        title = tdLangPackId(java.util.Locale.getDefault()),
-                        onClick = {
-                            navigator.push(Screen.Intro)
-                        },
+                    BasicComponent(
+                        title = tdLangPackId(java.util.Locale.getDefault())
                     )
                 }
             }

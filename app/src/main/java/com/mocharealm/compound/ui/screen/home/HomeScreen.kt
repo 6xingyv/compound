@@ -20,9 +20,9 @@ import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
-import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
@@ -58,7 +58,7 @@ fun HomeScreen(
 
     val profileString = tdString("MainTabsProfile")
 
-    val navigationItems = remember(state.user) {
+    val navigationItems = remember(state.user, tdString("MainTabsProfile")) {
         listOf(
             TopLevelNav(
                 "Compound",

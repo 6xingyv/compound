@@ -411,11 +411,10 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             ) {
                 Row(
                     Modifier
-
                         .then(
-                            if (state.stickerPanelVisible || state.locationPanelVisible) Modifier
+                            if (state.stickerPanelVisible || state.locationPanelVisible || WindowInsets.isImeVisible) Modifier
                             else Modifier
-                                .then(if (WindowInsets.isImeVisible) Modifier else Modifier.navigationBarsPadding())
+                                .navigationBarsPadding()
                                 .padding(captionBar.takeOnly(PaddingValuesSide.Bottom))
                         )
                         .padding(bottom = 16.dp)
