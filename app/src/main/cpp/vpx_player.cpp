@@ -569,13 +569,13 @@ Java_com_mocharealm_compound_ui_composable_base_VpxDecoder_nativeRelease(
     auto* ctx = reinterpret_cast<VpxDecoderContext*>(ptr);
     if (!ctx) return;
     if (async) {
-        // Stop + delete on a background thread to avoid blocking the UI
-        ctx->stopAsync();
-        std::thread([ctx]{ 
-            // Wait a bit for the detached decode thread to notice quit flag
-            // then delete (destructor calls stop() which is a no-op if already stopped)
-            std::this_thread::sleep_for(std::chrono::milliseconds(50));
-            delete ctx;
+        // Signal quit immediately so decode thread starts exiting
+        ctx->quit = true;
+        ctx->cv.notify_all();
+        // Join + delete on a background thread to avoid blocking the UI
+        std::thread([ctx]{
+            ctx->stop();    // properly joins decode thread — guaranteed exit
+            delete ctx;     // safe: decode thread is done
         }).detach();
     } else {
         delete ctx;
