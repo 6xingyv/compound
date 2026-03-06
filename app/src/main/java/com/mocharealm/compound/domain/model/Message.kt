@@ -53,6 +53,7 @@ sealed interface MessageBlock {
                 override val timestamp: Long,
                 val stickerFormat: StickerFormat? = null,
                 val file: File,
+                val thumbnail: File? = null,
                 val caption: Text
         ) : MessageBlock {
                 enum class StickerFormat {

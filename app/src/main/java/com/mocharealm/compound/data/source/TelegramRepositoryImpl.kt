@@ -10,6 +10,7 @@ import com.mocharealm.compound.domain.model.AuthState
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.DownloadProgress
+import com.mocharealm.compound.domain.model.File
 import com.mocharealm.compound.domain.model.InternalLink
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
@@ -837,10 +838,16 @@ class TelegramRepositoryImpl(
                     id = sticker.id,
                     timestamp = 0L,
                     stickerFormat = format,
-                    file = com.mocharealm.compound.domain.model.File(
+                    file = File(
                         fileId = sticker.sticker.id,
                         fileUrl = sticker.sticker.local?.takeIf { it.isDownloadingCompleted }?.path,
                     ),
+                    thumbnail = sticker.thumbnail?.let {
+                        File(
+                            fileId = it.file.id,
+                            fileUrl = it.file.local?.takeIf { l -> l.isDownloadingCompleted }?.path
+                        )
+                    },
                     caption = Text(sticker.emoji),
                 )
             }
