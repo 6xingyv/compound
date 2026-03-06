@@ -141,4 +141,33 @@ class TdStringProvider(
             // Silently handle fetch errors
         }
     }
+
+    /**
+     * Silently prefetch keys into the global cache without creating page-scoped
+     * reactive states or incrementing reference counts.
+     *
+     * This is used for pre-warming adjacent pages: the strings are fetched and
+     * cached so that when the user actually navigates to that page, [preload]
+     * finds them in [globalCache] and avoids a network/DB round-trip.
+     *
+     * Does NOT trigger recomposition on any currently displayed page.
+     */
+    suspend fun prefetch(keys: List<String>) {
+        if (keys.isEmpty()) return
+        val keysToFetch = mutex.withLock {
+            keys.filter { !globalCache.containsKey(it) }
+        }
+        if (keysToFetch.isNotEmpty()) {
+            try {
+                val fetched = fetchStrings(keysToFetch)
+                mutex.withLock {
+                    for ((key, value) in fetched) {
+                        globalCache.putIfAbsent(key, value)
+                    }
+                }
+            } catch (_: Exception) {
+                // Silently handle fetch errors — prefetch is best-effort
+            }
+        }
+    }
 }

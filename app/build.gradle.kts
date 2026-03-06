@@ -127,6 +127,10 @@ android {
     ndkVersion = "29.0.14206865"
 }
 
+ksp {
+    arg("tci18n.moduleName", "AppMain")
+}
+
 base {
     archivesName.set(
         "${rootProject.name.usLocaleDecapitalize()}-${libs.versions.appVersionName.get().replace(" ", "-")}"

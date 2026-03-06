@@ -25,7 +25,6 @@ import com.mocharealm.gaze.nav.rememberListDetailSceneStrategy
 import com.mocharealm.tci18n.core.LocalTdStringProvider
 import com.mocharealm.tci18n.core.TdStringProvider
 import com.mocharealm.tci18n.core.tdI18nNavEntryDecorator
-import com.mocharealm.tci18n.generated.TdManifest
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
@@ -64,8 +63,7 @@ class MainActivity : ComponentActivity() {
                 val tdStringProvider: TdStringProvider = koinInject()
                 val i18nDecorator = remember(tdStringProvider) {
                     tdI18nNavEntryDecorator<NavKey>(
-                        provider = tdStringProvider,
-                        getKeys = { pageId -> TdManifest.getKeys(pageId) }
+                        provider = tdStringProvider
                     )
                 }
 
