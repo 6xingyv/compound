@@ -309,8 +309,11 @@ fun RichTextContent(
 
     val layoutResult = remember { mutableStateOf<TextLayoutResult?>(null) }
     var time by remember { mutableFloatStateOf(0f) }
+    
+    val hasSpoilers = remember(text) { text.getStringAnnotations("SPOILER", 0, text.length).isNotEmpty() }
 
-    LaunchedEffect(Unit) {
+    LaunchedEffect(hasSpoilers) {
+        if (!hasSpoilers) return@LaunchedEffect
         var lastFrameTime = withFrameNanos { it }
         var accumulatedNanos = 0L
         val thresholdNanos = 1_000_000_000_000L
