@@ -231,6 +231,14 @@ fun StickerBlock(
                 contentScale = ContentScale.Fit
             )
         }
+    } else if (!block.thumbnail?.fileUrl.isNullOrEmpty()) {
+        AsyncImage(
+            model = ImageRequest.Builder(LocalContext.current)
+                .data(File(block.thumbnail.fileUrl)).build(),
+            contentDescription = "Sticker",
+            modifier = modifier,
+            contentScale = ContentScale.Fit
+        )
     }
 }
 
