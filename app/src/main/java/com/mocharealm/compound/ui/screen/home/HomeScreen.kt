@@ -32,6 +32,7 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.BottomTab
 import com.mocharealm.gaze.ui.composable.BottomTabs
 import com.mocharealm.gaze.ui.composable.Button
+import com.mocharealm.tci18n.core.tdString
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
@@ -55,6 +56,8 @@ fun HomeScreen(
         drawContent()
     }
 
+    val profileString = tdString("MainTabsProfile")
+
     val navigationItems = remember(state.user) {
         listOf(
             TopLevelNav(
@@ -64,7 +67,7 @@ fun HomeScreen(
                 },
             ),
             TopLevelNav(
-                "Me",
+                profileString,
                 {
                     Avatar(
                         state.user?.firstName?.take(2) ?: "Me",
