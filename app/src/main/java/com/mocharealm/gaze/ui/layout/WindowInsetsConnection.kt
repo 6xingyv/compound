@@ -394,12 +394,17 @@ private class WindowInsetsNestedScrollConnection(
         val currentInsets = controller.currentInsets
         controller.setInsetsAndAlpha(currentInsets, 1f, 0f)
 
-        continuation?.resume(controller) { _, _, _ -> }
+        continuation?.let { cont ->
+            if (cont.isActive) cont.resume(controller) { _, _, _ -> }
+        }
         continuation = null
     }
 
     fun dispose() {
-        continuation?.resume(null) { _, _, _ -> }
+        continuation?.let { cont ->
+            if (cont.isActive) cont.resume(null) { _, _, _ -> }
+        }
+        continuation = null
         animationJob?.cancel()
         val animationController = animationController
         if (animationController != null) {
@@ -427,7 +432,9 @@ private class WindowInsetsNestedScrollConnection(
 
         // The animation controller may not have been given to us, so we have to cancel animations
         // waiting for it.
-        continuation?.resume(null) { _, _, _ -> }
+        continuation?.let { cont ->
+            if (cont.isActive) cont.resume(null) { _, _, _ -> }
+        }
         continuation = null
 
         // Cancel any animation that's running.
