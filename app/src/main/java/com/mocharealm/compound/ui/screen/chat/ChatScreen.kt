@@ -27,7 +27,6 @@ import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.LocalIndication
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
@@ -40,6 +39,7 @@ import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.asPaddingValues
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.captionBar
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -86,7 +86,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
 import androidx.compose.ui.graphics.graphicsLayer
-import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalFocusManager
@@ -111,10 +111,13 @@ import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.ui.EmptyIndication
 import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.composable.chat.DocumentBlock
 import com.mocharealm.compound.ui.composable.chat.MessageBubble
+import com.mocharealm.compound.ui.composable.chat.PhotoBlock
 import com.mocharealm.compound.ui.composable.chat.StickerBlock
 import com.mocharealm.compound.ui.composable.chat.SystemMessage
 import com.mocharealm.compound.ui.composable.chat.TimestampLabel
+import com.mocharealm.compound.ui.composable.chat.VideoBlock
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.PaddingValuesSide
@@ -210,14 +213,14 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         ActivityResultContracts.PickMultipleVisualMedia()
     ) { uris: List<Uri> ->
         val files = uris.mapNotNull { uri -> uriToShareFileInfo(context, uri) }
-        viewModel.sendSelectedFiles(files)
+        viewModel.onFilesSelected(files)
     }
 
     val documentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.OpenMultipleDocuments()
     ) { uris: List<Uri> ->
         val files = uris.mapNotNull { uri -> uriToShareFileInfo(context, uri) }
-        viewModel.sendSelectedFiles(files)
+        viewModel.onFilesSelected(files)
     }
 
     LaunchedEffect(shouldLoadMore) {
@@ -587,51 +590,185 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                     androidx.compose.animation.AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
-                                        exit = fadeOut() + slideOutHorizontally { -it }) {
-                                        TextField(
-                                            modifier = Modifier
-                                                .fillMaxWidth()
-                                                .focusRequester(focusRequester)
-                                                .onFocusChanged {
-                                                    if (it.isFocused) {
-                                                        if (state.stickerPanelVisible) viewModel.hideStickerPanel()
-                                                        if (state.locationPanelVisible) viewModel.hideLocationPanel()
+                                        exit = fadeOut() + slideOutHorizontally { -it }
+                                    ) {
+                                        Column(
+                                            Modifier
+                                                .animateContentSize()
+                                        ) {
+                                            AnimatedVisibility(
+                                                visible = state.selectedFiles.isNotEmpty(),
+                                                enter = expandVertically() + fadeIn(),
+                                                exit = shrinkVertically() + fadeOut()
+                                            ) {
+                                                LazyRow(
+                                                    modifier = Modifier
+                                                        .fillMaxWidth()
+                                                        .padding(bottom = 8.dp),
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                ) {
+                                                    items(
+                                                        state.selectedFiles,
+                                                        key = { it.filePath }) { file ->
+                                                        Box(
+                                                            modifier = Modifier
+                                                                .height(80.dp)
+                                                                .clip(RoundedCornerShape(8.dp))
+                                                        ) {
+                                                            val messageBlock = remember(file) {
+                                                                if (file.mimeType.startsWith("image/")) {
+                                                                    MessageBlock.MediaBlock(
+                                                                        id = 0, timestamp = 0,
+                                                                        mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
+                                                                        file = com.mocharealm.compound.domain.model.File(
+                                                                            fileUrl = file.filePath
+                                                                        )
+                                                                    )
+                                                                } else if (file.mimeType.startsWith(
+                                                                        "video/"
+                                                                    )
+                                                                ) {
+                                                                    MessageBlock.MediaBlock(
+                                                                        id = 0, timestamp = 0,
+                                                                        mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
+                                                                        file = com.mocharealm.compound.domain.model.File(
+                                                                            fileUrl = file.filePath
+                                                                        ),
+                                                                        thumbnail = com.mocharealm.compound.domain.model.File(
+                                                                            fileUrl = file.thumbnailPath
+                                                                        )
+                                                                    )
+                                                                } else {
+                                                                    val fileName =
+                                                                        file.filePath.substringAfterLast(
+                                                                            "/"
+                                                                        )
+                                                                    MessageBlock.DocumentBlock(
+                                                                        id = 0, timestamp = 0,
+                                                                        document = com.mocharealm.compound.domain.model.Document(
+                                                                            file = com.mocharealm.compound.domain.model.File(
+                                                                                fileUrl = file.filePath
+                                                                            ),
+                                                                            fileName = fileName,
+                                                                            mimeType = file.mimeType
+                                                                        )
+                                                                    )
+                                                                }
+                                                            }
+
+                                                            when (messageBlock) {
+                                                                is MessageBlock.MediaBlock -> {
+                                                                    if (messageBlock.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO) {
+                                                                        PhotoBlock(
+                                                                            block = messageBlock,
+                                                                            modifier = Modifier
+                                                                                .fillMaxHeight()
+                                                                                .aspectRatio(1f),
+                                                                            imageModifier = Modifier.fillMaxSize(),
+                                                                            contentScale = ContentScale.Crop
+                                                                        )
+                                                                    } else {
+                                                                        VideoBlock(
+                                                                            block = messageBlock,
+                                                                            modifier = Modifier
+                                                                                .fillMaxHeight()
+                                                                                .aspectRatio(1f),
+                                                                            videoModifier = Modifier.fillMaxSize()
+                                                                        )
+                                                                    }
+                                                                }
+
+                                                                is MessageBlock.DocumentBlock -> {
+                                                                    Box(
+                                                                        Modifier
+                                                                            .fillMaxHeight()
+                                                                            .width(200.dp)
+                                                                            .background(
+                                                                                surfaceContainerColor
+                                                                            )
+                                                                            .padding(horizontal = 12.dp),
+                                                                        contentAlignment = Alignment.Center
+                                                                    ) {
+                                                                        DocumentBlock(messageBlock)
+                                                                    }
+                                                                }
+
+                                                                else -> {}
+                                                            }
+                                                            Box(
+                                                                modifier = Modifier
+                                                                    .align(Alignment.TopEnd)
+                                                                    .padding(4.dp)
+                                                                    .size(20.dp)
+                                                                    .clip(CircleShape)
+                                                                    .background(
+                                                                        Color.Black.copy(
+                                                                            alpha = 0.5f
+                                                                        )
+                                                                    )
+                                                                    .clickable {
+                                                                        viewModel.removeSelectedFile(
+                                                                            file
+                                                                        )
+                                                                    },
+                                                                contentAlignment = Alignment.Center
+                                                            ) {
+                                                                Icon(
+                                                                    SFIcons.Xmark,
+                                                                    null,
+                                                                    Modifier.size(12.dp),
+                                                                    tint = Color.White
+                                                                )
+                                                            }
+                                                        }
                                                     }
                                                 }
-                                                .animateContentSize(),
-                                            state = viewModel.inputState,
-                                            outputTransformation = MarkdownTransformation,
-                                            lineLimits = TextFieldLineLimits.MultiLine(),
-                                            padding = 0.dp,
-                                            clipRadius = 0.dp,
-                                            activeBackgroundColor = Color.Transparent,
-                                            inactiveBackgroundColor = Color.Transparent,
-                                            activeBorderSize = 0.dp,
-                                            inactiveBorderSize = 0.dp,
-                                            textStyle = MiuixTheme.textStyles.body1,
-                                            decorator = { innerTextField ->
-                                                if (viewModel.inputState.text.isEmpty()) {
-                                                    Box {
-                                                        innerTextField()
-                                                        Text(
-                                                            tdString(
-                                                                "TypeMessage", "default"
-                                                            ),
-                                                            modifier = Modifier.graphicsLayer {
-                                                                blendMode =
-                                                                    if (isDark) BlendMode.Plus else BlendMode.Multiply
-                                                                alpha = 0.6f
-                                                            },
-                                                            style = MiuixTheme.textStyles.body1,
-                                                        )
-                                                    }
-                                                } else innerTextField()
-                                            })
+                                            }
+                                            TextField(
+                                                modifier = Modifier
+                                                    .fillMaxWidth()
+                                                    .focusRequester(focusRequester)
+                                                    .onFocusChanged {
+                                                        if (it.isFocused) {
+                                                            if (state.stickerPanelVisible) viewModel.hideStickerPanel()
+                                                            if (state.locationPanelVisible) viewModel.hideLocationPanel()
+                                                        }
+                                                    },
+                                                state = viewModel.inputState,
+                                                outputTransformation = MarkdownTransformation,
+                                                lineLimits = TextFieldLineLimits.MultiLine(),
+                                                padding = 0.dp,
+                                                clipRadius = 0.dp,
+                                                activeBackgroundColor = Color.Transparent,
+                                                inactiveBackgroundColor = Color.Transparent,
+                                                activeBorderSize = 0.dp,
+                                                inactiveBorderSize = 0.dp,
+                                                textStyle = MiuixTheme.textStyles.body1,
+                                                decorator = { innerTextField ->
+                                                    if (viewModel.inputState.text.isEmpty()) {
+                                                        Box {
+                                                            innerTextField()
+                                                            Text(
+                                                                tdString(
+                                                                    "TypeMessage", "default"
+                                                                ),
+                                                                modifier = Modifier.graphicsLayer {
+                                                                    blendMode =
+                                                                        if (isDark) BlendMode.Plus else BlendMode.Multiply
+                                                                    alpha = 0.6f
+                                                                },
+                                                                style = MiuixTheme.textStyles.body1,
+                                                            )
+                                                        }
+                                                    } else innerTextField()
+                                                }
+                                            )
+                                        }
                                     }
                                 }
 
                                 AnimatedVisibility(
-                                    visible = (viewModel.inputState.text.lines().size <= 1 || inAudioMode) && !state.loading,
+                                    visible = (inAudioMode || (viewModel.inputState.text.lines().size <= 1 && state.selectedFiles.isEmpty())) && !state.loading,
                                     enter = fadeIn(),
                                     exit = fadeOut()
                                 ) {
@@ -667,7 +804,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     }
                     Spacer(Modifier.width(16.dp))
                     AnimatedVisibility(
-                        !state.loading && viewModel.inputState.text.isNotBlank(),
+                        !state.loading && (viewModel.inputState.text.isNotBlank() || state.selectedFiles.isNotEmpty()),
                         Modifier,
                         enter = fadeIn() + slideInHorizontally {
                             if (layoutDirection == LayoutDirection.Ltr) it
@@ -797,19 +934,21 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                 Box(
                                                     modifier = Modifier
                                                         .aspectRatio(1f)
-                                                        .clip(RoundedCornerShape(8.dp))
+                                                        .clip(ContinuousRoundedRectangle(8.dp))
                                                         .clickable {
                                                             viewModel.onStickerClick(
                                                                 sticker
                                                             )
                                                         }
                                                         .padding(4.dp),
-                                                    contentAlignment = Alignment.Center) {
-                                                    if (!sticker.file.fileUrl.isNullOrEmpty()) {
+                                                    contentAlignment = Alignment.Center
+                                                ) {
+                                                    val thumbPath = sticker.thumbnail?.fileUrl
+                                                    val filePath = sticker.file.fileUrl
+                                                    if (!thumbPath.isNullOrEmpty() || !filePath.isNullOrEmpty()) {
                                                         StickerBlock(
                                                             sticker,
-                                                            Modifier.fillMaxSize(),
-                                                            useTextureView = false
+                                                            Modifier.fillMaxSize()
                                                         )
                                                     } else {
                                                         Text(

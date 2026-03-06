@@ -56,14 +56,13 @@ data class ChatUiState(
     val error: String? = null,
     val scrollToMessageId: Long? = null,
     val videoDownloadProgress: Map<Long, Int> = emptyMap(),
-    // ── Sticker panel ────────────────────────────────────────────────
     val stickerSets: List<StickerSetInfo> = emptyList(),
     val currentSetStickers: List<MessageBlock.StickerBlock> = emptyList(),
     val selectedStickerSetId: Long? = null,
     val stickerPanelVisible: Boolean = false,
     val stickersLoading: Boolean = false,
-    // ── Location panel ───────────────────────────────────────────────
     val locationPanelVisible: Boolean = false,
+    val selectedFiles: List<ShareFileInfo> = emptyList(),
 )
 
 /** Helper: primary message ID (first block's id) */
@@ -184,10 +183,21 @@ class ChatViewModel(
 
     fun sendMessage() {
         val text = inputState.text.toString()
-        if (text.isBlank()) return
+        val files = _uiState.value.selectedFiles
 
-        viewModelScope.launch {
-            sendMessage(chatId, text).onSuccess { inputState.clearText() }.onFailure { e -> }
+        if (text.isBlank() && files.isEmpty()) return
+
+        if (files.isNotEmpty()) {
+            viewModelScope.launch {
+                sendFiles(chatId, files, text).onSuccess {
+                    inputState.clearText()
+                    _uiState.update { it.copy(selectedFiles = emptyList()) }
+                }.onFailure { e -> }
+            }
+        } else {
+            viewModelScope.launch {
+                sendMessage(chatId, text).onSuccess { inputState.clearText() }.onFailure { e -> }
+            }
         }
     }
 
@@ -559,16 +569,20 @@ class ChatViewModel(
             getStickerSetStickers(setId).onSuccess { stickers ->
                 // Download thumbnails for stickers that don't have local files
                 for (sticker in stickers) {
-                    val fId = sticker.file.fileId
-                    if (fId != null && sticker.file.fileUrl == null) {
+                    val thumbFileId = sticker.thumbnail?.fileId ?: sticker.file.fileId
+                    if (thumbFileId != null && sticker.thumbnail?.fileUrl == null && sticker.file.fileUrl == null) {
                         launch {
-                            downloadFile(fId).onSuccess { path ->
+                            downloadFile(thumbFileId).onSuccess { path ->
                                 _uiState.update { state ->
                                     state.copy(
                                         currentSetStickers = state.currentSetStickers.map { s ->
-                                            if (s.id == sticker.id) s.copy(
-                                                file = s.file.copy(fileUrl = path)
-                                            ) else s
+                                            if (s.id == sticker.id) {
+                                                if (thumbFileId == s.thumbnail?.fileId) {
+                                                    s.copy(thumbnail = s.thumbnail.copy(fileUrl = path))
+                                                } else {
+                                                    s.copy(file = s.file.copy(fileUrl = path))
+                                                }
+                                            } else s
                                         }
                                     )
                                 }
@@ -611,10 +625,12 @@ class ChatViewModel(
 
     // ── Gallery / Document ───────────────────────────────────────────────
 
-    fun sendSelectedFiles(files: List<ShareFileInfo>) {
+    fun onFilesSelected(files: List<ShareFileInfo>) {
         if (files.isEmpty()) return
-        viewModelScope.launch {
-            sendFiles(chatId, files)
-        }
+        _uiState.update { it.copy(selectedFiles = it.selectedFiles + files) }
+    }
+
+    fun removeSelectedFile(file: ShareFileInfo) {
+        _uiState.update { it.copy(selectedFiles = it.selectedFiles - file) }
     }
 }
