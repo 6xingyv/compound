@@ -14,7 +14,9 @@ val localProperties = Properties().apply {
 }
 
 fun getSecretProperty(key: String): String? {
-    return localProperties.getProperty(key) ?: project.findProperty(key) as? String
+    return System.getenv(key)
+        ?: localProperties.getProperty(key)
+        ?: project.findProperty(key) as? String
 }
 
 fun getGitCommitHash(): String {
@@ -76,11 +78,15 @@ android {
 
         if (sFile != null && sPassword != null && kAlias != null && kPassword != null) {
             create("release") {
-                storeFile = file(sFile)
-                storePassword = sPassword
-                keyAlias = kAlias
-                keyPassword = kPassword
-
+                val keystoreFile = rootProject.file(sFile)
+                if (keystoreFile.exists()) {
+                    storeFile = keystoreFile
+                    storePassword = sPassword
+                    keyAlias = kAlias
+                    keyPassword = kPassword
+                } else {
+                    logger.warn("Keystore file not found at: ${keystoreFile.absolutePath}")
+                }
                 enableV1Signing = true
                 enableV2Signing = true
                 enableV3Signing = true

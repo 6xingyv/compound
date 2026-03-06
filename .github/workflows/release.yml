@@ -1,6 +1,7 @@
 name: Android CI/CD - Release
 
 on:
+  workflow_dispatch:
   push:
     tags:
       - 'v*'
@@ -23,22 +24,23 @@ jobs:
 
       - name: Decode Keystore
         run: |
-          echo "${{ secrets.RELEASE_STORE_FILE }}" | base64 --decode > app/release.jks
+          echo "${{ secrets.RELEASE_STORE_FILE }}" | base64 --decode > release.jks
 
       - name: Create local.properties
         run: |
           echo "API_ID=${{ secrets.API_ID }}" >> local.properties
           echo "API_HASH=${{ secrets.API_HASH }}" >> local.properties
           echo "RELEASE_STORE_FILE=release.jks" >> local.properties
-          echo "RELEASE_STORE_PASSWORD=${{ secrets.RELEASE_STORE_PASSWORD }}" >> local.properties
-          echo "RELEASE_KEY_ALIAS=${{ secrets.RELEASE_KEY_ALIAS }}" >> local.properties
-          echo "RELEASE_KEY_PASSWORD=${{ secrets.RELEASE_KEY_PASSWORD }}" >> local.properties
 
       - name: Grant execute permission for gradlew
         run: chmod +x gradlew
 
       - name: Build with Gradle
         run: ./gradlew assembleRelease --stacktrace --no-daemon
+        env:
+          RELEASE_STORE_PASSWORD: ${{ secrets.RELEASE_STORE_PASSWORD }}
+          RELEASE_KEY_ALIAS: ${{ secrets.RELEASE_KEY_ALIAS }}
+          RELEASE_KEY_PASSWORD: ${{ secrets.RELEASE_KEY_PASSWORD }}
 
       - name: Upload APKs
         uses: actions/upload-artifact@v4
