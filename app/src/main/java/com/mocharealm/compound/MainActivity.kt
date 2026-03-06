@@ -81,7 +81,7 @@ class MainActivity : ComponentActivity() {
                             i18nDecorator,
                         ),
                         entryProvider = koinEntryProvider(),
-                        sceneStrategy = rememberListDetailSceneStrategy(),
+                        sceneStrategies = listOf(rememberListDetailSceneStrategy())
                     )
                 }
             }

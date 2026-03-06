@@ -9,10 +9,10 @@ espressoCore = "3.7.0"
 lifecycleRuntimeKtx = "2.10.0"
 activityCompose = "1.12.4"
 kotlin = "2.3.10"
-composeBom = "2026.02.00"
+composeBom = "2026.02.01"
 koin = "4.2.0-RC1"
 miuix = "0.8.3"
-nav3 = "1.1.0-alpha04"
+nav3 = "1.1.0-alpha05"
 media3 = "1.9.2"
 ksp = "2.3.6"
 kotlinpoet = "2.2.0"
@@ -36,12 +36,12 @@ androidx-compose-ui-test-junit4 = { group = "androidx.compose.ui", name = "ui-te
 androidx-constraintlayout-compose = { module = "androidx.constraintlayout:constraintlayout-compose", version = "1.1.1" }
 androidx-nav3-runtime = { group = "androidx.navigation3", name = "navigation3-runtime", version.ref = "nav3" }
 androidx-nav3-ui = { group = "androidx.navigation3", name = "navigation3-ui", version.ref = "nav3" }
-androidx-splashscreen = { module = "androidx.core:core-splashscreen", version = "1.0.1" }
+androidx-splashscreen = { module = "androidx.core:core-splashscreen", version = "1.2.0" }
 androidx-window-core = { module = "androidx.window:window-core", version = "1.5.1" }
 koin-androidx-compose = { group = "io.insert-koin", name = "koin-androidx-compose", version.ref = "koin" }
 koin-compose-navigation3 = { group = "io.insert-koin", name = "koin-compose-navigation3", version.ref = "koin" }
 miuix-android = { module = "top.yukonga.miuix.kmp:miuix-android", version.ref = "miuix" }
-coil-compose = { module = "io.coil-kt.coil3:coil-compose", version = "3.3.0" }
+coil-compose = { module = "io.coil-kt.coil3:coil-compose", version = "3.4.0" }
 coil-gif = { module = "io.coil-kt.coil3:coil-gif", version = "3.3.0" }
 coil-network-okhttp = { module = "io.coil-kt.coil3:coil-network-okhttp", version = "3.3.0" }
 media3-exoplayer = { module = "androidx.media3:media3-exoplayer", version.ref = "media3" }

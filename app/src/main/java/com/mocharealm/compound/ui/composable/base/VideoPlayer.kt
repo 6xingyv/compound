@@ -39,10 +39,8 @@ fun VideoPlayer(
         ExoPlayer.Builder(context).build().apply {
             setMediaItem(MediaItem.fromUri(Uri.fromFile(File(filePath))))
             repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
+            this.playWhenReady = playWhenReady
             volume = if (mute) 0f else 1f
-            if (playWhenReady) {
-                this.playWhenReady = true
-            }
             prepare()
         }
     }
