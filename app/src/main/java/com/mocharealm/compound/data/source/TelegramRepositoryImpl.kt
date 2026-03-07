@@ -207,14 +207,11 @@ class TelegramRepositoryImpl(
     }
 
     override suspend fun awaitAuthState(): AuthState {
-        // 先查一次当前状态
         val currentState = getAuthenticationState()
-        // 如果是一个有效状态（不是 Error，说明 TDLib 参数等已就绪），就直接返回
         if (currentState !is AuthState.Error) {
             return currentState
         }
 
-        // 如果是中间状态/Error，则等待 TDLib 的正式通知
         return updates
             .filterIsInstance<TdApi.UpdateAuthorizationState>()
             .map { parseAuthState(it.authorizationState) }
@@ -228,12 +225,10 @@ class TelegramRepositoryImpl(
 
     override suspend fun openChat(chatId: Long): Result<Unit> = runCatching {
         send(TdApi.OpenChat(chatId))
-        Unit
     }
 
     override suspend fun closeChat(chatId: Long): Result<Unit> = runCatching {
         send(TdApi.CloseChat(chatId))
-        Unit
     }
 
     private suspend fun TdApi.InternalLinkType.toDomain(): InternalLink =
@@ -284,15 +279,11 @@ class TelegramRepositoryImpl(
 
     override suspend fun getChats(limit: Int, offsetChatId: Long): Result<List<Chat>> =
         runCatching {
-            // 持续调用 LoadChats 把足够数量的聊天加载进 TDLib 内部列表
-            // offsetChatId != 0 时说明已经加载过前面的，需要多加载一些
             val totalNeeded =
                 if (offsetChatId == 0L) limit
                 else {
-                    // 需要获取 offset 之后的 limit 条，先把前面的 + 后面的都加载进来
-                    limit + limit // 多加载一些以确保有足够的后续数据
+                    limit + limit
                 }
-            // 循环调用 LoadChats 直到加载够或者没有更多
             var loaded = 0
             while (loaded < totalNeeded) {
                 val batch = runCatching {
@@ -736,7 +727,6 @@ class TelegramRepositoryImpl(
                     )
                 }
 
-                // Other system types that we don't have typed variants for yet
                 is TdApi.MessageChatDeleteMember,
                 is TdApi.MessageChatChangePhoto,
                 is TdApi.MessageChatUpgradeTo -> return null // fall through to generic parsing

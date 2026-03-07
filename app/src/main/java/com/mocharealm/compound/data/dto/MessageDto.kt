@@ -238,6 +238,7 @@ object MessageDto {
             is TdApi.MessageChatChangeTitle,
             is TdApi.MessageChatChangePhoto,
             is TdApi.MessagePinMessage,
+            is TdApi.MessageChatJoinByRequest,
             is TdApi.MessageChatUpgradeTo ->
                 listOf(
                     MessageBlock.TextBlock(
