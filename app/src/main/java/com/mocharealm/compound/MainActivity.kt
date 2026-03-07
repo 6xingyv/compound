@@ -42,7 +42,7 @@ class MainActivity : ComponentActivity() {
         enableEdgeToEdge()
 
         // Xiaomi nav bar workaround
-        if (Build.MANUFACTURER.toLowerCase(Locale.current) == "xiaomi") {
+        if (Build.MANUFACTURER.lowercase(java.util.Locale.getDefault()) == "xiaomi") {
             window.isNavigationBarContrastEnforced = false
         }
 

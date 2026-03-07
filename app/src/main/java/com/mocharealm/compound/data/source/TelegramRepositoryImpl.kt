@@ -31,6 +31,7 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
+import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
@@ -80,34 +81,58 @@ class TelegramRepositoryImpl(
 
     init {
         CoroutineScope(Dispatchers.IO).launch {
-            val langPackId = tdLangPackId(Locale.getDefault())
-            send(TdApi.SetOption("localization_target", TdApi.OptionValueString("android")))
-            send(TdApi.SetOption("language_pack_id", TdApi.OptionValueString(langPackId)))
-            send(
-                TdApi.SetOption(
-                    "language_pack_database_path",
-                    TdApi.OptionValueString(java.io.File(context.filesDir, "i18n/$langPackId").absolutePath)
-                )
-            )
-            // Initialize TDlib
-            send(
-                TdApi.SetTdlibParameters(
-                    false,
-                    context.filesDir.absolutePath,
-                    context.filesDir.absolutePath,
-                    ByteArray(0),
-                    true,
-                    true,
-                    true,
-                    true,
-                    BuildConfig.TD_API_ID,
-                    BuildConfig.TD_API_HASH,
-                    Locale.getDefault().toString(),
-                    Build.MODEL,
-                    Build.VERSION.RELEASE,
-                    BuildConfig.VERSION_NAME
-                )
-            )
+            updates.filterIsInstance<TdApi.UpdateAuthorizationState>().collect { update ->
+                if (update.authorizationState is TdApi.AuthorizationStateWaitTdlibParameters) {
+                    val langPackId = tdLangPackId(Locale.getDefault())
+                    val dbDir = java.io.File(context.filesDir, "i18n")
+                    val db = java.io.File(dbDir, "$langPackId.sqlite")
+                    if (!dbDir.exists()) {
+                        dbDir.mkdirs()
+                    }
+
+                    // MUST use raw client.send to bypass coroutine suspension.
+                    // TDLib may not immediately resolve these option requests until SetTdlibParameters is handled.
+                    client.send(
+                        TdApi.SetOption(
+                            "language_pack_database_path",
+                            TdApi.OptionValueString(db.absolutePath)
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
+                            "localization_target",
+                            TdApi.OptionValueString("android")
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
+                            "language_pack_id",
+                            TdApi.OptionValueString(langPackId)
+                        )
+                    ) { }
+
+                    sendSafe(
+                        TdApi.SetTdlibParameters(
+                            false,
+                            context.filesDir.absolutePath,
+                            context.filesDir.absolutePath,
+                            ByteArray(0),
+                            true,
+                            true,
+                            true,
+                            true,
+                            BuildConfig.TD_API_ID,
+                            BuildConfig.TD_API_HASH,
+                            Locale.getDefault().toString(),
+                            Build.MODEL,
+                            Build.VERSION.RELEASE,
+                            BuildConfig.VERSION_NAME
+                        )
+                    )
+                }
+            }
         }
     }
 

@@ -20,13 +20,15 @@ import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
 
 val dataModule = module {
-    single { MutableSharedFlow<TdApi.Update>(replay = 64, extraBufferCapacity = 64) }
+    single { MutableSharedFlow<TdApi.Update>(replay = 500, extraBufferCapacity = 500) }
     single<SharedFlow<TdApi.Update>> { get<MutableSharedFlow<TdApi.Update>>() }
     single {
+        val updateFlow = get<MutableSharedFlow<TdApi.Update>>()
+
         Client.create(
             { obj: Object? ->
                 if (obj is TdApi.Update) {
-                    get<MutableSharedFlow<TdApi.Update>>().tryEmit(obj)
+                    updateFlow.tryEmit(obj)
                 }
             },
             { _: Throwable? -> },
@@ -46,16 +48,10 @@ val dataModule = module {
         val client: Client = get()
         TdStringProvider { keys ->
             val langPackId = tdLangPackId(Locale.getDefault())
-            suspendCancellableCoroutine { syncCont ->
-                client.send(
-                    TdApi.SynchronizeLanguagePack(langPackId),
-                    { result: Object? ->
-                        syncCont.resume(Unit) // continue regardless of sync result
-                    },
-                    { _: Throwable? -> syncCont.resume(Unit) }
-                )
-            }
-            // Now fetch the strings
+            // Fire and forget synchronization so it doesn't block offline loading
+            client.send(TdApi.SynchronizeLanguagePack(langPackId)) { }
+
+            // Now fetch the locally cached strings immediately
             suspendCancellableCoroutine { cont ->
                 client.send(
                     TdApi.GetLanguagePackStrings(langPackId, keys.toTypedArray()),
