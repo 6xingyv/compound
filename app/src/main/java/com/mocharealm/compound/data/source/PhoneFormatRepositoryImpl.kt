@@ -76,7 +76,7 @@ class PhoneFormatRepositoryImpl(
     private fun loadCallingCodeInfo(callingCode: String): CallingCodeInfo? {
         val offset = callingCodeOffsets[callingCode] ?: return null
         val data = data ?: return null
-        val buffer = buffer ?: return null
+        buffer ?: return null
 
         var currentOffset = offset
         val start = currentOffset

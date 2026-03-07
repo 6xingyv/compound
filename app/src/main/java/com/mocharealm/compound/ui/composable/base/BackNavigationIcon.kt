@@ -15,7 +15,7 @@ fun BackNavigationIcon(
     onClick: () -> Unit,
     modifier: Modifier = Modifier,
 ) {
-    val layoutDirection = LocalLayoutDirection.current
+    LocalLayoutDirection.current
     IconButton(
         modifier = modifier,
         onClick = onClick,

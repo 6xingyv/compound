@@ -423,7 +423,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                 ) {
                     Spacer(Modifier.width(16.dp))
                     Box(Modifier.size(48.dp)) {
-                        androidx.compose.animation.AnimatedVisibility(
+                        AnimatedVisibility(
                             !menuOpened.value, Modifier.dropShadow(CircleShape) {
                                 radius = 24f.dp.toPx()
                                 offset = Offset(0.dp.toPx(), 0.dp.toPx())
@@ -560,7 +560,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         .heightIn(min = 24.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { it },
                                         exit = fadeOut() + slideOutHorizontally { it }) {
@@ -586,7 +586,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
 
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
                                         exit = fadeOut() + slideOutHorizontally { -it }

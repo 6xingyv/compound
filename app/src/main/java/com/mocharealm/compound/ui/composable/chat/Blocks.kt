@@ -538,7 +538,7 @@ fun LottieSticker(
         value =
             withContext(Dispatchers.IO) {
                 try {
-                    val file = java.io.File(filePath)
+                    val file = File(filePath)
                     val inputStream =
                         if (filePath.startsWith("file:///android_asset/")) {
                             val assetPath =

@@ -624,9 +624,8 @@ class TelegramRepositoryImpl(
                 var j = i + 1
                 while (j < messages.size) {
                     val nextMsg = messages[j]
-                    val nextFirstBlock = nextMsg.blocks.firstOrNull()
                     val nextAlbumId =
-                        when (nextFirstBlock) {
+                        when (val nextFirstBlock = nextMsg.blocks.firstOrNull()) {
                             is MessageBlock.MediaBlock -> nextFirstBlock.mediaAlbumId
                             is MessageBlock.DocumentBlock -> nextFirstBlock.mediaAlbumId
                             else -> 0L
@@ -824,8 +823,7 @@ class TelegramRepositoryImpl(
                             replyMsgId,
                             0
                         )
-                    val first = blocks.first()
-                    when (first) {
+                    when (val first = blocks.first()) {
                         is MessageBlock.TextBlock -> first.content.content
                         is MessageBlock.MediaBlock -> {
                             val caption =
@@ -842,8 +840,7 @@ class TelegramRepositoryImpl(
                 } else {
                     reply.content?.let {
                         val blocks = MessageDto.parseMessageContent(it, 0, 0)
-                        val first = blocks.first()
-                        when (first) {
+                        when (val first = blocks.first()) {
                             is MessageBlock.TextBlock -> first.content.content
                             else -> ""
                         }
