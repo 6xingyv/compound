@@ -337,7 +337,7 @@ private fun generateMessages(count: Int, seed: Long): List<Message> {
             typeWeights.runningFold(0.0) { acc, (_, weight) -> acc + weight }.drop(1)
 
     val stickers = 1..70
-    val lifePhotos = 1..13
+    val lifePhotos = 1..11
     val clefPhotos = 1..4
 
     return buildList(count) {
