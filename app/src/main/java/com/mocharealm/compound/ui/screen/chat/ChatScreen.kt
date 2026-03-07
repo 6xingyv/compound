@@ -71,6 +71,7 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -140,6 +141,8 @@ import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.tci18n.core.tdString
+import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.flow.debounce
 import org.koin.androidx.compose.koinViewModel
 import org.maplibre.android.maps.MapLibreMapOptions
 import top.yukonga.miuix.kmp.basic.BasicComponent
@@ -161,7 +164,7 @@ import kotlin.math.tanh
 val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
 val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
-@OptIn(ExperimentalLayoutApi::class)
+@OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
@@ -223,10 +226,37 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         viewModel.onFilesSelected(files)
     }
 
+    val shouldLoadNewer by remember {
+        derivedStateOf {
+            val layoutInfo = listState.layoutInfo
+            val firstVisibleItem = layoutInfo.visibleItemsInfo.firstOrNull()
+            firstVisibleItem != null && firstVisibleItem.index <= 3
+        }
+    }
+
     LaunchedEffect(shouldLoadMore) {
         if (shouldLoadMore && !state.loading && state.hasMore) {
             viewModel.loadOlderMessages()
         }
+    }
+
+    LaunchedEffect(shouldLoadNewer) {
+        if (shouldLoadNewer && !state.loading && state.hasMoreNewer) {
+            viewModel.loadNewerMessages()
+        }
+    }
+
+    LaunchedEffect(listState) {
+        snapshotFlow { listState.firstVisibleItemIndex }
+            .debounce(500L)
+            .collect { index ->
+                if (state.messages.isNotEmpty()) {
+                    val idx = state.messages.size - 1 - index
+                    if (idx in state.messages.indices) {
+                        viewModel.saveReadPosition(state.messages[idx].blocks.first().id)
+                    }
+                }
+            }
     }
 
     val captionBar = WindowInsets.captionBar.asPaddingValues()
@@ -423,7 +453,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                 ) {
                     Spacer(Modifier.width(16.dp))
                     Box(Modifier.size(48.dp)) {
-                        AnimatedVisibility(
+                        androidx.compose.animation.AnimatedVisibility(
                             !menuOpened.value, Modifier.dropShadow(CircleShape) {
                                 radius = 24f.dp.toPx()
                                 offset = Offset(0.dp.toPx(), 0.dp.toPx())
@@ -560,7 +590,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         .heightIn(min = 24.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    AnimatedVisibility(
+                                    androidx.compose.animation.AnimatedVisibility(
                                         visible = inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { it },
                                         exit = fadeOut() + slideOutHorizontally { it }) {
@@ -586,7 +616,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
 
-                                    AnimatedVisibility(
+                                    androidx.compose.animation.AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
                                         exit = fadeOut() + slideOutHorizontally { -it }
@@ -1053,13 +1083,13 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             }
 
             val scrollTarget = state.scrollToMessageId
-            LaunchedEffect(scrollTarget, state.chatItems) {
+            LaunchedEffect(scrollTarget, state.messages) {
                 if (scrollTarget != null) {
-                    val targetIdx = state.chatItems.indexOfFirst {
-                        it is MessageItem && it.message.blocks.any { b -> b.id == scrollTarget }
+                    val targetIdx = state.messages.indexOfFirst {
+                        it.blocks.any { b -> b.id == scrollTarget }
                     }
                     if (targetIdx >= 0) {
-                        listState.animateScrollToItem(targetIdx)
+                        listState.animateScrollToItem(state.messages.size - 1 - targetIdx)
                         viewModel.clearScrollTarget()
                     }
                 }
@@ -1111,29 +1141,68 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         }
                     }
                 } else {
+                    if (state.loadingNewer) {
+                        item {
+                            Row(
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(vertical = 8.dp),
+                                horizontalArrangement = Arrangement.Center
+                            ) {
+                                Text(
+                                    text = tdString("Loading"),
+                                    color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                                    textAlign = TextAlign.Center,
+                                    style = MiuixTheme.textStyles.footnote1
+                                )
+                            }
+                        }
+                    }
+
                     items(
-                        count = state.chatItems.size,
-                        key = { state.chatItems[it].key },
-                        contentType = { state.chatItems[it]::class.simpleName }) { index ->
-                        when (val item = state.chatItems[index]) {
-                            is TimestampItem -> {
-                                TimestampLabel(timestamp = item.timestamp)
+                        count = state.messages.size,
+                        key = { state.messages[state.messages.size - 1 - it].blocks.first().id },
+                        contentType = { "Message" }
+                    ) { index ->
+
+                        val msgIndex = state.messages.size - 1 - index
+                        val message = state.messages[msgIndex]
+                        val prevMessage = state.messages.getOrNull(msgIndex - 1)
+                        val nextMessage = state.messages.getOrNull(msgIndex + 1)
+
+                        val currentTs = message.blocks.first().timestamp
+                        val prevTs = prevMessage?.blocks?.first()?.timestamp ?: 0L
+                        val showTimestamp = prevTs == 0L || currentTs - prevTs > 300
+
+                        val sameAbove =
+                            prevMessage?.sender?.id == message.sender.id && prevMessage.blocks.first() !is MessageBlock.SystemActionBlock
+                        val sameBelow =
+                            nextMessage?.sender?.id == message.sender.id && nextMessage.blocks.first() !is MessageBlock.SystemActionBlock
+
+                        val position = when {
+                            message.blocks.first() is MessageBlock.SystemActionBlock -> GroupPosition.SINGLE
+                            !sameAbove && !sameBelow -> GroupPosition.SINGLE
+                            !sameAbove -> GroupPosition.FIRST
+                            !sameBelow -> GroupPosition.LAST
+                            else -> GroupPosition.MIDDLE
+                        }
+
+                        Column(Modifier.fillMaxWidth()) {
+                            if (showTimestamp) {
+                                TimestampLabel(timestamp = currentTs)
                             }
 
-                            is MessageItem -> {
-                                val message = item.message
-                                if (message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
-                                    SystemMessage(
-                                        message.blocks.first() as MessageBlock.SystemActionBlock
-                                    )
-                                } else {
-                                    MessageBubble(
-                                        message = message,
-                                        groupPosition = item.groupPosition,
-                                        showAvatar = state.chatInfo?.type == ChatType.GROUP,
-                                        onReplyClick = onReplyClick,
-                                    )
-                                }
+                            if (message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
+                                SystemMessage(
+                                    message.blocks.first() as MessageBlock.SystemActionBlock
+                                )
+                            } else {
+                                MessageBubble(
+                                    message = message,
+                                    groupPosition = position,
+                                    showAvatar = state.chatInfo?.type == ChatType.GROUP,
+                                    onReplyClick = onReplyClick,
+                                )
                             }
                         }
                     }

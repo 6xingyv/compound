@@ -31,11 +31,9 @@ import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
 import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.first
-import kotlinx.coroutines.flow.flowOn
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.transform
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 import kotlinx.coroutines.suspendCancellableCoroutine
 import kotlinx.coroutines.withTimeoutOrNull
 import org.drinkless.tdlib.Client
@@ -928,6 +926,39 @@ class TelegramRepositoryImpl(
         val content = TdApi.InputMessageLocation(location, 0, 0, 0)
         val msg = send(TdApi.SendMessage(chatId, null, null, null, null, content))
         mapSingleTdMessage(msg)
+    }
+
+    override suspend fun setChatDraftMessage(
+        chatId: Long,
+        replyToMessageId: Long,
+        draftText: String
+    ): Result<Unit> = runCatching {
+        val draft = if (draftText.isEmpty()) null else TdApi.DraftMessage().apply {
+            this.replyTo = if (replyToMessageId != 0L) TdApi.InputMessageReplyToMessage(
+                replyToMessageId,
+                null,
+                0
+            ) else null
+            this.inputMessageText =
+                TdApi.InputMessageText(TdApi.FormattedText(draftText, emptyArray()), null, true)
+        }
+        send(
+            TdApi.SetChatDraftMessage(
+                chatId,
+                null,
+                draft,
+            )
+        )
+    }
+
+    override suspend fun saveChatReadPosition(chatId: Long, messageId: Long) {
+        val prefs = context.getSharedPreferences("chat_read_positions", Context.MODE_PRIVATE)
+        prefs.edit().putLong("chat_$chatId", messageId).apply()
+    }
+
+    override suspend fun getChatReadPosition(chatId: Long): Long {
+        val prefs = context.getSharedPreferences("chat_read_positions", Context.MODE_PRIVATE)
+        return prefs.getLong("chat_$chatId", 0L)
     }
 }
 

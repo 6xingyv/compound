@@ -61,7 +61,6 @@ class IcuPersonNameFormatterRepositoryImpl: PersonNameFormatterRepository {
     private fun createFormatter(): Any {
         val cls = Class.forName("android.icu.text.PersonNameFormatter")
         val builder = cls.getMethod("builder").invoke(null)
-        // 可以根据需要通过反射调用 setLength, setUsage 等
         return builder.javaClass.getMethod("build").invoke(builder)
     }
 }

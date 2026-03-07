@@ -7,29 +7,31 @@ import com.mocharealm.compound.domain.model.User
 import org.drinkless.tdlib.TdApi
 
 data class ChatDto(
-        val id: Long,
-        val title: String,
-        val lastMessage: Message? = null,
-        val lastMessageDate: Long = 0L,
-        val unreadCount: Int = 0,
-        val isChannel: Boolean = false,
-        val isGroup: Boolean = false,
-        val photoUrl: String? = null,
-        val photoFileId: Int? = null,
+    val id: Long,
+    val title: String,
+    val lastMessage: Message? = null,
+    val lastMessageDate: Long = 0L,
+    val unreadCount: Int = 0,
+    val isChannel: Boolean = false,
+    val isGroup: Boolean = false,
+    val photoUrl: String? = null,
+    val photoFileId: Int? = null,
+    val draftMessage: String? = null,
 ) {
     fun toDomain(): Chat =
-            Chat(
-                    id = id,
-                    title = title,
-                    lastMessage = lastMessage,
-                    lastMessageDate = lastMessageDate,
-                    unreadCount = unreadCount,
-                    type =
-                            if (isGroup) ChatType.GROUP
-                            else if (isChannel) ChatType.CHANNEL else ChatType.DIRECT,
-                    photoUrl = photoUrl,
-                    photoFileId = photoFileId
-            )
+        Chat(
+            id = id,
+            title = title,
+            lastMessage = lastMessage,
+            lastMessageDate = lastMessageDate,
+            unreadCount = unreadCount,
+            type =
+                if (isGroup) ChatType.GROUP
+                else if (isChannel) ChatType.CHANNEL else ChatType.DIRECT,
+            photoUrl = photoUrl,
+            photoFileId = photoFileId,
+            draftMessage = draftMessage
+        )
 
     companion object {
         fun fromTdApi(chat: TdApi.Chat): ChatDto {
@@ -40,48 +42,52 @@ data class ChatDto(
             val supergroup = type as? TdApi.ChatTypeSupergroup
             val isChannel = supergroup?.isChannel == true
             val isGroup =
-                    type is TdApi.ChatTypeBasicGroup ||
-                            (supergroup != null && !supergroup.isChannel)
+                type is TdApi.ChatTypeBasicGroup ||
+                        (supergroup != null && !supergroup.isChannel)
 
             val lastMsg = chat.lastMessage
             val lastMessage =
-                    lastMsg?.let { msg ->
-                        val senderId =
-                                when (val s = msg.senderId) {
-                                    is TdApi.MessageSenderUser -> s.userId
-                                    is TdApi.MessageSenderChat -> s.chatId
-                                    else -> 0L
-                                }
-                        val blocks =
-                                MessageDto.parseMessageContent(
-                                        content = msg.content,
-                                        messageId = msg.id,
-                                        timestamp = msg.date.toLong(),
-                                )
-                        Message(
-                                sender =
-                                        User(
-                                                id = senderId,
-                                                firstName = "",
-                                                lastName = "",
-                                                username = "",
-                                        ),
-                                chatId = chat.id,
-                                isOutgoing = msg.isOutgoing,
-                                blocks = blocks,
+                lastMsg?.let { msg ->
+                    val senderId =
+                        when (val s = msg.senderId) {
+                            is TdApi.MessageSenderUser -> s.userId
+                            is TdApi.MessageSenderChat -> s.chatId
+                            else -> 0L
+                        }
+                    val blocks =
+                        MessageDto.parseMessageContent(
+                            content = msg.content,
+                            messageId = msg.id,
+                            timestamp = msg.date.toLong(),
                         )
-                    }
+                    Message(
+                        sender =
+                            User(
+                                id = senderId,
+                                firstName = "",
+                                lastName = "",
+                                username = "",
+                            ),
+                        chatId = chat.id,
+                        isOutgoing = msg.isOutgoing,
+                        blocks = blocks,
+                    )
+                }
+
+            val draftMsg = chat.draftMessage
+            val draftText = (draftMsg?.inputMessageText as? TdApi.InputMessageText)?.text?.text
 
             return ChatDto(
-                    id = chat.id,
-                    title = chat.title,
-                    lastMessage = lastMessage,
-                    lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
-                    unreadCount = chat.unreadCount,
-                    isChannel = isChannel,
-                    isGroup = isGroup,
-                    photoUrl = localPath,
-                    photoFileId = small?.id
+                id = chat.id,
+                title = chat.title,
+                lastMessage = lastMessage,
+                lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
+                unreadCount = chat.unreadCount,
+                isChannel = isChannel,
+                isGroup = isGroup,
+                photoUrl = localPath,
+                photoFileId = small?.id,
+                draftMessage = draftText
             )
         }
     }

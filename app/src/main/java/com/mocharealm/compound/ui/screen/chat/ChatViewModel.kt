@@ -11,10 +11,10 @@ import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.model.StickerSetInfo
+import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
-import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
 import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
@@ -23,35 +23,33 @@ import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendLocationUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SendStickerUseCase
+import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
+import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
+import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import kotlinx.coroutines.flow.debounce
+import kotlinx.coroutines.flow.distinctUntilChanged
+import kotlinx.coroutines.flow.drop
+import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import androidx.compose.runtime.snapshotFlow
+import kotlinx.coroutines.FlowPreview
 
 enum class GroupPosition {
     FIRST, MIDDLE, LAST, SINGLE
 }
 
-sealed interface ChatItem {
-    val key: String
-}
-
-data class TimestampItem(val timestamp: Long) : ChatItem {
-    override val key = "ts_$timestamp"
-}
-
-data class MessageItem(val message: Message, val groupPosition: GroupPosition) : ChatItem {
-    override val key = "msg_${message.blocks.first().id}"
-}
-
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
-    val chatItems: List<ChatItem> = emptyList(),
     val chatInfo: Chat? = null,
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
     val hasMore: Boolean = true,
+    val loadingNewer: Boolean = false,
+    val hasMoreNewer: Boolean = true,
     val initialLoaded: Boolean = false,
     val error: String? = null,
     val scrollToMessageId: Long? = null,
@@ -88,6 +86,9 @@ class ChatViewModel(
     private val sendSticker: SendStickerUseCase,
     private val sendLocation: SendLocationUseCase,
     private val sendFiles: SendFilesUseCase,
+    private val setChatDraftMessage: SetChatDraftMessageUseCase,
+    private val saveChatReadPosition: SaveChatReadPositionUseCase,
+    private val getChatReadPosition: GetChatReadPositionUseCase
 ) : ViewModel() {
 
     companion object {
@@ -175,9 +176,26 @@ class ChatViewModel(
         }
     }
 
+    @OptIn(FlowPreview::class)
     private fun loadChatInfo() {
         viewModelScope.launch {
-            getChat(chatId).onSuccess { chat -> _uiState.update { it.copy(chatInfo = chat) } }
+            getChat(chatId).onSuccess { chat -> 
+                _uiState.update { it.copy(chatInfo = chat) } 
+                if (!chat.draftMessage.isNullOrEmpty() && inputState.text.isEmpty()) {
+                    inputState.edit { replace(0, length, chat.draftMessage) }
+                }
+
+                // Debounce to save draft
+                launch {
+                    snapshotFlow { inputState.text }
+                        .drop(1) // drop the initial empty or restored value
+                        .map { it.toString() }
+                        .debounce(1000L)
+                        .collect { text ->
+                            setChatDraftMessage(chatId, 0L, text)
+                        }
+                }
+            }
         }
     }
 
@@ -204,25 +222,28 @@ class ChatViewModel(
     fun loadMessages() {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(loading = true, error = null, hasMore = true, initialLoaded = false)
+                it.copy(loading = true, error = null, hasMore = true, hasMoreNewer = true, initialLoaded = false)
             }
 
-            val localResult = getChatMessages(chatId, PAGE_SIZE, onlyLocal = true)
+            val readPos = getChatReadPosition(chatId)
+            val offset = if (readPos > 0) -PAGE_SIZE / 2 else 0
+
+            val localResult = getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset, onlyLocal = true)
             localResult.onSuccess { localMessages ->
                 if (localMessages.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
                             messages = localMessages,
-                            chatItems = computeChatItems(localMessages),
                             loading = false,
                             initialLoaded = true,
+                            scrollToMessageId = if (readPos > 0) readPos else null
                         )
                     }
                     downloadMissingFiles(localMessages)
                 }
             }
 
-            getChatMessages(chatId, PAGE_SIZE).fold(onSuccess = { networkMessages ->
+            getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset).fold(onSuccess = { networkMessages ->
                 _uiState.update { state ->
                     // Merge file URLs from already-downloaded local messages
                     val existingFileUrls = state.messages.flatMap { msg ->
@@ -248,10 +269,10 @@ class ChatViewModel(
 
                     state.copy(
                         messages = merged,
-                        chatItems = computeChatItems(merged),
                         loading = false,
                         hasMore = networkMessages.size >= PAGE_SIZE,
                         initialLoaded = true,
+                        scrollToMessageId = if (readPos > 0) readPos else state.scrollToMessageId
                     )
                 }
                 downloadMissingFiles(networkMessages)
@@ -270,9 +291,8 @@ class ChatViewModel(
     fun loadOlderMessages() {
         val state = _uiState.value
         if (state.loadingMore || state.loading || !state.hasMore) return
-        
-        // 修复 1：拿到真正的最老消息 ID（ID 最小的）
-        val oldestMessageId = state.messages.minOfOrNull { it.primaryId } ?: return
+
+        val oldestMessageId = state.messages.firstOrNull()?.primaryId ?: return
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
@@ -288,14 +308,13 @@ class ChatViewModel(
                 } else {
                     val existingIds = state.messages.map { it.primaryId }.toSet()
                     val newMessages = olderMessages.filter { it.primaryId !in existingIds }
-                    
-                    // 修复 2：合并后重新按时间倒序排序，保证队列干净
-                    val combinedMessages = (state.messages + newMessages).sortedByDescending { it.primaryTimestamp }
-                    
+
+                    val combinedMessages =
+                        (state.messages + newMessages).sortedBy { it.primaryTimestamp }
+
                     _uiState.update {
                         it.copy(
                             messages = combinedMessages,
-                            chatItems = computeChatItems(combinedMessages),
                             loadingMore = false,
                             hasMore = olderMessages.size >= PAGE_SIZE,
                         )
@@ -306,6 +325,46 @@ class ChatViewModel(
                 _uiState.update {
                     it.copy(loadingMore = false, error = error.message)
                 }
+            })
+        }
+    }
+
+    fun loadNewerMessages() {
+        val state = _uiState.value
+        if (state.loadingNewer || state.loading || !state.hasMoreNewer || state.messages.isEmpty()) return
+
+        val newestMessageId = state.messages.lastOrNull()?.primaryId ?: return
+
+        viewModelScope.launch {
+            _uiState.update { it.copy(loadingNewer = true) }
+            getChatMessages(
+                chatId,
+                PAGE_SIZE,
+                fromMessageId = newestMessageId,
+                offset = -PAGE_SIZE + 1
+            ).fold(onSuccess = { newerMessages ->
+                if (newerMessages.isEmpty()) {
+                    _uiState.update {
+                        it.copy(loadingNewer = false, hasMoreNewer = false)
+                    }
+                } else {
+                    val existingIds = state.messages.map { it.primaryId }.toSet()
+                    val newMessages = newerMessages.filter { it.primaryId !in existingIds }
+
+                    val combinedMessages =
+                        (state.messages + newMessages).sortedBy { it.primaryTimestamp }
+
+                    _uiState.update {
+                        it.copy(
+                            messages = combinedMessages,
+                            loadingNewer = false,
+                            hasMoreNewer = newerMessages.size >= PAGE_SIZE - 2,
+                        )
+                    }
+                    downloadMissingFiles(newMessages)
+                }
+            }, onFailure = { error ->
+                _uiState.update { it.copy(loadingNewer = false, error = error.message) }
             })
         }
     }
@@ -327,7 +386,6 @@ class ChatViewModel(
                     _uiState.update { state ->
                         state.copy(
                             messages = combinedMessages,
-                            chatItems = computeChatItems(combinedMessages),
                             loadingMore = false,
                             scrollToMessageId = messageId
                         )
@@ -346,6 +404,12 @@ class ChatViewModel(
         _uiState.update { it.copy(scrollToMessageId = null) }
     }
 
+    fun saveReadPosition(messageId: Long) {
+        viewModelScope.launch {
+            saveChatReadPosition(chatId, messageId)
+        }
+    }
+
     override fun onCleared() {
         super.onCleared()
         viewModelScope.launch {
@@ -356,61 +420,10 @@ class ChatViewModel(
     private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {
         _uiState.update { state ->
             val newMessages = updateFn(state.messages)
-            state.copy(messages = newMessages, chatItems = computeChatItems(newMessages))
+            state.copy(messages = newMessages)
         }
     }
 
-    /**
-     * Albums are already pre-aggregated at the repo layer, so each Message in the list is either a
-     * single-block message or a multi-block album.
-     */
-    private fun computeChatItems(messages: List<Message>): List<ChatItem> {
-        val sorted = messages.sortedBy { it.primaryTimestamp }
-        val items = mutableListOf<ChatItem>()
-        var lastTimestamp = 0L
-
-        for (msg in sorted) {
-            val ts = msg.primaryTimestamp
-
-            if (lastTimestamp == 0L || ts - lastTimestamp > 300) {
-                items.add(TimestampItem(ts))
-                lastTimestamp = ts
-            }
-
-            items.add(MessageItem(msg, GroupPosition.SINGLE))
-        }
-
-        // Compute group positions
-        for (j in items.indices) {
-            val current = items[j] as? MessageItem ?: continue
-            val primary = current.message
-
-            // System messages don't group
-            if (primary.blocks.first() is MessageBlock.SystemActionBlock) continue
-
-            val prevItem = items.getOrNull(j - 1) as? MessageItem
-            val nextItem = items.getOrNull(j + 1) as? MessageItem
-
-            val sameAbove =
-                prevItem?.message?.sender?.id == primary.sender.id && prevItem.message.blocks.first() !is MessageBlock.SystemActionBlock
-            val sameBelow =
-                nextItem?.message?.sender?.id == primary.sender.id && nextItem.message.blocks.first() !is MessageBlock.SystemActionBlock
-
-            // FIRST = visually topmost in group (shows sender name)
-            // LAST  = visually bottommost in group (shows avatar & tail)
-            // The list is reversed at the end for reverseLayout, so use
-            // natural chronological order here: first in time = FIRST.
-            val position = when {
-                !sameAbove && !sameBelow -> GroupPosition.SINGLE
-                !sameAbove -> GroupPosition.FIRST
-                !sameBelow -> GroupPosition.LAST
-                else -> GroupPosition.MIDDLE
-            }
-            items[j] = current.copy(groupPosition = position)
-        }
-
-        return items.reversed()
-    }
 
     private fun downloadMissingFiles(messages: List<Message>) {
         for (msg in messages) {

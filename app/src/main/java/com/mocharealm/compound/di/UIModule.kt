@@ -61,7 +61,10 @@ val uiModule = module {
             getStickerSetStickers = get(),
             sendSticker = get(),
             sendLocation = get(),
-            sendFiles = get()
+            sendFiles = get(),
+            setChatDraftMessage = get(),
+            saveChatReadPosition = get(),
+            getChatReadPosition = get()
         )
     }
 

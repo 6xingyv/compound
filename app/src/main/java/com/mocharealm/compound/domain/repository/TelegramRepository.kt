@@ -47,11 +47,11 @@ interface TelegramRepository {
      * @param onlyLocal 是否只返回本地缓存的消息
      */
     suspend fun getChatMessages(
-            chatId: Long,
-            limit: Int = 20,
-            fromMessageId: Long = 0,
-            onlyLocal: Boolean = false,
-            offset: Int = 0
+        chatId: Long,
+        limit: Int = 20,
+        fromMessageId: Long = 0,
+        onlyLocal: Boolean = false,
+        offset: Int = 0
     ): Result<List<Message>>
 
     /** 下载文件并返回本地路径 */
@@ -62,19 +62,19 @@ interface TelegramRepository {
 
     /** 发送文本消息 */
     suspend fun sendMessage(
-            chatId: Long,
-            text: String,
-            entities: List<Text.TextEntity> = emptyList(),
-            replyToMessageId: Long = 0
+        chatId: Long,
+        text: String,
+        entities: List<Text.TextEntity> = emptyList(),
+        replyToMessageId: Long = 0
     ): Result<Message>
 
     /** 发送文件（单个或多个组成相册） */
     suspend fun sendFiles(
-            chatId: Long,
-            files: List<ShareFileInfo>,
-            caption: String = "",
-            captionEntities: List<Text.TextEntity> = emptyList(),
-            replyToMessageId: Long = 0
+        chatId: Long,
+        files: List<ShareFileInfo>,
+        caption: String = "",
+        captionEntities: List<Text.TextEntity> = emptyList(),
+        replyToMessageId: Long = 0
     ): Result<List<Message>>
 
     /** 实时消息流 */
@@ -101,4 +101,15 @@ interface TelegramRepository {
 
     /** 发送位置 */
     suspend fun sendLocation(chatId: Long, latitude: Double, longitude: Double): Result<Message>
+
+    /** 保存/更新草稿 */
+    suspend fun setChatDraftMessage(
+        chatId: Long,
+        replyToMessageId: Long,
+        draftText: String
+    ): Result<Unit>
+
+    /** 保存/获取聊天最后阅读位置 */
+    suspend fun saveChatReadPosition(chatId: Long, messageId: Long)
+    suspend fun getChatReadPosition(chatId: Long): Long
 }

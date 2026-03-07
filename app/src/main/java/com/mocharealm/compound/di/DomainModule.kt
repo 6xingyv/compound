@@ -25,6 +25,9 @@ import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import com.mocharealm.compound.domain.usecase.phonenumber.ValidatePhoneNumberUseCase
+import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
+import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
+import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
 import org.koin.dsl.module
 
 val domainModule = module {
@@ -105,5 +108,14 @@ val domainModule = module {
     }
     factory {
         SendFilesUseCase(get())
+    }
+    factory {
+        SetChatDraftMessageUseCase(get())
+    }
+    factory {
+        SaveChatReadPositionUseCase(get())
+    }
+    factory {
+        GetChatReadPositionUseCase(get())
     }
 }
