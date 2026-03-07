@@ -101,7 +101,7 @@ fun MediaAlbumGrid(
                 .fillMaxWidth(),
             contentAlignment = Alignment.CenterStart
         ) {
-            displayBlocks.reversed().forEachIndexed { revIndex, block ->
+            displayBlocks.forEachIndexed { revIndex, block ->
                 val calculatedOriginalIndex = totalDisplay - 1 - revIndex
                 
                 key(block.id) {

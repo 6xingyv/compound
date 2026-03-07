@@ -247,14 +247,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.firstVisibleItemIndex }
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
             .debounce(500L)
-            .collect { index ->
-                if (state.messages.isNotEmpty()) {
-                    val idx = state.messages.size - 1 - index
-                    if (idx in state.messages.indices) {
-                        viewModel.saveReadPosition(state.messages[idx].blocks.first().id)
-                    }
+            .collect { visibleItems ->
+                val firstMessageKey = visibleItems.firstOrNull { it.key is Long }?.key as? Long
+                if (firstMessageKey != null) {
+                    viewModel.saveReadPosition(firstMessageKey)
                 }
             }
     }
@@ -1089,7 +1087,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         it.blocks.any { b -> b.id == scrollTarget }
                     }
                     if (targetIdx >= 0) {
-                        listState.animateScrollToItem(state.messages.size - 1 - targetIdx)
+                        val headerOffset = if (state.loadingNewer) 1 else 0
+                        listState.animateScrollToItem(headerOffset + state.messages.size - 1 - targetIdx)
                         viewModel.clearScrollTarget()
                     }
                 }
@@ -1187,7 +1186,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             else -> GroupPosition.MIDDLE
                         }
 
-                        Column(Modifier.fillMaxWidth()) {
+                        Column(Modifier.fillMaxWidth().animateItem()) {
                             if (showTimestamp) {
                                 TimestampLabel(timestamp = currentTs)
                             }

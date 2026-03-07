@@ -233,7 +233,7 @@ class ChatViewModel(
                 if (localMessages.isNotEmpty()) {
                     _uiState.update {
                         it.copy(
-                            messages = localMessages,
+                            messages = localMessages.sortedBy { it.primaryTimestamp },
                             loading = false,
                             initialLoaded = true,
                             scrollToMessageId = if (readPos > 0) readPos else null
@@ -268,7 +268,7 @@ class ChatViewModel(
                     }
 
                     state.copy(
-                        messages = merged,
+                        messages = merged.sortedBy { it.primaryTimestamp },
                         loading = false,
                         hasMore = networkMessages.size >= PAGE_SIZE,
                         initialLoaded = true,
