@@ -13,6 +13,7 @@ import com.mocharealm.compound.domain.model.DownloadProgress
 import com.mocharealm.compound.domain.model.File
 import com.mocharealm.compound.domain.model.InternalLink
 import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.MessageReaction
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
@@ -581,6 +582,15 @@ class TelegramRepositoryImpl(
                 }
             } else blocks
 
+        val reactions = msg.interactionInfo?.reactions?.reactions.orEmpty().mapNotNull { reaction ->
+            val emoji = (reaction.type as? TdApi.ReactionTypeEmoji)?.emoji ?: return@mapNotNull null
+            MessageReaction(
+                emoji = emoji,
+                count = reaction.totalCount,
+                isChosen = reaction.isChosen,
+            )
+        }
+
         return Message(
             sender = sender,
             chatId = msg.chatId,
@@ -588,6 +598,7 @@ class TelegramRepositoryImpl(
             blocks = finalBlocks,
             replyTo = replyTo,
             shareInfo = shareInfo,
+            reactions = reactions,
         )
     }
 

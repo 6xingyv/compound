@@ -6,13 +6,20 @@ data class Message(
         val isOutgoing: Boolean = false,
         val blocks: List<MessageBlock>,
         val replyTo: Message? = null,
-        val shareInfo: ShareInfo? = null
+        val shareInfo: ShareInfo? = null,
+        val reactions: List<MessageReaction> = emptyList(),
 ) {
         val id: Long
                 get() = blocks.firstOrNull()?.id ?: 0L
         val timestamp: Long
                 get() = blocks.firstOrNull()?.timestamp ?: 0L
 }
+
+data class MessageReaction(
+        val emoji: String,
+        val count: Int,
+        val isChosen: Boolean = false,
+)
 
 sealed interface MessageBlock {
         val id: Long

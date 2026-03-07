@@ -11,6 +11,9 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.CornerSize
 import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
@@ -318,6 +321,34 @@ fun MessageContent(
                 is MessageBlock.SystemActionBlock -> {}
                 is MessageBlock.VenueBlock -> {
                     VenueBlock(block)
+                }
+            }
+        }
+
+        if (message.reactions.isNotEmpty()) {
+            val reactionTop = if (hasReply || message.blocks.isNotEmpty() || hasShare) 8.dp else 10.dp
+            LazyRow(
+                horizontalArrangement = Arrangement.spacedBy(6.dp),
+                modifier = Modifier.padding(start = 12.dp, end = 12.dp, top = reactionTop)
+            ) {
+                items(message.reactions, key = { "${it.emoji}-${it.isChosen}" }) { reaction ->
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        modifier =
+                            Modifier.surface(
+                                shape = CircleShape,
+                                color =
+                                    if (reaction.isChosen) {
+                                        MiuixTheme.colorScheme.primary.copy(alpha = 0.18f)
+                                    } else {
+                                        MiuixTheme.colorScheme.surfaceContainerHighest
+                                    }
+                            ).padding(horizontal = 8.dp, vertical = 3.dp)
+                    ) {
+                        Text(text = reaction.emoji, style = MiuixTheme.textStyles.caption1)
+                        Spacer(Modifier.width(4.dp))
+                        Text(text = reaction.count.toString(), style = MiuixTheme.textStyles.caption1)
+                    }
                 }
             }
         }
