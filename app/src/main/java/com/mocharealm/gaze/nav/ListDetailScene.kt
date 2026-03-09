@@ -54,6 +54,16 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_LARGE_LOWE
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.runtime.MutableState
+
+/**
+ * This `CompositionLocal` can be used by a detail `NavEntry` to toggle whether the detail pane 
+ * should expand to full screen.
+ */
+val LocalListDetailExpanded = compositionLocalOf<MutableState<Boolean>> { 
+    error("No LocalListDetailExpanded provided") 
+}
 
 /**
  * A [Scene] that displays a list and a detail [NavEntry] side-by-side in a 40/60 split.
@@ -68,45 +78,51 @@ class ListDetailScene<T : Any>(
     override val entries: List<NavEntry<T>> = listOfNotNull(listEntry, detailEntry)
 
     override val content: @Composable (() -> Unit) = {
-        BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
-            val totalWidth = maxWidth
-            val detailWidth = totalWidth * 0.6f
-            var rememberedDetail by remember { mutableStateOf(detailEntry) }
-            if (detailEntry != null) {
-                rememberedDetail = detailEntry
-            }
+        val isExpandedState = remember { mutableStateOf(false) }
 
-            Row(modifier = Modifier.fillMaxSize()) {
-                Column(modifier = Modifier.weight(1f)) {
-                    listEntry.Content()
+        CompositionLocalProvider(LocalListDetailExpanded provides isExpandedState) {
+            BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
+                val totalWidth = maxWidth
+                val targetDetailWidth = if (isExpandedState.value) totalWidth else totalWidth * 0.6f
+                val animatedDetailWidth by animateDpAsState(
+                    targetValue = targetDetailWidth,
+                    label = "detailWidthAnimation"
+                )
+
+                var rememberedDetail by remember { mutableStateOf(detailEntry) }
+                if (detailEntry != null) {
+                    rememberedDetail = detailEntry
                 }
 
-                AnimatedVisibility(
-                    visible = detailEntry != null,
-                    enter = slideInHorizontally(initialOffsetX = { it }) +
-                            expandHorizontally(expandFrom = Alignment.Start),
-                    exit = slideOutHorizontally(targetOffsetX = { it }) +
-                            shrinkHorizontally(shrinkTowards = Alignment.Start)
-                ) {
-                    CompositionLocalProvider(LocalBackButtonVisibility provides false) {
+                Row(modifier = Modifier.fillMaxSize()) {
+                    Column(modifier = Modifier.weight(1f)) {
+                        listEntry.Content()
+                    }
 
-                        Box(modifier = Modifier.width(detailWidth)) {
-
-                            rememberedDetail?.let { entry ->
-                                AnimatedContent(
-                                    targetState = entry,
-                                    contentKey = { it.contentKey },
-                                    transitionSpec = {
-                                        slideInHorizontally(initialOffsetX = { it }) togetherWith
-                                                slideOutHorizontally(targetOffsetX = { -it })
-                                    },
-                                    label = "DetailContentTransition"
-                                ) { targetEntry ->
-                                    targetEntry.Content()
+                    AnimatedVisibility(
+                        visible = detailEntry != null,
+                        enter = slideInHorizontally(initialOffsetX = { it }) +
+                                expandHorizontally(expandFrom = Alignment.Start),
+                        exit = slideOutHorizontally(targetOffsetX = { it }) +
+                                shrinkHorizontally(shrinkTowards = Alignment.Start)
+                    ) {
+                        CompositionLocalProvider(LocalBackButtonVisibility provides isExpandedState.value) {
+                            Box(modifier = Modifier.width(animatedDetailWidth)) {
+                                rememberedDetail?.let { entry ->
+                                    AnimatedContent(
+                                        targetState = entry,
+                                        contentKey = { it.contentKey },
+                                        transitionSpec = {
+                                            slideInHorizontally(initialOffsetX = { it }) togetherWith
+                                                    slideOutHorizontally(targetOffsetX = { -it })
+                                        },
+                                        label = "DetailContentTransition"
+                                    ) { targetEntry ->
+                                        targetEntry.Content()
+                                    }
                                 }
                             }
                         }
-
                     }
                 }
             }
@@ -116,6 +132,7 @@ class ListDetailScene<T : Any>(
     companion object {
         internal const val LIST_KEY = "ListDetailScene-List"
         internal const val DETAIL_KEY = "ListDetailScene-Detail"
+        internal const val FULLSCREEN_KEY = "ListDetailScene-Fullscreen"
 
         /**
          * Helper function to add metadata to a [NavEntry] indicating it can be displayed
@@ -128,6 +145,12 @@ class ListDetailScene<T : Any>(
          * in the detail pane of a the [ListDetailScene].
          */
         fun detailPane() = mapOf(DETAIL_KEY to true)
+
+        /**
+         * Helper function to add metadata to a [NavEntry] indicating it should be displayed
+         * in fullscreen (ignoring ListDetail split) even on large screens.
+         */
+        fun fullscreenPane() = mapOf(FULLSCREEN_KEY to true)
     }
 }
 

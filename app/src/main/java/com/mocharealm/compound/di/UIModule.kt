@@ -14,6 +14,7 @@ import com.mocharealm.compound.ui.screen.share.SharePickerScreen
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
+import com.mocharealm.gaze.nav.ListDetailScene.Companion.FULLSCREEN_KEY
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
 import org.koin.compose.viewmodel.koinViewModel
 import org.koin.core.annotation.KoinExperimentalAPI
@@ -94,7 +95,7 @@ val uiModule = module {
     navigation<Screen.SharePicker>(mapOf(LIST_KEY to true)) { route ->
         SharePickerScreen(payload = route.payload)
     }
-    navigation<Screen.Intro> {
+    navigation<Screen.Intro>(mapOf(FULLSCREEN_KEY to true)) {
         IntroScreen()
     }
 }
