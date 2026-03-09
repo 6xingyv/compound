@@ -70,7 +70,6 @@ sealed interface MessageBlock {
                 override val timestamp: Long,
                 val type: SystemActionType
         ) : MessageBlock {
-                // TODO: Support all types
                 sealed interface SystemActionType {
                         data class MemberJoined(
                                 val actorId: Long,
