@@ -42,8 +42,46 @@ enum class GroupPosition {
     FIRST, MIDDLE, LAST, SINGLE
 }
 
+data class ChatMessageItem(
+    val message: Message,
+    val position: GroupPosition,
+    val showTimestamp: Boolean
+)
+
+fun List<Message>.toMessageItems(): List<ChatMessageItem> {
+    return this.mapIndexed { index, message ->
+        val prevMessage = this.getOrNull(index - 1)
+        val nextMessage = this.getOrNull(index + 1)
+
+        val currentTs = message.blocks.first().timestamp
+        val prevTs = prevMessage?.blocks?.first()?.timestamp ?: 0L
+        val nextTs = nextMessage?.blocks?.first()?.timestamp ?: 0L
+        val showTimestamp = prevTs == 0L || currentTs - prevTs > 300
+
+        val sameAbove =
+            prevMessage?.sender?.id == message.sender.id &&
+            prevMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
+            !showTimestamp
+        val sameBelow =
+            nextMessage?.sender?.id == message.sender.id &&
+            nextMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
+            nextTs != 0L && nextTs - currentTs <= 300
+
+        val position = when {
+            message.blocks.first() is MessageBlock.SystemActionBlock -> GroupPosition.SINGLE
+            !sameAbove && !sameBelow -> GroupPosition.SINGLE
+            !sameAbove -> GroupPosition.FIRST
+            !sameBelow -> GroupPosition.LAST
+            else -> GroupPosition.MIDDLE
+        }
+
+        ChatMessageItem(message, position, showTimestamp)
+    }
+}
+
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
+    val messageItems: List<ChatMessageItem> = emptyList(),
     val chatInfo: Chat? = null,
     val loading: Boolean = false,
     val loadingMore: Boolean = false,
@@ -61,7 +99,14 @@ data class ChatUiState(
     val stickersLoading: Boolean = false,
     val locationPanelVisible: Boolean = false,
     val selectedFiles: List<ShareFileInfo> = emptyList(),
-)
+) {
+    fun withMessages(newMessages: List<Message>): ChatUiState {
+        return copy(
+            messages = newMessages,
+            messageItems = newMessages.toMessageItems()
+        )
+    }
+}
 
 /** Helper: primary message ID (first block's id) */
 private val Message.primaryId: Long
@@ -232,8 +277,7 @@ class ChatViewModel(
             localResult.onSuccess { localMessages ->
                 if (localMessages.isNotEmpty()) {
                     _uiState.update {
-                        it.copy(
-                            messages = localMessages.sortedBy { it.primaryTimestamp },
+                        it.withMessages(localMessages.sortedBy { it.primaryTimestamp }).copy(
                             loading = false,
                             initialLoaded = true,
                             scrollToMessageId = if (readPos > 0) readPos else null
@@ -267,8 +311,7 @@ class ChatViewModel(
                             })
                     }
 
-                    state.copy(
-                        messages = merged.sortedBy { it.primaryTimestamp },
+                    state.withMessages(merged.sortedBy { it.primaryTimestamp }).copy(
                         loading = false,
                         hasMore = networkMessages.size >= PAGE_SIZE,
                         initialLoaded = true,
@@ -316,8 +359,7 @@ class ChatViewModel(
                     }
 
                     _uiState.update {
-                        it.copy(
-                            messages = combinedMessages,
+                        it.withMessages(combinedMessages).copy(
                             loadingMore = false,
                             hasMore = newMessages.isNotEmpty(),
                         )
@@ -361,8 +403,7 @@ class ChatViewModel(
                     }
 
                     _uiState.update {
-                        it.copy(
-                            messages = combinedMessages,
+                        it.withMessages(combinedMessages).copy(
                             loadingNewer = false,
                             hasMoreNewer = newMessages.isNotEmpty(),
                         )
@@ -390,8 +431,7 @@ class ChatViewModel(
                         it.primaryTimestamp
                     }
                     _uiState.update { state ->
-                        state.copy(
-                            messages = combinedMessages,
+                        state.withMessages(combinedMessages).copy(
                             loadingMore = false,
                             scrollToMessageId = messageId
                         )
@@ -426,7 +466,7 @@ class ChatViewModel(
     private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {
         _uiState.update { state ->
             val newMessages = updateFn(state.messages)
-            state.copy(messages = newMessages)
+            state.withMessages(newMessages)
         }
     }
 

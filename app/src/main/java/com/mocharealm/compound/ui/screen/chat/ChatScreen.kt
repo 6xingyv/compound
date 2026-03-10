@@ -1159,51 +1159,27 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     }
 
                     items(
-                        count = state.messages.size,
-                        key = { state.messages[state.messages.size - 1 - it].blocks.first().id },
+                        count = state.messageItems.size,
+                        key = { state.messageItems[state.messageItems.size - 1 - it].message.blocks.first().id },
                         contentType = { "Message" }
                     ) { index ->
 
-                        val msgIndex = state.messages.size - 1 - index
-                        val message = state.messages[msgIndex]
-                        val prevMessage = state.messages.getOrNull(msgIndex - 1)
-                        val nextMessage = state.messages.getOrNull(msgIndex + 1)
-
-                        val currentTs = message.blocks.first().timestamp
-                        val prevTs = prevMessage?.blocks?.first()?.timestamp ?: 0L
-                        val nextTs = nextMessage?.blocks?.first()?.timestamp ?: 0L
-                        val showTimestamp = prevTs == 0L || currentTs - prevTs > 300
-
-                        val sameAbove =
-                            prevMessage?.sender?.id == message.sender.id && 
-                            prevMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
-                            !showTimestamp
-                        val sameBelow =
-                            nextMessage?.sender?.id == message.sender.id && 
-                            nextMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
-                            nextTs != 0L && nextTs - currentTs <= 300
-
-                        val position = when {
-                            message.blocks.first() is MessageBlock.SystemActionBlock -> GroupPosition.SINGLE
-                            !sameAbove && !sameBelow -> GroupPosition.SINGLE
-                            !sameAbove -> GroupPosition.FIRST
-                            !sameBelow -> GroupPosition.LAST
-                            else -> GroupPosition.MIDDLE
-                        }
+                        val msgIndex = state.messageItems.size - 1 - index
+                        val messageItem = state.messageItems[msgIndex]
 
                         Column(Modifier.fillMaxWidth().animateItem()) {
-                            if (showTimestamp) {
-                                TimestampLabel(timestamp = currentTs)
+                            if (messageItem.showTimestamp) {
+                                TimestampLabel(timestamp = messageItem.message.blocks.first().timestamp)
                             }
 
-                            if (message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
+                            if (messageItem.message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
                                 SystemMessage(
-                                    message.blocks.first() as MessageBlock.SystemActionBlock
+                                    messageItem.message.blocks.first() as MessageBlock.SystemActionBlock
                                 )
                             } else {
                                 MessageBubble(
-                                    message = message,
-                                    groupPosition = position,
+                                    message = messageItem.message,
+                                    groupPosition = messageItem.position,
                                     showAvatar = state.chatInfo?.type == ChatType.GROUP,
                                     onReplyClick = onReplyClick,
                                 )
