@@ -1,12 +1,16 @@
 package com.mocharealm.gaze.nav
 
+import androidx.compose.animation.AnimatedContent
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
+import androidx.compose.animation.togetherWith
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
+import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
-import androidx.navigation3.scene.SceneDecoratorStrategy
-import androidx.navigation3.scene.SceneDecoratorStrategyScope
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
-import androidx.compose.runtime.Composable
-import androidx.navigation3.runtime.NavEntry
+import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 
 internal data class SinglePaneScene<T : Any>(
     override val key: Any,
@@ -15,7 +19,21 @@ internal data class SinglePaneScene<T : Any>(
 ) : Scene<T> {
     override val entries: List<NavEntry<T>> = listOf(entry)
 
-    override val content: @Composable () -> Unit = { entry.Content() }
+    override val content: @Composable (() -> Unit) = {
+        AnimatedContent(
+            targetState = entry,
+            contentKey = { it.contentKey },
+            transitionSpec = {
+                slideInHorizontally(initialOffsetX = { it }) togetherWith
+                        slideOutHorizontally(targetOffsetX = { -it })
+            },
+            label = "SinglePaneContentTransition"
+        ) { targetEntry ->
+            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                targetEntry.Content()
+            }
+        }
+    }
 
     override fun equals(other: Any?): Boolean {
         if (this === other) return true
@@ -44,7 +62,7 @@ internal data class SinglePaneScene<T : Any>(
 class SinglePaneSceneStrategy<T : Any> : SceneStrategy<T> {
 
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T> = SinglePaneScene(
-        key = entries.last().contentKey,
+        key = "SinglePaneRoot",
         entry = entries.last(),
         previousEntries = entries.dropLast(1),
     )

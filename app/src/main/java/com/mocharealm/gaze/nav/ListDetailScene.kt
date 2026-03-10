@@ -43,6 +43,7 @@ import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
+import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
@@ -62,9 +63,7 @@ import com.mocharealm.gaze.nav.ListDetailScene.Companion.FULLSCREEN_KEY
  * This `CompositionLocal` can be used by a detail `NavEntry` to toggle whether the detail pane 
  * should expand to full screen.
  */
-val LocalListDetailExpanded = compositionLocalOf<MutableState<Boolean>> { 
-    error("No LocalListDetailExpanded provided") 
-}
+val LocalListDetailExpanded = compositionLocalOf<MutableState<Boolean>?> { null }
 
 /**
  * A [Scene] that displays a list and a detail [NavEntry] side-by-side in a 40/60 split.
@@ -99,7 +98,11 @@ class ListDetailScene<T : Any>(
                 Row(modifier = Modifier.fillMaxSize()) {
                     if (!isExpanded) {
                         Column(modifier = Modifier.weight(1f)) {
-                            listEntry.Content()
+                            AnimatedVisibility(visible = true) {
+                                CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                                    listEntry.Content()
+                                }
+                            }
                         }
                     }
 
@@ -122,7 +125,9 @@ class ListDetailScene<T : Any>(
                                         },
                                         label = "DetailContentTransition"
                                     ) { targetEntry ->
-                                        targetEntry.Content()
+                                        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                                            targetEntry.Content()
+                                        }
                                     }
                                 }
                             }

@@ -38,16 +38,12 @@ import kotlin.math.hypot
 fun SpoilerImage(
     modifier: Modifier = Modifier, hasSpoiler: Boolean, content: @Composable () -> Unit
 ) {
-    if (!hasSpoiler) {
+    var isRevealed by rememberSaveable { mutableStateOf(false) }
+
+    if (!hasSpoiler || isRevealed) {
         Box(modifier = modifier) {
             content()
         }
-        return
-    }
-
-    var isRevealed by rememberSaveable { mutableStateOf(false) }
-    if (isRevealed) {
-        content()
         return
     }
 

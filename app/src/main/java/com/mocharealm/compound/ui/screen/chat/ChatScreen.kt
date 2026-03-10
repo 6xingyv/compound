@@ -166,6 +166,7 @@ import kotlin.math.tanh
 val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
 val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
 val LocalCustomEmojiStickers = staticCompositionLocalOf<Map<Long, MessageBlock.StickerBlock>> { emptyMap() }
+val LocalOnMediaClick = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
 @OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
 @Composable
@@ -1086,7 +1087,28 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             LocalOnDownloadVideo provides { messageId: Long ->
                 viewModel.downloadVideo(messageId)
             },
-            LocalCustomEmojiStickers provides state.customEmojiStickers
+            LocalCustomEmojiStickers provides state.customEmojiStickers,
+            LocalOnMediaClick provides { blockId ->
+                val mediaMessages = state.messages.filter { msg ->
+                    msg.blocks.any { it is MessageBlock.MediaBlock }
+                }
+                val allMediaItems = mediaMessages.flatMap { msg ->
+                    msg.blocks.filterIsInstance<MessageBlock.MediaBlock>().map { block ->
+                        com.mocharealm.compound.ui.nav.MediaItem(
+                            url = block.file.fileUrl ?: "",
+                            thumbnailUrl = block.thumbnail?.fileUrl,
+                            type = if (block.mediaType == MessageBlock.MediaBlock.MediaType.VIDEO)
+                                com.mocharealm.compound.ui.nav.MediaItem.MediaType.VIDEO
+                            else com.mocharealm.compound.ui.nav.MediaItem.MediaType.PHOTO,
+                            id = block.id
+                        )
+                    }
+                }
+                val initialIndex = allMediaItems.indexOfFirst { it.id == blockId }.coerceAtLeast(0)
+                if (allMediaItems.isNotEmpty()) {
+                    navigator.push(com.mocharealm.compound.ui.nav.Screen.MediaPreview(allMediaItems, initialIndex))
+                }
+            }
         ) {
             val onReplyClick: (Long) -> Unit = { replyMessageId ->
                 viewModel.scrollToMessage(replyMessageId)

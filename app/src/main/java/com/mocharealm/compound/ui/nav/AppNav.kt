@@ -29,6 +29,22 @@ sealed interface Screen : NavKey {
     @Serializable
     @TdRouteOverride("share")
     data class SharePicker(val payload: SharePayload) : Screen
+
+    @Serializable
+    data class MediaPreview(
+        val items: List<MediaItem>,
+        val initialIndex: Int
+    ) : Screen
+}
+
+@Serializable
+data class MediaItem(
+    val url: String,
+    val thumbnailUrl: String? = null,
+    val type: MediaType = MediaType.PHOTO,
+    val id: Long = 0L
+) {
+    enum class MediaType { PHOTO, VIDEO }
 }
 
 @Stable

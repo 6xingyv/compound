@@ -31,8 +31,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
-import androidx.compose.ui.platform.UriHandler
-import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
@@ -56,7 +54,10 @@ import com.mocharealm.compound.ui.composable.base.SpoilerImage
 import com.mocharealm.compound.ui.composable.base.VideoPlayer
 import com.mocharealm.compound.ui.composable.base.VpxVideoPlayer
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
+import com.mocharealm.compound.ui.screen.chat.LocalOnMediaClick
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
+import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
+import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
@@ -135,8 +136,22 @@ fun PhotoBlock(
         .wrapContentWidth(),
     contentScale: ContentScale = ContentScale.Fit
 ) {
+    val onMediaClick = LocalOnMediaClick.current
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+
+    val baseModifier = modifier.clickable { onMediaClick(block.id) }
+    val finalModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            baseModifier.sharedElement(
+                rememberSharedContentState(key = "media_${block.id}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
+    } else baseModifier
+
     if (!block.file.fileUrl.isNullOrEmpty()) {
-        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = modifier) {
+        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalModifier) {
             AsyncImage(
                 model =
                     ImageRequest.Builder(LocalContext.current)
@@ -156,6 +171,10 @@ fun VideoBlock(
     modifier: Modifier = Modifier.wrapContentSize(),
     videoModifier: Modifier? = null
 ) {
+    val onMediaClick = LocalOnMediaClick.current
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+
     val actualVideoModifier = videoModifier ?: run {
         val maxWidth = 280.dp
         val aspectRatio =
@@ -166,7 +185,17 @@ fun VideoBlock(
             .height(maxWidth / aspectRatio)
     }
 
-    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = modifier) {
+    val baseModifier = modifier.clickable { onMediaClick(block.id) }
+    val finalContainerModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
+        with(sharedTransitionScope) {
+            baseModifier.sharedElement(
+                rememberSharedContentState(key = "media_${block.id}"),
+                animatedVisibilityScope = animatedVisibilityScope
+            )
+        }
+    } else baseModifier
+
+    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalContainerModifier) {
         if (!block.file.fileUrl.isNullOrEmpty()) {
             MessageVideoPlayer(filePath = block.file.fileUrl, modifier = actualVideoModifier)
         } else {
@@ -264,7 +293,8 @@ fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
         camera = camera,
         styleUrl = "https://tiles.openfreemap.org/styles/bright",
         mapOptions = mapOptions
-    )
+    ) {
+    }
 }
 
 

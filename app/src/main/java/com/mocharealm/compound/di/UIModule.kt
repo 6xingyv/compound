@@ -5,6 +5,7 @@ import com.mocharealm.compound.ui.nav.DeepLinkHandler
 import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
+import com.mocharealm.compound.ui.screen.chat.MediaPreviewScreen
 import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.intro.IntroScreen
@@ -101,5 +102,8 @@ val uiModule = module {
     }
     navigation<Screen.Intro>(mapOf(FULLSCREEN_KEY to true)) {
         IntroScreen()
+    }
+    navigation<Screen.MediaPreview>(mapOf(DETAIL_KEY to true)) { route ->
+        MediaPreviewScreen(items = route.items, initialIndex = route.initialIndex)
     }
 }
