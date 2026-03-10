@@ -165,6 +165,7 @@ import kotlin.math.tanh
 
 val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
 val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
+val LocalCustomEmojiStickers = staticCompositionLocalOf<Map<Long, MessageBlock.StickerBlock>> { emptyMap() }
 
 @OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
 @Composable
@@ -1084,7 +1085,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             LocalVideoDownloadProgress provides state.videoDownloadProgress,
             LocalOnDownloadVideo provides { messageId: Long ->
                 viewModel.downloadVideo(messageId)
-            }) {
+            },
+            LocalCustomEmojiStickers provides state.customEmojiStickers
+        ) {
             val onReplyClick: (Long) -> Unit = { replyMessageId ->
                 viewModel.scrollToMessage(replyMessageId)
             }

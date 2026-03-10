@@ -2,9 +2,9 @@ package com.mocharealm.compound.di
 
 import com.mocharealm.compound.ui.nav.AppNavViewModel
 import com.mocharealm.compound.ui.nav.DeepLinkHandler
-import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
+import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.intro.IntroScreen
@@ -49,7 +49,7 @@ val uiModule = module {
             toggleChatArchive = get()
         )
     }
-    viewModel { (chatId: Long) ->
+    viewModel<ChatViewModel> { (chatId: Long) ->
         ChatViewModel(
             chatId = chatId,
             getChatMessages = get(),
@@ -67,7 +67,8 @@ val uiModule = module {
             sendFiles = get(),
             setChatDraftMessage = get(),
             saveChatReadPosition = get(),
-            getChatReadPosition = get()
+            getChatReadPosition = get(),
+            getCustomEmojiStickers = get()
         )
     }
 

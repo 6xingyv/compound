@@ -22,5 +22,6 @@ data class Text(
         data object Spoiler : TextEntityType()
         data object EmailAddress : TextEntityType()
         data object PhoneNumber : TextEntityType()
+        data class CustomEmoji(val customEmojiId: Long) : TextEntityType()
     }
 }

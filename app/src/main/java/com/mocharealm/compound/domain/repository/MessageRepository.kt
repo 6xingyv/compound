@@ -34,6 +34,7 @@ interface MessageRepository {
     val messageUpdates: Flow<MessageUpdateEvent>
 
     suspend fun sendSticker(chatId: Long, sticker: MessageBlock.StickerBlock): Result<Message>
+    suspend fun getCustomEmojiStickers(customEmojiIds: List<Long>): Result<List<MessageBlock.StickerBlock>>
     suspend fun sendLocation(chatId: Long, latitude: Double, longitude: Double): Result<Message>
     suspend fun setChatDraftMessage(
         chatId: Long,

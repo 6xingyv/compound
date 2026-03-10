@@ -2,6 +2,7 @@ package com.mocharealm.compound.ui.screen.chat
 
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.foundation.text.input.clearText
+import androidx.compose.runtime.snapshotFlow
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import com.mocharealm.compound.domain.model.Chat
@@ -11,32 +12,32 @@ import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.model.StickerSetInfo
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
+import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
+import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
 import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
 import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
 import com.mocharealm.compound.domain.usecase.OpenChatUseCase
+import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendLocationUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
-import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
-import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
-import kotlinx.coroutines.flow.distinctUntilChanged
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
-import androidx.compose.runtime.snapshotFlow
-import kotlinx.coroutines.FlowPreview
 
 enum class GroupPosition {
     FIRST, MIDDLE, LAST, SINGLE
@@ -60,12 +61,12 @@ fun List<Message>.toMessageItems(): List<ChatMessageItem> {
 
         val sameAbove =
             prevMessage?.sender?.id == message.sender.id &&
-            prevMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
-            !showTimestamp
+                    prevMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
+                    !showTimestamp
         val sameBelow =
             nextMessage?.sender?.id == message.sender.id &&
-            nextMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
-            nextTs != 0L && nextTs - currentTs <= 300
+                    nextMessage.blocks.first() !is MessageBlock.SystemActionBlock &&
+                    nextTs != 0L && nextTs - currentTs <= 300
 
         val position = when {
             message.blocks.first() is MessageBlock.SystemActionBlock -> GroupPosition.SINGLE
@@ -92,6 +93,7 @@ data class ChatUiState(
     val error: String? = null,
     val scrollToMessageId: Long? = null,
     val videoDownloadProgress: Map<Long, Int> = emptyMap(),
+    val customEmojiStickers: Map<Long, MessageBlock.StickerBlock> = emptyMap(),
     val stickerSets: List<StickerSetInfo> = emptyList(),
     val currentSetStickers: List<MessageBlock.StickerBlock> = emptyList(),
     val selectedStickerSetId: Long? = null,
@@ -133,7 +135,8 @@ class ChatViewModel(
     private val sendFiles: SendFilesUseCase,
     private val setChatDraftMessage: SetChatDraftMessageUseCase,
     private val saveChatReadPosition: SaveChatReadPositionUseCase,
-    private val getChatReadPosition: GetChatReadPositionUseCase
+    private val getChatReadPosition: GetChatReadPositionUseCase,
+    private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase
 ) : ViewModel() {
 
     companion object {
@@ -224,8 +227,8 @@ class ChatViewModel(
     @OptIn(FlowPreview::class)
     private fun loadChatInfo() {
         viewModelScope.launch {
-            getChat(chatId).onSuccess { chat -> 
-                _uiState.update { it.copy(chatInfo = chat) } 
+            getChat(chatId).onSuccess { chat ->
+                _uiState.update { it.copy(chatInfo = chat) }
                 if (!chat.draftMessage.isNullOrEmpty() && inputState.text.isEmpty()) {
                     inputState.edit { replace(0, length, chat.draftMessage) }
                 }
@@ -267,13 +270,25 @@ class ChatViewModel(
     fun loadMessages() {
         viewModelScope.launch {
             _uiState.update {
-                it.copy(loading = true, error = null, hasMore = true, hasMoreNewer = true, initialLoaded = false)
+                it.copy(
+                    loading = true,
+                    error = null,
+                    hasMore = true,
+                    hasMoreNewer = true,
+                    initialLoaded = false
+                )
             }
 
             val readPos = getChatReadPosition(chatId)
             val offset = if (readPos > 0) -PAGE_SIZE / 2 else 0
 
-            val localResult = getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset, onlyLocal = true)
+            val localResult = getChatMessages(
+                chatId,
+                PAGE_SIZE,
+                fromMessageId = readPos,
+                offset = offset,
+                onlyLocal = true
+            )
             localResult.onSuccess { localMessages ->
                 if (localMessages.isNotEmpty()) {
                     _uiState.update {
@@ -287,47 +302,49 @@ class ChatViewModel(
                 }
             }
 
-            getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset).fold(onSuccess = { networkMessages ->
-                _uiState.update { state ->
-                    // Merge file URLs from already-downloaded local messages
-                    val existingFileUrls = state.messages.flatMap { msg ->
-                        msg.blocks.filterIsInstance<MessageBlock.MediaBlock>()
-                            .filter { it.file.fileUrl != null }
-                            .map { it.id to it.file.fileUrl!! }
-                    }.toMap()
+            getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset).fold(
+                onSuccess = { networkMessages ->
+                    _uiState.update { state ->
+                        // Merge file URLs from already-downloaded local messages
+                        val existingFileUrls = state.messages.flatMap { msg ->
+                            msg.blocks.filterIsInstance<MessageBlock.MediaBlock>()
+                                .filter { it.file.fileUrl != null }
+                                .map { it.id to it.file.fileUrl!! }
+                        }.toMap()
 
-                    val merged = networkMessages.map { msg ->
-                        msg.copy(
-                            blocks = msg.blocks.map { block ->
-                                if (block is MessageBlock.MediaBlock && block.file.fileUrl == null) {
-                                    existingFileUrls[block.id]?.let { url ->
-                                        block.copy(
-                                            file = block.file.copy(
-                                                fileUrl = url
+                        val merged = networkMessages.map { msg ->
+                            msg.copy(
+                                blocks = msg.blocks.map { block ->
+                                    if (block is MessageBlock.MediaBlock && block.file.fileUrl == null) {
+                                        existingFileUrls[block.id]?.let { url ->
+                                            block.copy(
+                                                file = block.file.copy(
+                                                    fileUrl = url
+                                                )
                                             )
-                                        )
-                                    } ?: block
-                                } else block
-                            })
-                    }
+                                        } ?: block
+                                    } else block
+                                })
+                        }
 
-                    state.withMessages(merged.sortedBy { it.primaryTimestamp }).copy(
-                        loading = false,
-                        hasMore = networkMessages.size >= PAGE_SIZE,
-                        initialLoaded = true,
-                        scrollToMessageId = if (readPos > 0) readPos else state.scrollToMessageId
-                    )
-                }
-                downloadMissingFiles(networkMessages)
-            }, onFailure = { error ->
-                _uiState.update { state ->
-                    if (state.messages.isEmpty()) {
-                        state.copy(error = error.message, loading = false)
-                    } else {
-                        state.copy(loading = false, initialLoaded = true)
+                        state.withMessages(merged.sortedBy { it.primaryTimestamp }).copy(
+                            loading = false,
+                            hasMore = networkMessages.size >= PAGE_SIZE,
+                            initialLoaded = true,
+                            scrollToMessageId = if (readPos > 0) readPos else state.scrollToMessageId
+                        )
                     }
-                }
-            })
+                    downloadMissingFiles(networkMessages)
+                },
+                onFailure = { error ->
+                    _uiState.update { state ->
+                        if (state.messages.isEmpty()) {
+                            state.copy(error = error.message, loading = false)
+                        } else {
+                            state.copy(loading = false, initialLoaded = true)
+                        }
+                    }
+                })
         }
     }
 
@@ -508,7 +525,48 @@ class ChatViewModel(
                         }
                     }
 
+                    is MessageBlock.TextBlock -> {
+                        val customEmojiIds = block.content.entities
+                            .filter { it.type is Text.TextEntityType.CustomEmoji }
+                            .map { (it.type as Text.TextEntityType.CustomEmoji).customEmojiId }
+                            .filter { id -> !_uiState.value.customEmojiStickers.containsKey(id) }
+
+                        customEmojiIds.forEach { id ->
+                            viewModelScope.launch {
+                                getCustomEmojiStickers(listOf(id)).onSuccess { stickers ->
+                                    stickers.firstOrNull()?.let { sticker ->
+                                        _uiState.update { state ->
+                                            state.copy(customEmojiStickers = state.customEmojiStickers + (id to sticker))
+                                        }
+                                        downloadCustomEmojiFiles(listOf(sticker))
+                                    }
+                                }
+                            }
+                        }
+                    }
+
                     else -> {}
+                }
+            }
+        }
+    }
+
+    private fun downloadCustomEmojiFiles(stickers: List<MessageBlock.StickerBlock>) {
+        for (sticker in stickers) {
+            val fileId = sticker.file.fileId
+            if (fileId != null && sticker.file.fileUrl == null) {
+                viewModelScope.launch {
+                    downloadFile(fileId).onSuccess { path ->
+                        _uiState.update { state ->
+                            state.copy(
+                                customEmojiStickers = state.customEmojiStickers.mapValues { (_, s) ->
+                                    if (s.file.fileId == fileId) {
+                                        s.copy(file = s.file.copy(fileUrl = path))
+                                    } else s
+                                }
+                            )
+                        }
+                    }
                 }
             }
         }
@@ -522,13 +580,13 @@ class ChatViewModel(
                     msg.copy(
                         blocks = msg.blocks.map { block ->
                             when (block) {
-                                is MessageBlock.MediaBlock if block.id == blockId -> block.copy(
+                                is MessageBlock.MediaBlock -> if (block.id == blockId) block.copy(
                                     file = block.file.copy(fileUrl = path)
-                                )
+                                ) else block
 
-                                is MessageBlock.StickerBlock if block.id == blockId -> block.copy(
+                                is MessageBlock.StickerBlock -> if (block.id == blockId) block.copy(
                                     file = block.file.copy(fileUrl = path)
-                                )
+                                ) else block
 
                                 else -> block
                             }

@@ -335,6 +335,12 @@ object MessageDto {
                     is TdApi.TextEntityTypePhoneNumber ->
                         Text.TextEntityType.PhoneNumber
 
+                    is TdApi.TextEntityTypeCustomEmoji ->
+                        Text.TextEntityType.CustomEmoji(
+                            (entity.type as TdApi.TextEntityTypeCustomEmoji)
+                                .customEmojiId
+                        )
+
                     else -> null
                 }
                     ?: return@mapNotNull null
@@ -387,6 +393,9 @@ object MessageDto {
 
                         is Text.TextEntityType.PhoneNumber ->
                             TdApi.TextEntityTypePhoneNumber()
+
+                        is Text.TextEntityType.CustomEmoji ->
+                            TdApi.TextEntityTypeCustomEmoji(entity.type.customEmojiId)
                     }
                 TdApi.TextEntity(entity.offset, entity.length, type)
             }

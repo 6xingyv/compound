@@ -11,6 +11,7 @@ import com.mocharealm.compound.domain.usecase.auth.AwaitAuthenticationStateUseCa
 import com.mocharealm.compound.domain.usecase.auth.GetAuthenticationStateUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
+import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
 import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
@@ -101,6 +102,9 @@ val domainModule = module {
     }
     factory {
         GetStickerSetStickersUseCase(get())
+    }
+    factory {
+        GetCustomEmojiStickersUseCase(get())
     }
     factory {
         SendStickerUseCase(get())

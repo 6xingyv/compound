@@ -124,6 +124,21 @@ class MessageRepositoryImpl(
         messageMapper.mapSingleTdMessage(msg)
     }
 
+    override suspend fun getCustomEmojiStickers(customEmojiIds: List<Long>): Result<List<MessageBlock.StickerBlock>> = runCatching {
+        val result = tdLibDataSource.send(TdApi.GetCustomEmojiStickers(customEmojiIds.toLongArray()))
+        if (result !is TdApi.Stickers) error("Invalid stickers response type")
+        result.stickers.map { sticker ->
+            MessageBlock.StickerBlock(
+                id = 0,
+                timestamp = 0,
+                stickerFormat = MessageDto.mapStickerFormat(sticker.format),
+                file = com.mocharealm.compound.domain.model.File(fileId = sticker.sticker.id),
+                thumbnail = sticker.thumbnail?.file?.id?.let { com.mocharealm.compound.domain.model.File(fileId = it) },
+                caption = com.mocharealm.compound.domain.model.Text("")
+            )
+        }
+    }
+
     override suspend fun sendLocation(chatId: Long, latitude: Double, longitude: Double): Result<Message> = runCatching {
         val location = TdApi.Location(latitude, longitude, 0.0)
         val content = TdApi.InputMessageLocation(location, 0, 0, 0)

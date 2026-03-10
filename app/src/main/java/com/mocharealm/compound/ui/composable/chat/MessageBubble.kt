@@ -35,8 +35,8 @@ import com.mocharealm.compound.ui.screen.chat.GroupPosition
 import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
 import com.mocharealm.compound.ui.shape.BubbleAlignment
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
-import com.mocharealm.compound.ui.util.buildAnnotatedString
 import com.mocharealm.compound.ui.util.copyRelativeLightness
+import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.ui.modifier.surface
 import top.yukonga.miuix.kmp.basic.Text
@@ -288,21 +288,16 @@ fun MessageContent(
                 is MessageBlock.TextBlock -> {
                     val richText =
                         remember(
-                            block.content.content,
-                            block.content.entities,
+                            block.content,
                             revealedSpoilers.value
                         ) {
-                            buildAnnotatedString(
-                                block.content.content,
-                                block.content.entities,
-                                linkColor,
-                                revealedSpoilers.value
+                            block.content.toAnnotatedString(
+                                linkColor = linkColor
                             )
                         }
-                    RichTextContent(
+                    RichText(
                         text = richText,
                         contentColor = contentColor,
-                        uriHandler = uriHandler,
                         revealedEntityIndices = revealedSpoilers.value,
                         onSpoilerClick = { i -> revealedSpoilers.value += i },
                         modifier =

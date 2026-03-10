@@ -30,7 +30,7 @@ object TextEntityStyle {
                     SpanStyle(color = linkColor, textDecoration = TextDecoration.Underline)
             is Text.TextEntityType.Mention, is Text.TextEntityType.PhoneNumber ->
                     SpanStyle(color = linkColor)
-            is Text.TextEntityType.Spoiler -> SpanStyle()
+            is Text.TextEntityType.Spoiler, is Text.TextEntityType.CustomEmoji -> SpanStyle()
         }
     }
 }
