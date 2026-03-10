@@ -17,6 +17,9 @@ data class ChatDto(
     val photoUrl: String? = null,
     val photoFileId: Int? = null,
     val draftMessage: String? = null,
+    val isPinned: Boolean = false,
+    val isArchived: Boolean = false,
+    val order: Long = 0L
 ) {
     fun toDomain(): Chat =
         Chat(
@@ -30,7 +33,10 @@ data class ChatDto(
                 else if (isChannel) ChatType.CHANNEL else ChatType.DIRECT,
             photoUrl = photoUrl,
             photoFileId = photoFileId,
-            draftMessage = draftMessage
+            draftMessage = draftMessage,
+            isPinned = isPinned,
+            isArchived = isArchived,
+            order = order
         )
 
     companion object {
@@ -77,6 +83,13 @@ data class ChatDto(
             val draftMsg = chat.draftMessage
             val draftText = (draftMsg?.inputMessageText as? TdApi.InputMessageText)?.text?.text
 
+            val mainPosition = chat.positions?.find { it.list is TdApi.ChatListMain }
+            val archivePosition = chat.positions?.find { it.list is TdApi.ChatListArchive }
+
+            val isPinned = mainPosition?.isPinned == true
+            val isArchived = archivePosition != null
+            val order = mainPosition?.order ?: 0L
+
             return ChatDto(
                 id = chat.id,
                 title = chat.title,
@@ -87,7 +100,10 @@ data class ChatDto(
                 isGroup = isGroup,
                 photoUrl = localPath,
                 photoFileId = small?.id,
-                draftMessage = draftText
+                draftMessage = draftText,
+                isPinned = isPinned,
+                isArchived = isArchived,
+                order = order
             )
         }
     }

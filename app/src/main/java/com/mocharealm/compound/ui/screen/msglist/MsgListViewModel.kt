@@ -8,6 +8,8 @@ import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetChatsUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
+import com.mocharealm.compound.domain.usecase.ToggleChatArchiveUseCase
+import com.mocharealm.compound.domain.usecase.ToggleChatPinUseCase
 import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
@@ -30,7 +32,9 @@ class MsgListViewModel(
         private val getChats: GetChatsUseCase,
         private val downloadFile: DownloadFileUseCase,
         private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
-        private val getChat: GetChatUseCase
+        private val getChat: GetChatUseCase,
+        private val toggleChatPin: ToggleChatPinUseCase,
+        private val toggleChatArchive: ToggleChatArchiveUseCase
 ) : ViewModel() {
 
     companion object {
@@ -58,9 +62,26 @@ class MsgListViewModel(
                                     lastMessageDate = message.timestamp,
                                     unreadCount = if (message.isOutgoing) updated[idx].unreadCount else updated[idx].unreadCount + 1
                                 )
-                                // Move to top
                                 updated.removeAt(idx)
-                                updated.add(0, updatedChat)
+                                
+                                val insertIdx = if (updatedChat.isPinned) {
+                                    // Pinned chats maintain their absolute relative order among pinned chats.
+                                    // However, without fully sorting by order, we can just put it back at its original position
+                                    // or sort by order if available. Since it was pinned, we put it back where it was.
+                                    idx
+                                } else {
+                                    // Unpinned chats move to the top of the unpinned section
+                                    val firstUnpinned = updated.indexOfFirst { !it.isPinned }
+                                    if (firstUnpinned != -1) firstUnpinned else updated.size
+                                }
+                                
+                                // Insert safely
+                                if (insertIdx in 0..updated.size) {
+                                    updated.add(insertIdx, updatedChat)
+                                } else {
+                                    updated.add(updatedChat)
+                                }
+                                
                                 state.copy(chats = updated)
                             } else state
                         }
@@ -68,10 +89,17 @@ class MsgListViewModel(
                         // If chat is not in the list, fetch it
                         if (_uiState.value.chats.none { it.id == chatId }) {
                             getChat(chatId).onSuccess { chat ->
+                                if (chat.isArchived) return@onSuccess
                                 _uiState.update { state ->
                                     val newChats = state.chats.toMutableList()
                                     if (newChats.none { it.id == chat.id }) {
-                                        newChats.add(0, chat)
+                                        val insertIdx = if (chat.isPinned) {
+                                            0
+                                        } else {
+                                            val firstUnpinned = newChats.indexOfFirst { !it.isPinned }
+                                            if (firstUnpinned != -1) firstUnpinned else newChats.size
+                                        }
+                                        newChats.add(insertIdx, chat)
                                     }
                                     state.copy(chats = newChats)
                                 }
@@ -115,11 +143,10 @@ class MsgListViewModel(
     fun loadMoreChats() {
         val state = _uiState.value
         if (state.loadingMore || state.loading || !state.hasMore) return
-        val lastChatId = state.chats.lastOrNull()?.id ?: return
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
-            getChats(PAGE_SIZE, offsetChatId = lastChatId)
+            getChats(PAGE_SIZE, offset = state.chats.size)
                     .fold(
                             onSuccess = { moreChats ->
                                 if (moreChats.isEmpty()) {
@@ -188,6 +215,51 @@ class MsgListViewModel(
                     state.copy(chats = merged)
                 }
                 downloadMissingPhotos(freshChats)
+            }
+        }
+    }
+
+    fun togglePin(chatId: Long, isPinned: Boolean) {
+        viewModelScope.launch {
+            // 乐观更新 UI：置顶的放到最前面，取消置顶的按时间插入未置顶区域
+            _uiState.update { state ->
+                val mutableChats = state.chats.toMutableList()
+                val idx = mutableChats.indexOfFirst { it.id == chatId }
+                if (idx != -1) {
+                    val chat = mutableChats.removeAt(idx).copy(isPinned = isPinned)
+                    if (isPinned) {
+                        mutableChats.add(0, chat)
+                    } else {
+                        val firstUnpinned = mutableChats.indexOfFirst { !it.isPinned }
+                        val start = if (firstUnpinned != -1) firstUnpinned else mutableChats.size
+                        var insertIdx = start
+                        while (insertIdx < mutableChats.size && mutableChats[insertIdx].lastMessageDate > chat.lastMessageDate) {
+                            insertIdx++
+                        }
+                        mutableChats.add(insertIdx, chat)
+                    }
+                    state.copy(chats = mutableChats)
+                } else state
+            }
+
+            toggleChatPin(chatId, isPinned).onSuccess {
+                refreshChats()
+            }
+        }
+    }
+
+    fun toggleArchive(chatId: Long, isArchived: Boolean) {
+        viewModelScope.launch {
+            toggleChatArchive(chatId, isArchived).onSuccess {
+                _uiState.update { state ->
+                    if (isArchived) {
+                        // Remove from main list when archived
+                        state.copy(chats = state.chats.filter { it.id != chatId })
+                    } else {
+                        val chats = state.chats.map { if (it.id == chatId) it.copy(isArchived = isArchived) else it }
+                        state.copy(chats = chats)
+                    }
+                }
             }
         }
     }

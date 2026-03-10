@@ -44,7 +44,9 @@ val uiModule = module {
             getChats = get(),
             downloadFile = get(),
             subscribeToMessageUpdates = get(),
-            getChat = get()
+            getChat = get(),
+            toggleChatPin = get(),
+            toggleChatArchive = get()
         )
     }
     viewModel { (chatId: Long) ->

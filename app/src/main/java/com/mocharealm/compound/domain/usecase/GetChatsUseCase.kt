@@ -6,7 +6,7 @@ import com.mocharealm.compound.domain.repository.TelegramRepository
 class GetChatsUseCase(
     private val repository: TelegramRepository
 ) {
-    suspend operator fun invoke(limit: Int = 20, offsetChatId: Long = 0): Result<List<Chat>> {
-        return repository.getChats(limit, offsetChatId)
+    suspend operator fun invoke(limit: Int = 20, offset: Int = 0): Result<List<Chat>> {
+        return repository.getChats(limit, offset)
     }
 }

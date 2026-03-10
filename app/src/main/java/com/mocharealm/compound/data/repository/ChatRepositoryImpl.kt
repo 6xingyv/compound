@@ -17,33 +17,23 @@ class ChatRepositoryImpl(
     private val messageMapper: MessageMapper
 ) : ChatRepository {
 
-    override suspend fun getChats(limit: Int, offsetChatId: Long): Result<List<Chat>> =
+    override suspend fun getChats(limit: Int, offset: Int): Result<List<Chat>> =
         runCatching {
             // Continuously call LoadChats to load enough chats into TDLib internal list.
-            // When offsetChatId != 0, it means we've already loaded some, so we need more.
-            val totalNeeded = if (offsetChatId == 0L) limit else limit + limit
+            val totalNeeded = offset + limit
             var loaded = 0
             while (loaded < totalNeeded) {
                 val batch = runCatching {
-                    tdLibDataSource.send(TdApi.LoadChats(TdApi.ChatListMain(), totalNeeded - loaded))
+                    tdLibDataSource.send(TdApi.LoadChats(TdApi.ChatListMain(), limit))
                 }
                 if (batch.isFailure) break // 404 = no more chats
-                loaded += totalNeeded - loaded
+                loaded += limit
             }
 
             val chatList = tdLibDataSource.send(TdApi.GetChats(TdApi.ChatListMain(), totalNeeded))
             if (chatList !is TdApi.Chats) error("Invalid chat list response")
 
-            val chatIds = if (offsetChatId == 0L) {
-                chatList.chatIds.take(limit)
-            } else {
-                val idx = chatList.chatIds.indexOf(offsetChatId)
-                if (idx >= 0 && idx + 1 < chatList.chatIds.size) {
-                    chatList.chatIds.drop(idx + 1).take(limit)
-                } else {
-                    emptyList()
-                }
-            }
+            val chatIds = chatList.chatIds.drop(offset).take(limit)
 
             val chats = mutableListOf<Chat>()
             for (id in chatIds) {

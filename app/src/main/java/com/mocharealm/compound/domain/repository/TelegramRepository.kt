@@ -37,9 +37,9 @@ interface TelegramRepository {
 
     /**
      * 获取对话列表
-     * @param offsetChatId 分页偏移 chatId，0 表示从头加载
+     * @param offset 分页偏移，0 表示从头加载
      */
-    suspend fun getChats(limit: Int = 20, offsetChatId: Long = 0): Result<List<Chat>>
+    suspend fun getChats(limit: Int = 20, offset: Int = 0): Result<List<Chat>>
 
     /**
      * 获取聊天消息

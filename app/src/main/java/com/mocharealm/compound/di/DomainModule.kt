@@ -28,6 +28,8 @@ import com.mocharealm.compound.domain.usecase.phonenumber.ValidatePhoneNumberUse
 import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
+import com.mocharealm.compound.domain.usecase.ToggleChatArchiveUseCase
+import com.mocharealm.compound.domain.usecase.ToggleChatPinUseCase
 import org.koin.dsl.module
 
 val domainModule = module {
@@ -117,5 +119,11 @@ val domainModule = module {
     }
     factory {
         GetChatReadPositionUseCase(get())
+    }
+    factory {
+        ToggleChatPinUseCase(get())
+    }
+    factory {
+        ToggleChatArchiveUseCase(get())
     }
 }

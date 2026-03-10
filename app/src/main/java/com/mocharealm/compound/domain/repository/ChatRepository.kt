@@ -4,7 +4,7 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.InternalLink
 
 interface ChatRepository {
-    suspend fun getChats(limit: Int = 20, offsetChatId: Long = 0): Result<List<Chat>>
+    suspend fun getChats(limit: Int = 20, offset: Int = 0): Result<List<Chat>>
     suspend fun getChat(chatId: Long): Result<Chat>
     suspend fun getInternalLink(link: String): Result<InternalLink>
     suspend fun openChat(chatId: Long): Result<Unit>

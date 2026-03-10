@@ -9,7 +9,10 @@ data class Chat(
     val type: ChatType = ChatType.DIRECT,
     val photoUrl: String? = null,
     val photoFileId: Int? = null,
-    val draftMessage: String? = null
+    val draftMessage: String? = null,
+    val isPinned: Boolean = false,
+    val isArchived: Boolean = false,
+    val order: Long = 0L
 )
 
 enum class ChatType {
