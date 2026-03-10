@@ -19,10 +19,10 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.derivedStateOf
 import androidx.compose.runtime.getValue
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
@@ -33,15 +33,14 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.LocalDensity
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.runtime.CompositionLocalProvider
+import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
-import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.compound.ui.util.toPreviewAnnotatedString
 import com.mocharealm.gaze.icons.SFIcons
@@ -53,12 +52,10 @@ import com.mocharealm.tci18n.core.tdString
 import kotlinx.coroutines.launch
 import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.BasicComponent
-import top.yukonga.miuix.kmp.basic.Button
 import top.yukonga.miuix.kmp.basic.Card
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.basic.TextButton
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.overScrollVertical
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
@@ -89,54 +86,9 @@ fun MsgListScreen(
 
         val separatorColor = (if (isSystemInDarkTheme()) Color.White else Color.Black).copy(0.12f)
 
-        val selectedChatId = remember { mutableStateOf<Long?>(null) }
-        val showBottomSheet = remember { mutableStateOf(false) }
-
         LaunchedEffect(shouldLoadMore) {
             if (shouldLoadMore && !state.loading && state.hasMore) {
                 viewModel.loadMoreChats()
-            }
-        }
-
-        if (showBottomSheet.value) {
-            val selectedChat = state.chats.find { it.id == selectedChatId.value }
-            if (selectedChat != null) {
-                SuperBottomSheet(
-                    show = showBottomSheet,
-                    title = selectedChat.title,
-                    onDismissRequest = { showBottomSheet.value = false },
-                ) {
-                    Column(
-                        Modifier
-                            .fillMaxWidth()
-                            .padding(16.dp)
-                    ) {
-                        Button(
-                            onClick = {
-                                viewModel.togglePin(selectedChat.id, !selectedChat.isPinned)
-                                showBottomSheet.value = false
-                            },
-                            modifier = Modifier
-                                .fillMaxWidth()
-                                .padding(bottom = 8.dp)
-                        ) {
-                            Text(text = if (selectedChat.isPinned) tdString("Unpin") else tdString("Pin"))
-                        }
-                        Button(
-                            onClick = {
-                                viewModel.toggleArchive(selectedChat.id, !selectedChat.isArchived)
-                                showBottomSheet.value = false
-                            },
-                            modifier = Modifier.fillMaxWidth()
-                        ) {
-                            Text(
-                                text = if (selectedChat.isArchived) tdString("Unarchive") else tdString(
-                                    "Archive"
-                                ),
-                            )
-                        }
-                    }
-                }
             }
         }
 
@@ -190,7 +142,7 @@ fun MsgListScreen(
                     RevealSwipe(
                         state = revealState,
                         shape = RoundedCornerShape(0.dp),
-                        modifier = Modifier.Companion.animateItem(),
+                        modifier = Modifier.animateItem(),
                         swipe = { direction, _ ->
                             if (direction == RevealDirection.StartToEnd) {
                                 Box(
@@ -234,16 +186,7 @@ fun MsgListScreen(
                             Row(
                                 Modifier
                                     .fillMaxWidth()
-                                    .background(MiuixTheme.colorScheme.background)
-                                    .pointerInput(Unit) {
-                                        detectTapGestures(
-                                            onTap = { onChatClick(chat.id) },
-                                            onLongPress = {
-                                                selectedChatId.value = chat.id
-                                                showBottomSheet.value = true
-                                            }
-                                        )
-                                    }
+                                    .background(MiuixTheme.colorScheme.surface)
                                     .drawWithCache {
                                         onDrawBehind {
                                             drawLine(
@@ -257,6 +200,9 @@ fun MsgListScreen(
                                                 strokeWidth = 1f
                                             )
                                         }
+                                    }
+                                    .clickable {
+                                        onChatClick(chat.id)
                                     }
                                     .padding(28.dp, 16.dp),
                                 horizontalArrangement = Arrangement.spacedBy(12.dp),

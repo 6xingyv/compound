@@ -38,6 +38,8 @@ import androidx.compose.ui.text.Placeholder
 import androidx.compose.ui.text.PlaceholderVerticalAlign
 import androidx.compose.ui.text.TextLayoutResult
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.text.style.TextOverflow.Companion
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
@@ -58,6 +60,7 @@ fun RichText(
     style: TextStyle = MiuixTheme.textStyles.body1,
     maxLines: Int = Int.MAX_VALUE,
     minLines: Int = 1,
+    overflow: TextOverflow = TextOverflow.Clip,
     isInteractive: Boolean = true,
     revealedEntityIndices: Set<Int> = emptySet(),
     onSpoilerClick: (Int) -> Unit = {},
@@ -143,6 +146,7 @@ fun RichText(
         maxLines = maxLines,
         minLines = minLines,
         inlineContent = inlineContent,
+        overflow = overflow,
         modifier = modifier
             .drawWithContent {
                 val obscuredPath = Path()

@@ -252,7 +252,6 @@ class MsgListViewModel(
         }
     }
 
-    /** 刷新聊天列表（保留已有列表，静默更新） 用于从 ChatScreen 返回时同步最新消息 */
     fun refreshChats() {
         viewModelScope.launch {
             val currentChats = _uiState.value.chats
@@ -280,7 +279,6 @@ class MsgListViewModel(
 
     fun togglePin(chatId: Long, isPinned: Boolean) {
         viewModelScope.launch {
-            // 乐观更新 UI：置顶的放到最前面，取消置顶的按时间插入未置顶区域
             _uiState.update { state ->
                 val mutableChats = state.chats.toMutableList()
                 val idx = mutableChats.indexOfFirst { it.id == chatId }
