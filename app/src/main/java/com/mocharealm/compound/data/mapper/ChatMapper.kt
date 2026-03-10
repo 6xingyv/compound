@@ -3,7 +3,6 @@ package com.mocharealm.compound.data.mapper
 import com.mocharealm.compound.data.dto.ChatDto
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.Chat
-import com.mocharealm.compound.ui.util.toPreviewText
 import org.drinkless.tdlib.TdApi
 
 class ChatMapper(private val tdLibDataSource: TdLibDataSource) {
@@ -11,18 +10,28 @@ class ChatMapper(private val tdLibDataSource: TdLibDataSource) {
         val dto = ChatDto.fromTdApi(tdChat)
         var lastMsgContent = dto.lastMessage
 
-        // If it's a group, we might want to prepend the sender's name to the last message preview
-        if (dto.isGroup && dto.lastMessage?.sender != null) {
-            val senderName = when {
-                dto.lastMessage.sender.id < 0 -> {
-                    tdLibDataSource.sendSafe(TdApi.GetChat(dto.lastMessage.sender.id))
-                        .getOrNull()?.title
+        if (dto.lastMessage?.sender != null) {
+            val senderId = dto.lastMessage.sender.id
+            if (senderId > 0) {
+                val user = tdLibDataSource.sendSafe(TdApi.GetUser(senderId)).getOrNull()
+                if (user != null) {
+                    lastMsgContent = dto.lastMessage.copy(
+                        sender = dto.lastMessage.sender.copy(
+                            firstName = user.firstName,
+                            lastName = user.lastName,
+                        )
+                    )
                 }
-
-                else -> {
-                    val user = tdLibDataSource.sendSafe(TdApi.GetUser(dto.lastMessage.sender.id))
-                        .getOrNull()
-                    user?.let { "${it.firstName} ${it.lastName}".trim() }
+            } else if (senderId < 0) {
+                val chat = tdLibDataSource.sendSafe(TdApi.GetChat(senderId)).getOrNull()
+                if (chat != null) {
+                    lastMsgContent = dto.lastMessage.copy(
+                        sender = dto.lastMessage.sender.copy(
+                            firstName = chat.title,
+                            lastName = "",
+                            username = ""
+                        )
+                    )
                 }
             }
         }

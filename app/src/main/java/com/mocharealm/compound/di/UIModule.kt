@@ -46,7 +46,8 @@ val uiModule = module {
             subscribeToMessageUpdates = get(),
             getChat = get(),
             toggleChatPin = get(),
-            toggleChatArchive = get()
+            toggleChatArchive = get(),
+            getCustomEmojiStickers = get()
         )
     }
     viewModel<ChatViewModel> { (chatId: Long) ->

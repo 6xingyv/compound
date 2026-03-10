@@ -37,9 +37,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.runtime.CompositionLocalProvider
+import com.mocharealm.compound.ui.composable.chat.RichText
+import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
 import com.mocharealm.compound.ui.composable.Avatar
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
-import com.mocharealm.compound.ui.util.toPreviewText
+import com.mocharealm.compound.ui.util.toPreviewAnnotatedString
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.RevealDirection
 import com.mocharealm.gaze.ui.composable.RevealSwipe
@@ -69,237 +73,245 @@ fun MsgListScreen(
     val listState = rememberLazyListState()
     val scope = rememberCoroutineScope()
 
-    // 当滚动到无法再往下滚动时加载更多聊天
-    val shouldLoadMore by remember {
-        derivedStateOf { !listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0 }
-    }
-
-    val density = LocalDensity.current
-
-    val paddingPx = with(density) { 28.dp.toPx() }
-    val avatarPx = with(density) { 45.dp.toPx() }
-    val spacePx = with(density) { 12.dp.toPx() }
-
-    val separatorColor = (if (isSystemInDarkTheme()) Color.White else Color.Black).copy(0.12f)
-
-    val selectedChatId = remember { mutableStateOf<Long?>(null) }
-    val showBottomSheet = remember { mutableStateOf(false) }
-
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && !state.loading && state.hasMore) {
-            viewModel.loadMoreChats()
+    CompositionLocalProvider(
+        LocalCustomEmojiStickers provides state.customEmojiStickers
+    ) {
+        // 当滚动到无法再往下滚动时加载更多聊天
+        val shouldLoadMore by remember {
+            derivedStateOf { !listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0 }
         }
-    }
 
-    if (showBottomSheet.value) {
-        val selectedChat = state.chats.find { it.id == selectedChatId.value }
-        if (selectedChat != null) {
-            SuperBottomSheet(
-                show = showBottomSheet,
-                title = selectedChat.title,
-                onDismissRequest = { showBottomSheet.value = false },
-            ) {
-                Column(Modifier
-                    .fillMaxWidth()
-                    .padding(16.dp)) {
-                    Button(
-                        onClick = {
-                            viewModel.togglePin(selectedChat.id, !selectedChat.isPinned)
-                            showBottomSheet.value = false
-                        },
-                        modifier = Modifier
+        val density = LocalDensity.current
+
+        val paddingPx = with(density) { 28.dp.toPx() }
+        val avatarPx = with(density) { 45.dp.toPx() }
+        val spacePx = with(density) { 12.dp.toPx() }
+
+        val separatorColor = (if (isSystemInDarkTheme()) Color.White else Color.Black).copy(0.12f)
+
+        val selectedChatId = remember { mutableStateOf<Long?>(null) }
+        val showBottomSheet = remember { mutableStateOf(false) }
+
+        LaunchedEffect(shouldLoadMore) {
+            if (shouldLoadMore && !state.loading && state.hasMore) {
+                viewModel.loadMoreChats()
+            }
+        }
+
+        if (showBottomSheet.value) {
+            val selectedChat = state.chats.find { it.id == selectedChatId.value }
+            if (selectedChat != null) {
+                SuperBottomSheet(
+                    show = showBottomSheet,
+                    title = selectedChat.title,
+                    onDismissRequest = { showBottomSheet.value = false },
+                ) {
+                    Column(
+                        Modifier
                             .fillMaxWidth()
-                            .padding(bottom = 8.dp)
+                            .padding(16.dp)
                     ) {
-                        Text(text = if (selectedChat.isPinned) tdString("Unpin") else tdString("Pin"))
+                        Button(
+                            onClick = {
+                                viewModel.togglePin(selectedChat.id, !selectedChat.isPinned)
+                                showBottomSheet.value = false
+                            },
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(bottom = 8.dp)
+                        ) {
+                            Text(text = if (selectedChat.isPinned) tdString("Unpin") else tdString("Pin"))
+                        }
+                        Button(
+                            onClick = {
+                                viewModel.toggleArchive(selectedChat.id, !selectedChat.isArchived)
+                                showBottomSheet.value = false
+                            },
+                            modifier = Modifier.fillMaxWidth()
+                        ) {
+                            Text(
+                                text = if (selectedChat.isArchived) tdString("Unarchive") else tdString(
+                                    "Archive"
+                                ),
+                            )
+                        }
                     }
-                    Button(
-                        onClick = {
-                            viewModel.toggleArchive(selectedChat.id, !selectedChat.isArchived)
-                            showBottomSheet.value = false
-                        },
-                        modifier = Modifier.fillMaxWidth()
-                    ) {
-                        Text(
-                            text = if (selectedChat.isArchived) tdString("Unarchive") else tdString(
-                                "Archive"
-                            ),
+                }
+            }
+        }
+
+        LazyColumn(
+            state = listState,
+            modifier = Modifier
+                .fillMaxHeight()
+                .overScrollVertical()
+                .scrollEndHaptic(),
+            contentPadding =
+                PaddingValues(
+                    top = padding.calculateTopPadding(),
+                    bottom = padding.calculateBottomPadding() + 12.dp,
+                ),
+            overscrollEffect = null,
+        ) {
+            if (state.loading && state.chats.isEmpty()) {
+                item {
+                    Card(modifier = Modifier.padding(12.dp)) {
+                        BasicComponent(title = tdString("Loading"))
+                    }
+                }
+            } else if (state.error != null && state.chats.isEmpty()) {
+                item {
+                    Card(modifier = Modifier.padding(12.dp)) {
+                        BasicComponent(
+                            title = tdString("ErrorOccurred"),
+                            summary = state.error,
+                        )
+                        TextButton(
+                            text = tdString("Retry"),
+                            onClick = viewModel::loadChats,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
                         )
                     }
                 }
-            }
-        }
-    }
-
-    LazyColumn(
-        state = listState,
-        modifier = Modifier
-            .fillMaxHeight()
-            .overScrollVertical()
-            .scrollEndHaptic(),
-        contentPadding =
-            PaddingValues(
-                top = padding.calculateTopPadding(),
-                bottom = padding.calculateBottomPadding() + 12.dp,
-            ),
-        overscrollEffect = null,
-    ) {
-        if (state.loading && state.chats.isEmpty()) {
-            item {
-                Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(title = tdString("Loading"))
+            } else if (state.chats.isEmpty()) {
+                item {
+                    Card(modifier = Modifier.padding(12.dp)) {
+                        BasicComponent(title = "No chats found")
+                        TextButton(
+                            text = tdString("Refresh"),
+                            onClick = viewModel::loadChats,
+                            modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                        )
+                    }
                 }
-            }
-        } else if (state.error != null && state.chats.isEmpty()) {
-            item {
-                Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(
-                        title = tdString("ErrorOccurred"),
-                        summary = state.error,
-                    )
-                    TextButton(
-                        text = tdString("Retry"),
-                        onClick = viewModel::loadChats,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        } else if (state.chats.isEmpty()) {
-            item {
-                Card(modifier = Modifier.padding(12.dp)) {
-                    BasicComponent(title = "No chats found")
-                    TextButton(
-                        text = tdString("Refresh"),
-                        onClick = viewModel::loadChats,
-                        modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
-                    )
-                }
-            }
-        } else {
-            items(state.chats, key = { chat -> chat.id }) { chat ->
-                val revealState = rememberRevealState(key = chat.id)
-                RevealSwipe(
-                    state = revealState,
-                    shape = RoundedCornerShape(0.dp),
-                    modifier = Modifier.Companion.animateItem(),
-                    swipe = { direction, _ ->
-                        if (direction == RevealDirection.StartToEnd) {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(MiuixTheme.colorScheme.primary)
-                                    .clickable {
-                                        viewModel.togglePin(chat.id, !chat.isPinned)
-                                        scope.launch { revealState.resetAnimated() }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = if (chat.isPinned) SFIcons.Pin_Slash else SFIcons.Pin,
-                                    contentDescription = "Pin",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        } else {
-                            Box(
-                                modifier = Modifier
-                                    .fillMaxSize()
-                                    .background(Color.Gray)
-                                    .clickable {
-                                        viewModel.toggleArchive(chat.id, !chat.isArchived)
-                                        scope.launch { revealState.resetAnimated() }
-                                    },
-                                contentAlignment = Alignment.Center
-                            ) {
-                                Icon(
-                                    imageVector = SFIcons.Archivebox,
-                                    contentDescription = "Archive",
-                                    tint = Color.White,
-                                    modifier = Modifier.size(24.dp)
-                                )
-                            }
-                        }
-                    },
-                    content = { _, _ ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .pointerInput(Unit) {
-                                    detectTapGestures(
-                                        onTap = { onChatClick(chat.id) },
-                                        onLongPress = {
-                                            selectedChatId.value = chat.id
-                                            showBottomSheet.value = true
-                                        }
+            } else {
+                items(state.chats, key = { chat -> chat.id }) { chat ->
+                    val revealState = rememberRevealState(key = chat.id)
+                    RevealSwipe(
+                        state = revealState,
+                        shape = RoundedCornerShape(0.dp),
+                        modifier = Modifier.Companion.animateItem(),
+                        swipe = { direction, _ ->
+                            if (direction == RevealDirection.StartToEnd) {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(MiuixTheme.colorScheme.primary)
+                                        .clickable {
+                                            viewModel.togglePin(chat.id, !chat.isPinned)
+                                            scope.launch { revealState.resetAnimated() }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = if (chat.isPinned) SFIcons.Pin_Slash else SFIcons.Pin,
+                                        contentDescription = "Pin",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
                                     )
                                 }
-                                .drawWithCache {
-                                    onDrawBehind {
-                                        drawLine(
-                                            separatorColor,
-                                            start =
-                                                Offset(
-                                                    paddingPx + avatarPx + spacePx,
-                                                    size.height
-                                                ),
-                                            end = Offset(size.width - paddingPx, size.height),
-                                            strokeWidth = 1f
+                            } else {
+                                Box(
+                                    modifier = Modifier
+                                        .fillMaxSize()
+                                        .background(Color.Gray)
+                                        .clickable {
+                                            viewModel.toggleArchive(chat.id, !chat.isArchived)
+                                            scope.launch { revealState.resetAnimated() }
+                                        },
+                                    contentAlignment = Alignment.Center
+                                ) {
+                                    Icon(
+                                        imageVector = SFIcons.Archivebox,
+                                        contentDescription = "Archive",
+                                        tint = Color.White,
+                                        modifier = Modifier.size(24.dp)
+                                    )
+                                }
+                            }
+                        },
+                        content = { _, _ ->
+                            Row(
+                                Modifier
+                                    .fillMaxWidth()
+                                    .background(MiuixTheme.colorScheme.background)
+                                    .pointerInput(Unit) {
+                                        detectTapGestures(
+                                            onTap = { onChatClick(chat.id) },
+                                            onLongPress = {
+                                                selectedChatId.value = chat.id
+                                                showBottomSheet.value = true
+                                            }
                                         )
                                     }
-                                }
-                                .padding(28.dp, 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Avatar(
-                                modifier = Modifier.size(45.dp),
-                                photoPath = chat.photoUrl,
-                                initials = chat.title.take(2)
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Row {
-                                    Text(
-                                        text = if (chat.isPinned) "📌 ${chat.title}" else chat.title,
-                                        style = MiuixTheme.textStyles.body1,
-                                        fontWeight = FontWeight.Bold,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.weight(1f)
-                                    )
-                                    Text(
-                                        text = chat.lastMessageDate.formatMessageTimestamp(),
-                                        style = MiuixTheme.textStyles.body1,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.alpha(0.6f)
-                                    )
-                                }
-                                Text(
-                                    text = chat.lastMessage?.toPreviewText() ?: "",
-                                    style = MiuixTheme.textStyles.body1,
-                                    minLines = 2,
-                                    maxLines = 2,
-                                    overflow = TextOverflow.Ellipsis,
-                                    modifier = Modifier.alpha(0.6f)
+                                    .drawWithCache {
+                                        onDrawBehind {
+                                            drawLine(
+                                                separatorColor,
+                                                start =
+                                                    Offset(
+                                                        paddingPx + avatarPx + spacePx,
+                                                        size.height
+                                                    ),
+                                                end = Offset(size.width - paddingPx, size.height),
+                                                strokeWidth = 1f
+                                            )
+                                        }
+                                    }
+                                    .padding(28.dp, 16.dp),
+                                horizontalArrangement = Arrangement.spacedBy(12.dp),
+                                verticalAlignment = Alignment.CenterVertically
+                            ) {
+                                Avatar(
+                                    modifier = Modifier.size(45.dp),
+                                    photoPath = chat.photoUrl,
+                                    initials = chat.title.take(2)
                                 )
+                                Column(Modifier.weight(1f)) {
+                                    Row {
+                                        Text(
+                                            text = if (chat.isPinned) "📌 ${chat.title}" else chat.title,
+                                            style = MiuixTheme.textStyles.body1,
+                                            fontWeight = FontWeight.Bold,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        Text(
+                                            text = chat.lastMessageDate.formatMessageTimestamp(),
+                                            style = MiuixTheme.textStyles.body1,
+                                            maxLines = 1,
+                                            overflow = TextOverflow.Ellipsis,
+                                            modifier = Modifier.alpha(0.6f)
+                                        )
+                                    }
+                                    RichText(
+                                        text = chat.lastMessage?.toPreviewAnnotatedString(chat)
+                                            ?: AnnotatedString(""),
+                                        style = MiuixTheme.textStyles.body1,
+                                        modifier = Modifier.alpha(0.6f),
+                                        maxLines = 2,
+                                        minLines = 2,
+                                        isInteractive = false
+                                    )
+                                }
                             }
                         }
-                    }
-                )
-            }
-            if (state.loadingMore) {
-                item {
-                    Row(
-                        modifier = Modifier
-                            .fillMaxWidth()
-                            .padding(12.dp),
-                        horizontalArrangement = Arrangement.Center
-                    ) {
-                        Text(
-                            text = tdString("Loading"),
-                            color = MiuixTheme.colorScheme.onSurfaceVariantActions,
-                        )
+                    )
+                }
+                if (state.loadingMore) {
+                    item {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp),
+                            horizontalArrangement = Arrangement.Center
+                        ) {
+                            Text(
+                                text = tdString("Loading"),
+                                color = MiuixTheme.colorScheme.onSurfaceVariantActions,
+                            )
+                        }
                     }
                 }
             }

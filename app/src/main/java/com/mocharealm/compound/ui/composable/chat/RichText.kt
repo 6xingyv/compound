@@ -7,10 +7,8 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.text.InlineTextContent
-import androidx.compose.foundation.text.selection.SelectionContainer
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
@@ -58,6 +56,9 @@ fun RichText(
     modifier: Modifier = Modifier,
     contentColor: Color = LocalContentColor.current,
     style: TextStyle = MiuixTheme.textStyles.body1,
+    maxLines: Int = Int.MAX_VALUE,
+    minLines: Int = 1,
+    isInteractive: Boolean = true,
     revealedEntityIndices: Set<Int> = emptySet(),
     onSpoilerClick: (Int) -> Unit = {},
     onMentionClick: (String) -> Unit = {}
@@ -67,7 +68,10 @@ fun RichText(
 
     val inlineContent = remember(text, customEmojiStickers) {
         text.getStringAnnotations(RichTextTags.CUSTOM_EMOJI, 0, text.length).associate { range ->
-            val emojiId = range.item.toLongOrNull() ?: return@associate range.item to InlineTextContent(Placeholder(0.sp, 0.sp, PlaceholderVerticalAlign.Center)) {}
+            val emojiId =
+                range.item.toLongOrNull() ?: return@associate range.item to InlineTextContent(
+                    Placeholder(0.sp, 0.sp, PlaceholderVerticalAlign.Center)
+                ) {}
             val sticker = customEmojiStickers[emojiId]
             range.item to InlineTextContent(
                 Placeholder(22.sp, 22.sp, PlaceholderVerticalAlign.Center)
@@ -131,108 +135,114 @@ fun RichText(
         paths
     }
 
-    SelectionContainer {
-        Text(
-            text = text,
-            color = contentColor,
-            style = style,
-            onTextLayout = { layoutResult.value = it },
-            inlineContent = inlineContent,
-            modifier = modifier
-                .drawWithContent {
-                    val obscuredPath = Path()
-                    var hasObscured = false
-                    spoilerPaths.forEach { (index, path) ->
-                        if (index !in revealedEntityIndices || index in revealingSpoilers) {
-                            obscuredPath.addPath(path)
-                            hasObscured = true
-                        }
+    Text(
+        text = text,
+        color = contentColor,
+        style = style,
+        onTextLayout = { layoutResult.value = it },
+        maxLines = maxLines,
+        minLines = minLines,
+        inlineContent = inlineContent,
+        modifier = modifier
+            .drawWithContent {
+                val obscuredPath = Path()
+                var hasObscured = false
+                spoilerPaths.forEach { (index, path) ->
+                    if (index !in revealedEntityIndices || index in revealingSpoilers) {
+                        obscuredPath.addPath(path)
+                        hasObscured = true
                     }
+                }
 
-                    if (!hasObscured) {
-                        drawContent()
-                        return@drawWithContent
-                    }
+                if (!hasObscured) {
+                    drawContent()
+                    return@drawWithContent
+                }
 
-                    clipPath(obscuredPath, clipOp = ClipOp.Difference) {
-                        this@drawWithContent.drawContent()
-                    }
+                clipPath(obscuredPath, clipOp = ClipOp.Difference) {
+                    this@drawWithContent.drawContent()
+                }
 
-                    val hasRipples = revealingSpoilers.isNotEmpty()
-                    if (hasRipples) {
-                        clipPath(obscuredPath) {
-                            val canvas = drawContext.canvas
-                            canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
-
-                            revealingSpoilers.forEach { (index, anim) ->
-                                revealingOrigins[index]?.let { origin ->
-                                    val radius = anim.value
-                                    if (radius > 0f) {
-                                        drawCircle(
-                                            brush = Brush.radialGradient(
-                                                0.0f to Color.Black,
-                                                0.5f to Color.Black,
-                                                1.0f to Color.Transparent,
-                                                center = origin,
-                                                radius = radius
-                                            ),
-                                            center = origin,
-                                            radius = radius
-                                        )
-                                    }
-                                }
-                            }
-
-                            canvas.saveLayer(
-                                Rect(0f, 0f, size.width, size.height),
-                                Paint().apply { blendMode = BlendMode.SrcIn }
-                            )
-                            this@drawWithContent.drawContent()
-                            canvas.restore()
-                            canvas.restore()
-                        }
-                    }
-
+                val hasRipples = revealingSpoilers.isNotEmpty()
+                if (hasRipples) {
                     clipPath(obscuredPath) {
                         val canvas = drawContext.canvas
                         canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
 
-                        shader.setFloatUniform(
-                            "particleColor",
-                            contentColor.red,
-                            contentColor.green,
-                            contentColor.blue,
-                            contentColor.alpha
-                        )
-                        shader.setFloatUniform("time", time)
-                        shader.setFloatUniform("resolution", size.width, size.height)
-                        drawRect(brush = brush)
-
-                        if (hasRipples) {
-                            revealingSpoilers.forEach { (index, anim) ->
-                                revealingOrigins[index]?.let { origin ->
-                                    val radius = anim.value
-                                    if (radius > 0f) {
-                                        drawCircle(
-                                            brush = Brush.radialGradient(
-                                                0.0f to Color.Black,
-                                                0.5f to Color.Black,
-                                                1.0f to Color.Transparent,
-                                                center = origin,
-                                                radius = radius
-                                            ),
+                        revealingSpoilers.forEach { (index, anim) ->
+                            revealingOrigins[index]?.let { origin ->
+                                val radius = anim.value
+                                if (radius > 0f) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            0.0f to Color.Black,
+                                            0.5f to Color.Black,
+                                            1.0f to Color.Transparent,
                                             center = origin,
-                                            radius = radius,
-                                            blendMode = BlendMode.DstOut
-                                        )
-                                    }
+                                            radius = radius
+                                        ),
+                                        center = origin,
+                                        radius = radius
+                                    )
                                 }
                             }
                         }
+
+                        canvas.saveLayer(
+                            Rect(0f, 0f, size.width, size.height),
+                            Paint().apply { blendMode = BlendMode.SrcIn }
+                        )
+                        this@drawWithContent.drawContent()
+                        canvas.restore()
                         canvas.restore()
                     }
                 }
-                .pointerInput(text, layoutResult, revealedEntityIndices) {
+
+                clipPath(obscuredPath) {
+                    val canvas = drawContext.canvas
+                    canvas.saveLayer(Rect(0f, 0f, size.width, size.height), Paint())
+
+                    shader.setFloatUniform(
+                        "particleColor",
+                        contentColor.red,
+                        contentColor.green,
+                        contentColor.blue,
+                        contentColor.alpha
+                    )
+                    shader.setFloatUniform("time", time)
+                    shader.setFloatUniform("resolution", size.width, size.height)
+                    drawRect(brush = brush)
+
+                    if (hasRipples) {
+                        revealingSpoilers.forEach { (index, anim) ->
+                            revealingOrigins[index]?.let { origin ->
+                                val radius = anim.value
+                                if (radius > 0f) {
+                                    drawCircle(
+                                        brush = Brush.radialGradient(
+                                            0.0f to Color.Black,
+                                            0.5f to Color.Black,
+                                            1.0f to Color.Transparent,
+                                            center = origin,
+                                            radius = radius
+                                        ),
+                                        center = origin,
+                                        radius = radius,
+                                        blendMode = BlendMode.DstOut
+                                    )
+                                }
+                            }
+                        }
+                    }
+                    canvas.restore()
+                }
+            }
+            .then(
+                if (isInteractive) Modifier.pointerInput(
+                    text,
+                    layoutResult,
+                    revealedEntityIndices
+                ) {
                     detectTapGestures { pos ->
                         val layout = layoutResult.value ?: return@detectTapGestures
                         if (pos.y < 0 || pos.y > layout.size.height) return@detectTapGestures
@@ -250,9 +260,15 @@ fun RichText(
                             .firstOrNull()
                             ?.let {
                                 val index = it.item.toIntOrNull() ?: return@let
-                                if (index in revealedEntityIndices || revealingSpoilers.containsKey(index)) return@let
+                                if (index in revealedEntityIndices || revealingSpoilers.containsKey(
+                                        index
+                                    )
+                                ) return@let
 
-                                val maxRadius = hypot(layout.size.width.toDouble(), layout.size.height.toDouble()).toFloat()
+                                val maxRadius = hypot(
+                                    layout.size.width.toDouble(),
+                                    layout.size.height.toDouble()
+                                ).toFloat()
                                 val anim = Animatable(0f)
                                 revealingSpoilers[index] = anim
                                 revealingOrigins[index] = pos
@@ -260,7 +276,10 @@ fun RichText(
                                 coroutineScope.launch {
                                     anim.animateTo(
                                         targetValue = maxRadius,
-                                        animationSpec = tween(durationMillis = 400, easing = LinearEasing)
+                                        animationSpec = tween(
+                                            durationMillis = 400,
+                                            easing = LinearEasing
+                                        )
                                     )
                                     onSpoilerClick(index)
                                     yield()
@@ -270,6 +289,7 @@ fun RichText(
                             }
                     }
                 }
-        )
-    }
+                else Modifier
+            )
+    )
 }

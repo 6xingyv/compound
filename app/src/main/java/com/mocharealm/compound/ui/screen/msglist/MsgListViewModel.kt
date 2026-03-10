@@ -19,22 +19,28 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withTimeoutOrNull
+import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.MessageBlock
+import com.mocharealm.compound.domain.model.Text as DomainText
+import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
 
 data class MsgListUiState(
-        val chats: List<Chat> = emptyList(),
-        val loading: Boolean = false,
-        val loadingMore: Boolean = false,
-        val hasMore: Boolean = true,
-        val error: String? = null
+    val chats: List<Chat> = emptyList(),
+    val customEmojiStickers: Map<Long, MessageBlock.StickerBlock> = emptyMap(),
+    val loading: Boolean = false,
+    val loadingMore: Boolean = false,
+    val hasMore: Boolean = true,
+    val error: String? = null
 )
 
 class MsgListViewModel(
-        private val getChats: GetChatsUseCase,
-        private val downloadFile: DownloadFileUseCase,
-        private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
-        private val getChat: GetChatUseCase,
-        private val toggleChatPin: ToggleChatPinUseCase,
-        private val toggleChatArchive: ToggleChatArchiveUseCase
+    private val getChats: GetChatsUseCase,
+    private val downloadFile: DownloadFileUseCase,
+    private val subscribeToMessageUpdates: SubscribeToMessageUpdatesUseCase,
+    private val getChat: GetChatUseCase,
+    private val toggleChatPin: ToggleChatPinUseCase,
+    private val toggleChatArchive: ToggleChatArchiveUseCase,
+    private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase
 ) : ViewModel() {
 
     companion object {
@@ -85,6 +91,9 @@ class MsgListViewModel(
                                 state.copy(chats = updated)
                             } else state
                         }
+                        
+                        // Fetch custom emoji stickers for the new message
+                        fetchCustomEmojiStickers(listOf(message))
 
                         // If chat is not in the list, fetch it
                         if (_uiState.value.chats.none { it.id == chatId }) {
@@ -104,10 +113,57 @@ class MsgListViewModel(
                                     state.copy(chats = newChats)
                                 }
                                 downloadMissingPhotos(listOf(chat))
+                                chat.lastMessage?.let { fetchCustomEmojiStickers(listOf(it)) }
                             }
                         }
                     }
+
                     else -> {}
+                }
+            }
+        }
+    }
+
+    private fun fetchCustomEmojiStickers(messages: List<Message>) {
+        val customEmojiIds = messages.flatMap { msg ->
+            msg.blocks.filterIsInstance<MessageBlock.TextBlock>().flatMap { block ->
+                block.content.entities
+                    .filter { it.type is DomainText.TextEntityType.CustomEmoji }
+                    .map { (it.type as DomainText.TextEntityType.CustomEmoji).customEmojiId }
+            }
+        }.filter { id -> !_uiState.value.customEmojiStickers.containsKey(id) }.distinct()
+
+        if (customEmojiIds.isEmpty()) return
+
+        viewModelScope.launch {
+            getCustomEmojiStickers(customEmojiIds).onSuccess { stickers ->
+                _uiState.update { state ->
+                    val newStickers = state.customEmojiStickers.toMutableMap()
+                    stickers.forEachIndexed { index, sticker ->
+                        newStickers[customEmojiIds[index]] = sticker
+                    }
+                    state.copy(customEmojiStickers = newStickers)
+                }
+                downloadMissingStickers(stickers)
+            }
+        }
+    }
+
+    private fun downloadMissingStickers(stickers: List<MessageBlock.StickerBlock>) {
+        for (sticker in stickers) {
+            val fileId = sticker.file.fileId ?: continue
+            if (sticker.file.fileUrl != null) continue
+            viewModelScope.launch {
+                downloadFile(fileId).onSuccess { path ->
+                    _uiState.update { state ->
+                        state.copy(
+                            customEmojiStickers = state.customEmojiStickers.mapValues { (_, s) ->
+                                if (s.file.fileId == fileId) {
+                                    s.copy(file = s.file.copy(fileUrl = path))
+                                } else s
+                            }
+                        )
+                    }
                 }
             }
         }
@@ -122,19 +178,20 @@ class MsgListViewModel(
                 return@launch
             }
             result.fold(
-                    onSuccess = { chats ->
-                        _uiState.update {
-                            it.copy(
-                                    chats = chats,
-                                    loading = false,
-                                    hasMore = chats.size >= PAGE_SIZE,
-                            )
-                        }
-                        downloadMissingPhotos(chats)
-                    },
-                    onFailure = { error ->
-                        _uiState.update { it.copy(error = error.message, loading = false) }
+                onSuccess = { chats ->
+                    _uiState.update {
+                        it.copy(
+                            chats = chats,
+                            loading = false,
+                            hasMore = chats.size >= PAGE_SIZE,
+                        )
                     }
+                    downloadMissingPhotos(chats)
+                    fetchCustomEmojiStickers(chats.mapNotNull { it.lastMessage })
+                },
+                onFailure = { error ->
+                    _uiState.update { it.copy(error = error.message, loading = false) }
+                }
             )
         }
     }
@@ -147,31 +204,32 @@ class MsgListViewModel(
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
             getChats(PAGE_SIZE, offset = state.chats.size)
-                    .fold(
-                            onSuccess = { moreChats ->
-                                if (moreChats.isEmpty()) {
-                                    _uiState.update {
-                                        it.copy(loadingMore = false, hasMore = false)
-                                    }
-                                } else {
-                                    val existingIds = state.chats.map { it.id }.toSet()
-                                    val newChats = moreChats.filter { it.id !in existingIds }
-                                    _uiState.update {
-                                        it.copy(
-                                                chats = it.chats + newChats,
-                                                loadingMore = false,
-                                                hasMore = moreChats.size >= PAGE_SIZE,
-                                        )
-                                    }
-                                    downloadMissingPhotos(newChats)
-                                }
-                            },
-                            onFailure = { error ->
-                                _uiState.update {
-                                    it.copy(loadingMore = false, error = error.message)
-                                }
+                .fold(
+                    onSuccess = { moreChats ->
+                        if (moreChats.isEmpty()) {
+                            _uiState.update {
+                                it.copy(loadingMore = false, hasMore = false)
                             }
-                    )
+                        } else {
+                            val existingIds = state.chats.map { it.id }.toSet()
+                            val newChats = moreChats.filter { it.id !in existingIds }
+                            _uiState.update {
+                                it.copy(
+                                    chats = it.chats + newChats,
+                                    loadingMore = false,
+                                    hasMore = moreChats.size >= PAGE_SIZE,
+                                )
+                            }
+                            downloadMissingPhotos(newChats)
+                            fetchCustomEmojiStickers(newChats.mapNotNull { it.lastMessage })
+                        }
+                    },
+                    onFailure = { error ->
+                        _uiState.update {
+                            it.copy(loadingMore = false, error = error.message)
+                        }
+                    }
+                )
         }
     }
 
@@ -215,6 +273,7 @@ class MsgListViewModel(
                     state.copy(chats = merged)
                 }
                 downloadMissingPhotos(freshChats)
+                fetchCustomEmojiStickers(freshChats.mapNotNull { it.lastMessage })
             }
         }
     }
