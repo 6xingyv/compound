@@ -55,7 +55,12 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_LARGE_LOWE
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
-import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.foundation.layout.offset
+import androidx.compose.ui.unit.IntOffset
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.runtime.MutableState
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.FULLSCREEN_KEY
 
@@ -84,49 +89,66 @@ class ListDetailScene<T : Any>(
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val totalWidth = maxWidth
                 val isExpanded = isExpandedState.value
-                val targetDetailWidth = if (isExpanded) totalWidth else totalWidth * 0.6f
-                val animatedDetailWidth by animateDpAsState(
-                    targetValue = targetDetailWidth,
-                    label = "detailWidthAnimation"
+                
+                val expansionProgress by animateFloatAsState(
+                    targetValue = if (isExpanded) 1f else 0f,
+                    label = "expansionProgress"
                 )
+
+                val listWidth = totalWidth * 0.4f
+                val detailWidthNormal = totalWidth * 0.6f
+                
+                val listOffset = -listWidth * expansionProgress
+                val detailOffset = listWidth * (1f - expansionProgress)
+                val detailWidth = detailWidthNormal + (listWidth * expansionProgress)
 
                 var rememberedDetail by remember { mutableStateOf(detailEntry) }
                 if (detailEntry != null) {
                     rememberedDetail = detailEntry
                 }
 
-                Row(modifier = Modifier.fillMaxSize()) {
-                    if (!isExpanded) {
-                        Column(modifier = Modifier.weight(1f)) {
-                            AnimatedVisibility(visible = true) {
-                                CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                                    listEntry.Content()
-                                }
+                Box(modifier = Modifier.fillMaxSize()) {
+                    // List Pane
+                    Box(
+                        modifier = Modifier
+                            .width(listWidth)
+                            .fillMaxHeight()
+                            .offset { IntOffset(listOffset.roundToPx(), 0) }
+                    ) {
+                        AnimatedVisibility(visible = true) {
+                            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                                listEntry.Content()
                             }
                         }
                     }
 
-                    AnimatedVisibility(
-                        visible = detailEntry != null,
-                        enter = slideInHorizontally(initialOffsetX = { it }) +
-                                expandHorizontally(expandFrom = Alignment.Start),
-                        exit = slideOutHorizontally(targetOffsetX = { it }) +
-                                shrinkHorizontally(shrinkTowards = Alignment.Start)
+                    // Detail Pane
+                    Box(
+                        modifier = Modifier
+                            .width(detailWidth)
+                            .fillMaxHeight()
+                            .offset { IntOffset(detailOffset.roundToPx(), 0) }
                     ) {
-                        CompositionLocalProvider(LocalBackButtonVisibility provides isExpanded) {
-                            Box(modifier = Modifier.width(animatedDetailWidth)) {
-                                rememberedDetail?.let { entry ->
-                                    AnimatedContent(
-                                        targetState = entry,
-                                        contentKey = { it.contentKey },
-                                        transitionSpec = {
-                                            slideInHorizontally(initialOffsetX = { it }) togetherWith
-                                                    slideOutHorizontally(targetOffsetX = { -it })
-                                        },
-                                        label = "DetailContentTransition"
-                                    ) { targetEntry ->
-                                        CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                                            targetEntry.Content()
+                        AnimatedVisibility(
+                            visible = detailEntry != null,
+                            enter = fadeIn(),
+                            exit = fadeOut()
+                        ) {
+                            CompositionLocalProvider(LocalBackButtonVisibility provides isExpanded) {
+                                Box(modifier = Modifier.fillMaxSize()) {
+                                    rememberedDetail?.let { entry ->
+                                        AnimatedContent(
+                                            targetState = entry,
+                                            contentKey = { it.contentKey },
+                                            transitionSpec = {
+                                                slideInHorizontally(initialOffsetX = { it }) togetherWith
+                                                        slideOutHorizontally(targetOffsetX = { -it })
+                                            },
+                                            label = "DetailContentTransition"
+                                        ) { targetEntry ->
+                                            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
+                                                targetEntry.Content()
+                                            }
                                         }
                                     }
                                 }
