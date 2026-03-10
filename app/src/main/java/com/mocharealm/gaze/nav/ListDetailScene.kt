@@ -56,6 +56,7 @@ import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
 import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.runtime.MutableState
+import com.mocharealm.gaze.nav.ListDetailScene.Companion.FULLSCREEN_KEY
 
 /**
  * This `CompositionLocal` can be used by a detail `NavEntry` to toggle whether the detail pane 
@@ -83,7 +84,8 @@ class ListDetailScene<T : Any>(
         CompositionLocalProvider(LocalListDetailExpanded provides isExpandedState) {
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val totalWidth = maxWidth
-                val targetDetailWidth = if (isExpandedState.value) totalWidth else totalWidth * 0.6f
+                val isExpanded = isExpandedState.value
+                val targetDetailWidth = if (isExpanded) totalWidth else totalWidth * 0.6f
                 val animatedDetailWidth by animateDpAsState(
                     targetValue = targetDetailWidth,
                     label = "detailWidthAnimation"
@@ -95,8 +97,10 @@ class ListDetailScene<T : Any>(
                 }
 
                 Row(modifier = Modifier.fillMaxSize()) {
-                    Column(modifier = Modifier.weight(1f)) {
-                        listEntry.Content()
+                    if (!isExpanded) {
+                        Column(modifier = Modifier.weight(1f)) {
+                            listEntry.Content()
+                        }
                     }
 
                     AnimatedVisibility(
@@ -106,7 +110,7 @@ class ListDetailScene<T : Any>(
                         exit = slideOutHorizontally(targetOffsetX = { it }) +
                                 shrinkHorizontally(shrinkTowards = Alignment.Start)
                     ) {
-                        CompositionLocalProvider(LocalBackButtonVisibility provides isExpandedState.value) {
+                        CompositionLocalProvider(LocalBackButtonVisibility provides isExpanded) {
                             Box(modifier = Modifier.width(animatedDetailWidth)) {
                                 rememberedDetail?.let { entry ->
                                     AnimatedContent(
@@ -243,18 +247,32 @@ fun <T : Any> rememberListDetailSceneStrategy(): ListDetailSceneStrategy<T> {
 class ListDetailSceneStrategy<T : Any>(val windowSizeClass: WindowSizeClass) : SceneStrategy<T> {
 
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
+        val topEntry = entries.last()
 
+        // If the top entry is explicitly fullscreen, we don't use ListDetailScene.
+        if (topEntry.metadata.containsKey(FULLSCREEN_KEY)) {
+            return null
+        }
+
+        // If the window is compact, we always use a single pane.
         if (!windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)) {
             return SinglePaneScene(
-                key = entries.last().contentKey,
-                entry = entries.last(),
+                key = topEntry.contentKey,
+                entry = topEntry,
                 previousEntries = entries.dropLast(1),
             )
         }
 
+        // To use ListDetailScene, we need at least one entry marked as a list pane.
         val listEntry = entries.findLast { it.metadata.containsKey(LIST_KEY) } ?: return null
 
-        val detailEntry = entries.lastOrNull()?.takeIf { it.metadata.containsKey(DETAIL_KEY) }
+        // The top entry must be either a list pane or a detail pane.
+        // If it's something else (like an Intro screen), we fallback to SinglePaneScene.
+        if (!topEntry.metadata.containsKey(LIST_KEY) && !topEntry.metadata.containsKey(DETAIL_KEY)) {
+            return null
+        }
+
+        val detailEntry = topEntry.takeIf { it.metadata.containsKey(DETAIL_KEY) }
 
         val sceneKey = listEntry.contentKey
 

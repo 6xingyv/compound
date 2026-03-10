@@ -22,6 +22,7 @@ import com.mocharealm.compound.ui.nav.AppNavViewModel
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Navigator
 import com.mocharealm.compound.ui.theme.CompoundTheme
+import com.mocharealm.gaze.nav.SinglePaneSceneStrategy
 import com.mocharealm.gaze.nav.rememberListDetailSceneStrategy
 import com.mocharealm.tci18n.core.LocalTdStringProvider
 import com.mocharealm.tci18n.core.TdStringProvider
@@ -81,7 +82,10 @@ class MainActivity : ComponentActivity() {
                             i18nDecorator,
                         ),
                         entryProvider = koinEntryProvider(),
-                        sceneStrategies = listOf(rememberListDetailSceneStrategy())
+                        sceneStrategies = listOf(
+                            rememberListDetailSceneStrategy(),
+                            SinglePaneSceneStrategy()
+                        )
                     )
                 }
             }
