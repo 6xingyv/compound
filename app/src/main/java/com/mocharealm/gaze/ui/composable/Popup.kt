@@ -98,7 +98,7 @@ object OverlayPositionProvider : PopupPositionProvider {
 
 @Composable
 fun PopupMenu(
-    show: MutableState<Boolean>,
+    show: Boolean,
     backdrop: Backdrop,
     modifier: Modifier = Modifier,
     popupPositionProvider: PopupPositionProvider = ListPopupDefaults.DropdownPositionProvider,
@@ -117,12 +117,11 @@ fun PopupMenu(
     val animationProgress = remember { Animatable(0f) }
     val currentOnDismiss by rememberUpdatedState(onDismissRequest)
     val coroutineScope = rememberCoroutineScope()
-    val internalPopupState = remember { mutableStateOf(show.value) }
+    val internalPopupState = remember { mutableStateOf(show) }
     val layoutDirection = LocalLayoutDirection.current
 
-    // 动画逻辑
-    LaunchedEffect(show.value) {
-        if (show.value) {
+    LaunchedEffect(show) {
+        if (show) {
             internalPopupState.value = true
             animationProgress.animateTo(
                 targetValue = 1f,
@@ -145,7 +144,7 @@ fun PopupMenu(
     val navigationEventState = rememberNavigationEventState(currentInfo = NavigationEventInfo.None)
     NavigationBackHandler(
         state = navigationEventState,
-        isBackEnabled = show.value,
+        isBackEnabled = show,
         onBackCancelled = {
             coroutineScope.launch {
                 animationProgress.animateTo(
@@ -169,12 +168,11 @@ fun PopupMenu(
         }
     }
 
-    if (!show.value && !internalPopupState.value) return
+    if (!show && !internalPopupState.value) return
 
     var parentBounds by remember { mutableStateOf(IntRect.Zero) }
     Spacer(
         modifier = Modifier.onGloballyPositioned { coordinates ->
-            // 注意：PopupMenu 应该放在触发它的组件同级或内部
             coordinates.parentLayoutCoordinates?.let { parentLayout ->
                 val positionInWindow = parentLayout.positionInWindow()
                 parentBounds = IntRect(
@@ -213,7 +211,7 @@ fun PopupMenu(
         ) {
             LiquidSurface(
                 backdrop = backdrop,
-                modifier = modifier
+                modifier = Modifier
                     .onGloballyPositioned {
                         if (popupContentSize != it.size) {
                             popupContentSize = it.size
@@ -246,6 +244,7 @@ fun PopupMenu(
                             placeable.place(calculatedOffset)
                         }
                     }
+                    .then(modifier)
                     .pointerInput(Unit) {
                         // 防止点击菜单内容触发背景的 dismiss
                         detectTapGestures(onTap = { /* 消费点击事件 */ })

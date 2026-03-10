@@ -10,6 +10,8 @@ import androidx.activity.result.PickVisualMediaRequest
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.SharedTransitionLayout
+import androidx.compose.animation.SharedTransitionScope
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.expandHorizontally
 import androidx.compose.animation.expandVertically
@@ -247,8 +249,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     }
 
     LaunchedEffect(listState) {
-        snapshotFlow { listState.layoutInfo.visibleItemsInfo }
-            .debounce(500L)
+        snapshotFlow { listState.layoutInfo.visibleItemsInfo }.debounce(500L)
             .collect { visibleItems ->
                 val firstMessageKey = visibleItems.firstOrNull { it.key is Long }?.key as? Long
                 if (firstMessageKey != null) {
@@ -276,8 +277,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         }
                     }
                     .statusBarsPadding()
-                    .padding(captionBar.takeOnly(PaddingValuesSide.Top))
-            ) {
+                    .padding(captionBar.takeOnly(PaddingValuesSide.Top))) {
                 Row(
                     Modifier
                         .align(Alignment.CenterStart)
@@ -429,14 +429,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         onDrawBehind {
                             drawRect(
                                 Brush.verticalGradient(
-                                    0f to surfaceColor.copy(0f),
-                                    1f to surfaceColor.copy(1f)
+                                    0f to surfaceColor.copy(0f), 1f to surfaceColor.copy(1f)
                                 )
                             )
                         }
                     }
-                    .fillMaxWidth()
-            ) {
+                    .fillMaxWidth()) {
                 Row(
                     Modifier
                         .then(
@@ -450,107 +448,121 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     verticalAlignment = Alignment.Bottom
                 ) {
                     Spacer(Modifier.width(16.dp))
-                    Box(Modifier.size(48.dp)) {
-                        androidx.compose.animation.AnimatedVisibility(
-                            !menuOpened.value, Modifier.dropShadow(CircleShape) {
-                                radius = 24f.dp.toPx()
-                                offset = Offset(0.dp.toPx(), 0.dp.toPx())
-                                color = Color.Black.copy(alpha = 0.1f)
-                            }, enter = fadeIn(), exit = fadeOut()
-                        ) {
-                            LiquidSurface(
-                                layerBackdrop,
-                                Modifier.fillMaxSize(),
-                                Modifier.clickable { menuOpened.value = true },
-                                effects = {
-                                    vibrancy()
-                                    blur(1.dp.toPx())
-                                    lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
-                                },
-                                shadow = {
-                                    Shadow(
-                                        radius = 0.dp,
-                                        offset = DpOffset(0.dp, 0.dp),
-                                        color = Color.Transparent,
-                                        alpha = 1f,
-                                        blendMode = DrawScope.DefaultBlendMode
-                                    )
-                                },
-                                surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
-                            ) { Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center)) }
-                        }
-                        PopupMenu(
-                            menuOpened,
-                            layerBackdrop,
-                            popupPositionProvider = OverlayPositionProvider,
-                            alignment = PopupPositionProvider.Align.BottomStart,
-                            surfaceColor = surfaceContainerColor.copy(0.4f),
-                            onDismissRequest = { menuOpened.value = false },
-                            effects = {
-                                blur(8.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
-                            }) {
-                            Column(
-                                Modifier.padding(16.dp),
-                                verticalArrangement = Arrangement.spacedBy(16.dp)
-                            ) {
-                                data class MenuItem(
-                                    val label: String,
-                                    val icon: androidx.compose.ui.graphics.vector.ImageVector,
-                                    val onClick: () -> Unit
-                                )
-
-                                val list = listOf(
-                                    MenuItem(
-                                        tdString("AttachSticker"), SFIcons.Face_Smiling
-                                    ) {
-                                        menuOpened.value = false
-                                        viewModel.showStickerPanel()
-                                    }, MenuItem(
-                                        tdString("ChatGallery"), SFIcons.Photo_On_Rectangle_Angled
-                                    ) {
-                                        menuOpened.value = false
-                                        galleryLauncher.launch(
-                                            PickVisualMediaRequest(
-                                                ActivityResultContracts.PickVisualMedia.ImageAndVideo
-                                            )
+                    SharedTransitionLayout(
+                        Modifier.size(48.dp)
+                    ) {
+                        AnimatedContent(menuOpened.value) { menuOpenedFinal ->
+                            if (menuOpenedFinal) {
+                                PopupMenu(
+                                    true,
+                                    layerBackdrop,
+                                    Modifier.sharedBounds(
+                                        rememberSharedContentState(key = "bounds"),
+                                        animatedVisibilityScope = this@AnimatedContent,
+                                        enter = fadeIn(),
+                                        exit = fadeOut(),
+                                        resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds()
+                                    ),
+                                    popupPositionProvider = OverlayPositionProvider,
+                                    alignment = PopupPositionProvider.Align.BottomStart,
+                                    surfaceColor = surfaceContainerColor.copy(0.4f),
+                                    onDismissRequest = { menuOpened.value = false },
+                                    effects = {
+                                        blur(8.dp.toPx())
+                                        lens(
+                                            16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false
                                         )
-                                    }, MenuItem(
-                                        tdString("ChatDocument"), SFIcons.Document
+                                    }
+                                ) {
+                                    Column(
+                                        Modifier.padding(16.dp),
+                                        verticalArrangement = Arrangement.spacedBy(16.dp)
                                     ) {
-                                        menuOpened.value = false
-                                        documentLauncher.launch(arrayOf("*/*"))
-                                    }, MenuItem(
-                                        tdString("ChatLocation"), SFIcons.Mappin_And_Ellipse
-                                    ) {
-                                        menuOpened.value = false
-                                        viewModel.showLocationPanel()
-                                    })
-                                CompositionLocalProvider(LocalIndication provides EmptyIndication) {
-                                    list.forEach { item ->
-                                        Row(
-                                            Modifier.clickable(onClick = item.onClick),
-                                            verticalAlignment = Alignment.CenterVertically,
-                                            horizontalArrangement = Arrangement.spacedBy(12.dp)
-                                        ) {
-                                            Icon(
-                                                item.icon,
-                                                null,
-                                                Modifier
-                                                    .clip(CircleShape)
-                                                    .background(
-                                                        Brush.verticalGradient(
-                                                            0f to Color.Gray, 1f to Color.DarkGray
-                                                        )
+                                        data class MenuItem(
+                                            val label: String,
+                                            val icon: androidx.compose.ui.graphics.vector.ImageVector,
+                                            val onClick: () -> Unit
+                                        )
+
+                                        val list = listOf(
+                                            MenuItem(
+                                                tdString("AttachSticker"), SFIcons.Face_Smiling
+                                            ) {
+                                                menuOpened.value = false
+                                                viewModel.showStickerPanel()
+                                            }, MenuItem(
+                                                tdString("ChatGallery"),
+                                                SFIcons.Photo_On_Rectangle_Angled
+                                            ) {
+                                                menuOpened.value = false
+                                                galleryLauncher.launch(
+                                                    PickVisualMediaRequest(
+                                                        ActivityResultContracts.PickVisualMedia.ImageAndVideo
                                                     )
-                                                    .padding(8.dp)
-                                                    .size(20.dp),
-                                                tint = Color.White
-                                            )
-                                            Text(item.label)
+                                                )
+                                            }, MenuItem(
+                                                tdString("ChatDocument"), SFIcons.Document
+                                            ) {
+                                                menuOpened.value = false
+                                                documentLauncher.launch(arrayOf("*/*"))
+                                            }, MenuItem(
+                                                tdString("ChatLocation"), SFIcons.Mappin_And_Ellipse
+                                            ) {
+                                                menuOpened.value = false
+                                                viewModel.showLocationPanel()
+                                            }
+                                        )
+                                        CompositionLocalProvider(LocalIndication provides EmptyIndication) {
+                                            list.forEach { item ->
+                                                Row(
+                                                    Modifier.clickable(onClick = item.onClick),
+                                                    verticalAlignment = Alignment.CenterVertically,
+                                                    horizontalArrangement = Arrangement.spacedBy(12.dp)
+                                                ) {
+                                                    Icon(
+                                                        item.icon,
+                                                        null,
+                                                        Modifier
+                                                            .clip(CircleShape)
+                                                            .background(
+                                                                Brush.verticalGradient(
+                                                                    0f to Color.Gray,
+                                                                    1f to Color.DarkGray
+                                                                )
+                                                            )
+                                                            .padding(8.dp)
+                                                            .size(20.dp),
+                                                        tint = Color.White
+                                                    )
+                                                    Text(item.label)
+                                                }
+                                            }
                                         }
                                     }
                                 }
+                            }
+                            else {
+                                LiquidSurface(
+                                    layerBackdrop,
+                                    Modifier
+                                        .size(48.dp)
+                                        .sharedBounds(
+                                            rememberSharedContentState(key = "bounds"),
+                                            animatedVisibilityScope = this@AnimatedContent,
+                                            enter = fadeIn(),
+                                            exit = fadeOut(),
+                                            resizeMode = SharedTransitionScope.ResizeMode.scaleToBounds()
+                                        ),
+                                    Modifier.clickable { menuOpened.value = true },
+                                    effects = {
+                                        vibrancy()
+                                        blur(1.dp.toPx())
+                                        lens(
+                                            16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false
+                                        )
+                                    },
+                                    surfaceColor = surfaceContainerColor.copy(alpha = 0.6f)
+                                ) { Icon(SFIcons.Plus, null, Modifier.align(Alignment.Center)) }
                             }
                         }
                     }
@@ -617,11 +629,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                     androidx.compose.animation.AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
-                                        exit = fadeOut() + slideOutHorizontally { -it }
-                                    ) {
+                                        exit = fadeOut() + slideOutHorizontally { -it }) {
                                         Column(
-                                            Modifier
-                                                .animateContentSize()
+                                            Modifier.animateContentSize()
                                         ) {
                                             AnimatedVisibility(
                                                 visible = state.selectedFiles.isNotEmpty(),
@@ -632,7 +642,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                     modifier = Modifier
                                                         .fillMaxWidth()
                                                         .padding(bottom = 8.dp),
-                                                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                                                    horizontalArrangement = Arrangement.spacedBy(
+                                                        8.dp
+                                                    )
                                                 ) {
                                                     items(
                                                         state.selectedFiles,
@@ -645,7 +657,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                             val messageBlock = remember(file) {
                                                                 if (file.mimeType.startsWith("image/")) {
                                                                     MessageBlock.MediaBlock(
-                                                                        id = 0, timestamp = 0,
+                                                                        id = 0,
+                                                                        timestamp = 0,
                                                                         mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
                                                                         file = com.mocharealm.compound.domain.model.File(
                                                                             fileUrl = file.filePath
@@ -656,7 +669,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                                     )
                                                                 ) {
                                                                     MessageBlock.MediaBlock(
-                                                                        id = 0, timestamp = 0,
+                                                                        id = 0,
+                                                                        timestamp = 0,
                                                                         mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
                                                                         file = com.mocharealm.compound.domain.model.File(
                                                                             fileUrl = file.filePath
@@ -671,7 +685,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                                             "/"
                                                                         )
                                                                     MessageBlock.DocumentBlock(
-                                                                        id = 0, timestamp = 0,
+                                                                        id = 0,
+                                                                        timestamp = 0,
                                                                         document = com.mocharealm.compound.domain.model.Document(
                                                                             file = com.mocharealm.compound.domain.model.File(
                                                                                 fileUrl = file.filePath
@@ -716,7 +731,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                                             .padding(horizontal = 12.dp),
                                                                         contentAlignment = Alignment.Center
                                                                     ) {
-                                                                        DocumentBlock(messageBlock)
+                                                                        DocumentBlock(
+                                                                            messageBlock
+                                                                        )
                                                                     }
                                                                 }
 
@@ -788,8 +805,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                             )
                                                         }
                                                     } else innerTextField()
-                                                }
-                                            )
+                                                })
                                         }
                                     }
                                 }
@@ -882,7 +898,11 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             .fillMaxWidth()
                             .animateContentSize(),
                         isInteractive = false,
-                        shape = { ContinuousRoundedRectangle(topStart = 24.dp, topEnd = 24.dp) },
+                        shape = {
+                            ContinuousRoundedRectangle(
+                                topStart = 24.dp, topEnd = 24.dp
+                            )
+                        },
                         effects = {
                             vibrancy()
                             blur(4.dp.toPx())
@@ -901,13 +921,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             if (isSticker) {
                                 Column(Modifier.height(300.dp)) {
                                     LazyRow(
-                                        Modifier
-                                            .fillMaxWidth(),
-                                        contentPadding = PaddingValues(
-                                            horizontal = 16.dp,
-                                            vertical = 16.dp
-                                        ),
-                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                        Modifier.fillMaxWidth(), contentPadding = PaddingValues(
+                                            horizontal = 16.dp, vertical = 16.dp
+                                        ), horizontalArrangement = Arrangement.spacedBy(4.dp)
                                     ) {
                                         items(state.stickerSets, key = { it.id }) { setInfo ->
                                             val selected = state.selectedStickerSetId == setInfo.id
@@ -917,9 +933,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                         setInfo.id
                                                     )
                                                 },
-                                                surfaceColor =
-                                                    if (selected) primaryColor
-                                                    else surfaceContainerColor,
+                                                surfaceColor = if (selected) primaryColor
+                                                else surfaceContainerColor,
                                                 shape = RoundedCornerShape(8.dp),
                                             ) {
                                                 Text(
@@ -956,8 +971,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         ) {
                                             items(
                                                 state.currentSetStickers,
-                                                key = { it.id }
-                                            ) { sticker ->
+                                                key = { it.id }) { sticker ->
                                                 Box(
                                                     modifier = Modifier
                                                         .aspectRatio(1f)
@@ -968,14 +982,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                             )
                                                         }
                                                         .padding(4.dp),
-                                                    contentAlignment = Alignment.Center
-                                                ) {
+                                                    contentAlignment = Alignment.Center) {
                                                     val thumbPath = sticker.thumbnail?.fileUrl
                                                     val filePath = sticker.file.fileUrl
                                                     if (!thumbPath.isNullOrEmpty() || !filePath.isNullOrEmpty()) {
                                                         StickerBlock(
-                                                            sticker,
-                                                            Modifier.fillMaxSize()
+                                                            sticker, Modifier.fillMaxSize()
                                                         )
                                                     } else {
                                                         Text(
@@ -1022,13 +1034,11 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         Button(
                                             {
                                                 viewModel.hideLocationPanel()
-                                            },
-                                            tint = surfaceContainerColor
+                                            }, tint = surfaceContainerColor
                                         ) {
                                             Text(
                                                 tdString("Cancel"),
-                                                Modifier
-                                                    .padding(16.dp),
+                                                Modifier.padding(16.dp),
                                                 style = MiuixTheme.textStyles.body1,
                                             )
                                         }
@@ -1041,8 +1051,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                         centered.latitude, centered.longitude
                                                     )
                                                 }
-                                            },
-                                            tint = primaryColor
+                                            }, tint = primaryColor
                                         ) {
                                             Row(
                                                 Modifier.padding(16.dp),
@@ -1135,7 +1144,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             TextButton(
                                 text = tdString("Retry"),
                                 onClick = { viewModel.loadMessages() },
-                                modifier = Modifier.padding(horizontal = 12.dp, vertical = 8.dp),
+                                modifier = Modifier.padding(
+                                    horizontal = 12.dp, vertical = 8.dp
+                                ),
                             )
                         }
                     }
@@ -1161,13 +1172,16 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     items(
                         count = state.messageItems.size,
                         key = { state.messageItems[state.messageItems.size - 1 - it].message.blocks.first().id },
-                        contentType = { "Message" }
-                    ) { index ->
+                        contentType = { "Message" }) { index ->
 
                         val msgIndex = state.messageItems.size - 1 - index
                         val messageItem = state.messageItems[msgIndex]
 
-                        Column(Modifier.fillMaxWidth().animateItem()) {
+                        Column(
+                            Modifier
+                                .fillMaxWidth()
+                                .animateItem()
+                        ) {
                             if (messageItem.showTimestamp) {
                                 TimestampLabel(timestamp = messageItem.message.blocks.first().timestamp)
                             }
