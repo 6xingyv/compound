@@ -92,7 +92,7 @@ class ChatViewModel(
 ) : ViewModel() {
 
     companion object {
-        private const val PAGE_SIZE = 30
+        private const val PAGE_SIZE = 50
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
@@ -309,14 +309,17 @@ class ChatViewModel(
                     val existingIds = state.messages.map { it.primaryId }.toSet()
                     val newMessages = olderMessages.filter { it.primaryId !in existingIds }
 
-                    val combinedMessages =
-                        (state.messages + newMessages).sortedBy { it.primaryTimestamp }
+                    val combinedMessages = if (newMessages.isNotEmpty()) {
+                        newMessages.sortedBy { it.primaryTimestamp } + state.messages
+                    } else {
+                        state.messages
+                    }
 
                     _uiState.update {
                         it.copy(
                             messages = combinedMessages,
                             loadingMore = false,
-                            hasMore = olderMessages.size >= PAGE_SIZE,
+                            hasMore = newMessages.isNotEmpty(),
                         )
                     }
                     downloadMissingFiles(newMessages)
@@ -351,14 +354,17 @@ class ChatViewModel(
                     val existingIds = state.messages.map { it.primaryId }.toSet()
                     val newMessages = newerMessages.filter { it.primaryId !in existingIds }
 
-                    val combinedMessages =
-                        (state.messages + newMessages).sortedBy { it.primaryTimestamp }
+                    val combinedMessages = if (newMessages.isNotEmpty()) {
+                        state.messages + newMessages.sortedBy { it.primaryTimestamp }
+                    } else {
+                        state.messages
+                    }
 
                     _uiState.update {
                         it.copy(
                             messages = combinedMessages,
                             loadingNewer = false,
-                            hasMoreNewer = newerMessages.size >= PAGE_SIZE - 2,
+                            hasMoreNewer = newMessages.isNotEmpty(),
                         )
                     }
                     downloadMissingFiles(newMessages)

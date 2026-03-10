@@ -177,7 +177,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
             val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
-            lastVisibleItem != null && lastVisibleItem.index >= layoutInfo.totalItemsCount - 3
+            lastVisibleItem != null && lastVisibleItem.index >= layoutInfo.totalItemsCount - 25
         }
     }
 
@@ -230,18 +230,18 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         derivedStateOf {
             val layoutInfo = listState.layoutInfo
             val firstVisibleItem = layoutInfo.visibleItemsInfo.firstOrNull()
-            firstVisibleItem != null && firstVisibleItem.index <= 3
+            firstVisibleItem != null && firstVisibleItem.index <= 25
         }
     }
 
-    LaunchedEffect(shouldLoadMore) {
-        if (shouldLoadMore && !state.loading && state.hasMore) {
+    LaunchedEffect(shouldLoadMore, state.loadingMore, state.loading) {
+        if (shouldLoadMore && !state.loadingMore && !state.loading && state.hasMore) {
             viewModel.loadOlderMessages()
         }
     }
 
-    LaunchedEffect(shouldLoadNewer) {
-        if (shouldLoadNewer && !state.loading && state.hasMoreNewer) {
+    LaunchedEffect(shouldLoadNewer, state.loadingNewer, state.loading) {
+        if (shouldLoadNewer && !state.loadingNewer && !state.loading && state.hasMoreNewer) {
             viewModel.loadNewerMessages()
         }
     }
