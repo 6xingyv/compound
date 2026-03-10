@@ -56,7 +56,7 @@ val dataModule = module {
 
     // Mappers
     single { UserMapper(get()) }
-    single { ChatMapper(get()) }
+    single { ChatMapper(get(), get()) }
     single { MessageMapper(get(), get()) }
 
     // Sub-Repositories

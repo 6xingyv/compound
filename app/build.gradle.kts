@@ -124,6 +124,10 @@ android {
             include("armeabi-v7a", "arm64-v8a", "x86_64", "x86")
         }
     }
+    dependenciesInfo {
+        includeInApk = false
+        includeInBundle = false
+    }
     ndkVersion = "29.0.14206865"
 }
 
@@ -166,6 +170,8 @@ dependencies {
     implementation(libs.maplibre.compose)
 
     implementation(libs.kotlinx.serialization.core)
+
+    implementation(libs.hiddenapi.bypass)
 
     implementation(project(":tci18n:core"))
     ksp(project(":tci18n:processor"))

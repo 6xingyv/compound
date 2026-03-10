@@ -27,6 +27,8 @@ import com.mocharealm.gaze.nav.rememberListDetailSceneStrategy
 import com.mocharealm.tci18n.core.LocalTdStringProvider
 import com.mocharealm.tci18n.core.TdStringProvider
 import com.mocharealm.tci18n.core.tdI18nNavEntryDecorator
+import com.mocharealm.compound.ui.util.LocalPersonNameFormatter
+import com.mocharealm.compound.domain.repository.PersonNameFormatterRepository
 import org.koin.androidx.viewmodel.ext.android.viewModel
 import org.koin.compose.koinInject
 import org.koin.compose.navigation3.koinEntryProvider
@@ -63,6 +65,7 @@ class MainActivity : ComponentActivity() {
                 val onBack = remember(navigator) { { navigator.pop() } }
 
                 val tdStringProvider: TdStringProvider = koinInject()
+                val nameFormatter: PersonNameFormatterRepository = koinInject()
                 val i18nDecorator = remember(tdStringProvider) {
                     tdI18nNavEntryDecorator<NavKey>(
                         provider = tdStringProvider
@@ -72,6 +75,7 @@ class MainActivity : ComponentActivity() {
                 CompositionLocalProvider(
                     LocalNavigator provides navigator,
                     LocalTdStringProvider provides tdStringProvider,
+                    LocalPersonNameFormatter provides nameFormatter,
                 ) {
                     NavDisplay(
                         backStack = backStack,

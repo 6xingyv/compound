@@ -36,6 +36,7 @@ import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
 import com.mocharealm.compound.ui.shape.BubbleAlignment
 import com.mocharealm.compound.ui.shape.BubbleContinuousShape
 import com.mocharealm.compound.ui.util.copyRelativeLightness
+import com.mocharealm.compound.ui.util.formatName
 import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.ui.modifier.surface
@@ -108,7 +109,7 @@ fun MessageBubble(
             if (showAvatar) {
                 if (!message.isOutgoing && isFirst) {
                     Text(
-                        text = message.sender.name.ifEmpty { message.sender.id.toString() },
+                        text = message.sender.formatName(),
                         fontWeight = FontWeight.SemiBold,
                         style = MiuixTheme.textStyles.footnote1,
                         modifier = Modifier
@@ -214,7 +215,7 @@ fun MessageContent(
                 }
 
             ReplyPreview(
-                senderName = message.replyTo.sender.name,
+                senderName = message.replyTo.sender.formatName(),
                 text = replyText,
                 accentColor = linkColor,
                 onClick = { onReplyClick(message.replyTo.id) },

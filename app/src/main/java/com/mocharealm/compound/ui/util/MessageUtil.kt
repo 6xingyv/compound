@@ -11,19 +11,18 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
+import com.mocharealm.compound.ui.util.formatName
 import com.mocharealm.tci18n.core.tdString
 
 /** Extracts a human-readable preview with styles from a [Message] for display in the chat list. */
 @Composable
 fun Message.toPreviewAnnotatedString(chat: Chat): AnnotatedString {
     val senderPrefix = when {
-        chat.type == ChatType.GROUP -> {
-            if (isOutgoing) {
-                val fromYou = tdString("FromYou")
-                "$fromYou: "
-            }
-            else "${sender.name}: "
+        isOutgoing -> {
+            val fromYou = tdString("FromYou")
+            "$fromYou: "
         }
+        chat.type == ChatType.GROUP -> "${sender.formatName()}: "
         else -> ""
     }
 

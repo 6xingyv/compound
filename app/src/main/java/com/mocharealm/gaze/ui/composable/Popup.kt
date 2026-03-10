@@ -21,6 +21,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.layout
@@ -188,6 +189,7 @@ fun PopupMenu(
     if (parentBounds == IntRect.Zero) return
 
     var popupContentSize by remember { mutableStateOf(IntSize.Zero) }
+    var hostPositionInWindow by remember { mutableStateOf(Offset.Zero) }
     val layoutInfo = rememberListPopupLayoutInfo(
         alignment = alignment,
         popupPositionProvider = popupPositionProvider,
@@ -200,7 +202,8 @@ fun PopupMenu(
         enterTransition = fadeIn(),
         exitTransition = fadeOut(),
         enableWindowDim = false,
-        enableBackHandler = false
+        enableBackHandler = false,
+        renderInRootScaffold = false
     ) {
         Box(
             modifier = Modifier
@@ -213,41 +216,46 @@ fun PopupMenu(
                 backdrop = backdrop,
                 modifier = Modifier
                     .onGloballyPositioned {
+                        hostPositionInWindow = it.positionInWindow()
                         if (popupContentSize != it.size) {
                             popupContentSize = it.size
                         }
                     }
                     .layout { measurable, constraints ->
-                        val maxH =
-                            (layoutInfo.windowBounds.height - layoutInfo.popupMargin.top - layoutInfo.popupMargin.bottom)
-                                .coerceAtLeast(50.dp.roundToPx())
-
+                        val windowBounds = layoutInfo.windowBounds
+                        val popupMargin = layoutInfo.popupMargin
                         val placeable = measurable.measure(
                             constraints.copy(
-                                maxHeight = maxH.coerceAtMost(constraints.maxHeight),
-                                minHeight = 0
-                            )
+                                maxHeight = (windowBounds.height - popupMargin.top - popupMargin.bottom)
+                                        .coerceAtLeast(50.dp.roundToPx()),
+                                minHeight = if (50.dp.roundToPx() <= constraints.maxHeight) 50.dp.roundToPx() else constraints.maxHeight,
+                                maxWidth = constraints.maxWidth,
+                                minWidth = constraints.minWidth
+                            ),
                         )
+                        val measuredSize = IntSize(placeable.width, placeable.height)
 
-                        // 实时计算当前测量大小下的位置偏移
                         val calculatedOffset = popupPositionProvider.calculatePosition(
                             parentBounds,
-                            layoutInfo.windowBounds,
+                            windowBounds,
                             layoutDirection,
-                            IntSize(placeable.width, placeable.height),
-                            layoutInfo.popupMargin,
+                            measuredSize,
+                            popupMargin,
                             alignment,
                         )
 
+                        val adjustedOffset = IntOffset(
+                            x = calculatedOffset.x - hostPositionInWindow.x.toInt(),
+                            y = calculatedOffset.y - hostPositionInWindow.y.toInt(),
+                        )
+
                         layout(constraints.maxWidth, constraints.maxHeight) {
-                            // 使用全屏坐标放置
-                            placeable.place(calculatedOffset)
+                            placeable.place(adjustedOffset)
                         }
                     }
                     .then(modifier)
                     .pointerInput(Unit) {
-                        // 防止点击菜单内容触发背景的 dismiss
-                        detectTapGestures(onTap = { /* 消费点击事件 */ })
+                        detectTapGestures(onTap = {})
                     },
                 tint = tint,
                 surfaceColor = surfaceColor,
