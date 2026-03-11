@@ -71,6 +71,10 @@ class TdLibDataSource(
             send(query)
         }
 
+    fun setBackgroundActive(active: Boolean) {
+        client.send(TdApi.SetOption("is_background_active", TdApi.OptionValueBoolean(active))) { }
+    }
+
     init {
         CoroutineScope(Dispatchers.IO).launch {
             updates.filterIsInstance<TdApi.UpdateAuthorizationState>().collect { update ->
@@ -102,6 +106,21 @@ class TdLibDataSource(
                         TdApi.SetOption(
                             "language_pack_id",
                             TdApi.OptionValueString(langPackId)
+                        )
+                    ) { }
+
+                    // Enable push notification support in TDLib
+                    client.send(
+                        TdApi.SetOption(
+                            "use_pns_for_push_notifications",
+                            TdApi.OptionValueBoolean(true)
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
+                            "ignore_background_updates",
+                            TdApi.OptionValueBoolean(false)
                         )
                     ) { }
 

@@ -112,4 +112,10 @@ interface TelegramRepository {
     /** 保存/获取聊天最后阅读位置 */
     suspend fun saveChatReadPosition(chatId: Long, messageId: Long)
     suspend fun getChatReadPosition(chatId: Long): Long
+
+    /** 注册推送设备 */
+    suspend fun registerDevice(token: String): Result<Unit>
+
+    /** 处理推送通知 */
+    suspend fun processPushNotification(json: String): Result<Unit>
 }

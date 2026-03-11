@@ -11,4 +11,6 @@ interface AuthRepository {
     suspend fun logout(): Result<Unit>
     suspend fun getAuthenticationState(): AuthState
     suspend fun awaitAuthState(): AuthState
+    suspend fun registerDevice(token: String): Result<Unit>
+    suspend fun processPushNotification(json: String): Result<Unit>
 }

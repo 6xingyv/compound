@@ -59,4 +59,8 @@ class TelegramRepositoryImpl(
     override fun downloadFileWithProgress(fileId: Int) = mediaRepository.downloadFileWithProgress(fileId)
     override suspend fun getInstalledStickerSets() = mediaRepository.getInstalledStickerSets()
     override suspend fun getStickerSetStickers(setId: Long) = mediaRepository.getStickerSetStickers(setId)
+
+    // Push Notification registration
+    override suspend fun registerDevice(token: String) = authRepository.registerDevice(token)
+    override suspend fun processPushNotification(json: String) = authRepository.processPushNotification(json)
 }

@@ -18,10 +18,10 @@ import org.koin.dsl.module
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-
 import com.mocharealm.compound.data.mapper.ChatMapper
 import com.mocharealm.compound.data.mapper.MessageMapper
 import com.mocharealm.compound.data.mapper.UserMapper
+import com.mocharealm.compound.data.notification.AppNotificationManager
 import com.mocharealm.compound.data.repository.AuthRepositoryImpl
 import com.mocharealm.compound.data.repository.ChatRepositoryImpl
 import com.mocharealm.compound.data.repository.MediaRepositoryImpl
@@ -49,6 +49,9 @@ val dataModule = module {
             { _: Throwable? -> }
         )
     }
+
+    // Notification Manager
+    single { AppNotificationManager(get(), get()) }
 
     // Data Sources
     single { TdLibDataSource(get(), get(), get()) }
