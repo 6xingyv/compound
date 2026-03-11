@@ -6,6 +6,7 @@ plugins {
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.kotlin.serialization)
     alias(libs.plugins.ksp)
+    alias(libs.plugins.gms)
 }
 
 val localProperties = Properties().apply {
@@ -173,6 +174,10 @@ dependencies {
     implementation(libs.kotlinx.serialization.core)
 
     implementation(libs.hiddenapi.bypass)
+
+    implementation(platform(libs.firebase.bom))
+    implementation(libs.firebase.analytics)
+    implementation(libs.firebase.messaging)
 
     implementation(project(":tci18n:core"))
     ksp(project(":tci18n:processor"))
