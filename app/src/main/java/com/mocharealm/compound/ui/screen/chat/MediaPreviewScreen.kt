@@ -2,6 +2,7 @@ package com.mocharealm.compound.ui.screen.chat
 
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
 import androidx.compose.foundation.background
@@ -34,6 +35,7 @@ import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableLongStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -66,6 +68,7 @@ import com.mocharealm.compound.ui.nav.MediaItem
 import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
@@ -147,7 +150,6 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                     AdvancedVideoPlayer(
                         filePath = item.url,
                         modifier = finalModifier,
-                        layerBackdrop = layerBackdrop
                     )
                 } else {
                     ZoomableImage(
@@ -160,10 +162,10 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
             }
         }
 
-        // Top Bar
         if (sharedTransitionScope != null && animatedVisibilityScope != null) {
             with(sharedTransitionScope) {
                 with(animatedVisibilityScope) {
+                    // Top Bar
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -180,18 +182,10 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                             Modifier.size(48.dp),
                             Modifier.clickable { navigator.pop() },
                             effects = {
-                                vibrancy(); blur(1.dp.toPx()); lens(
-                                16.dp.toPx(),
-                                32.dp.toPx()
-                            )
+                                vibrancy(); blur(1.dp.toPx()); lens(16.dp.toPx(), 32.dp.toPx())
                             }
                         ) {
-                            Icon(
-                                SFIcons.Chevron_Backward,
-                                null,
-                                Modifier.align(Alignment.Center),
-                                Color.White
-                            )
+                            Icon(SFIcons.Chevron_Backward, null, Modifier.align(Alignment.Center), Color.White)
                         }
 
                         LiquidSurface(
@@ -212,7 +206,7 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                         Spacer(Modifier.size(48.dp))
                     }
 
-                    // Bottom Bar (Thumbnails)
+                    // Bottom Bar
                     Box(
                         modifier = Modifier
                             .align(Alignment.BottomCenter)
@@ -246,23 +240,11 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                                             color = if (isSelected) Color.White else Color.Transparent,
                                             shape = ContinuousRoundedRectangle(12.dp)
                                         )
-                                        .clickable {
-                                            scope.launch {
-                                                pagerState.animateScrollToPage(
-                                                    index
-                                                )
-                                            }
-                                        }
+                                        .clickable { scope.launch { pagerState.animateScrollToPage(index) } }
                                 ) {
                                     AsyncImage(
                                         model = ImageRequest.Builder(LocalContext.current)
-                                            .data(
-                                                if ((item.thumbnailUrl
-                                                        ?: item.url).startsWith("http")
-                                                ) (item.thumbnailUrl ?: item.url) else File(
-                                                    item.thumbnailUrl ?: item.url
-                                                )
-                                            )
+                                            .data(if ((item.thumbnailUrl ?: item.url).startsWith("http")) (item.thumbnailUrl ?: item.url) else File(item.thumbnailUrl ?: item.url))
                                             .build(),
                                         contentDescription = null,
                                         modifier = Modifier.fillMaxSize(),
@@ -287,6 +269,7 @@ fun ZoomableImage(
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+    val animatedScale by animateFloatAsState(targetValue = scale, label = "scale")
 
     val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
         scale = (scale * zoomChange).coerceIn(1f, 5f)
@@ -303,7 +286,7 @@ fun ZoomableImage(
             .clip(RectangleShape)
             .pointerInput(Unit) {
                 detectTapGestures(
-                    onDoubleTap = { tapOffset ->
+                    onDoubleTap = {
                         if (scale > 1f) {
                             scale = 1f
                             offset = Offset.Zero
@@ -316,10 +299,10 @@ fun ZoomableImage(
             }
             .transformable(state = transformState)
             .graphicsLayer {
-                scaleX = scale
-                scaleY = scale
-                translationX = offset.x
-                translationY = offset.y
+                scaleX = animatedScale
+                scaleY = animatedScale
+                translationX = offset.x * animatedScale
+                translationY = offset.y * animatedScale
             },
         contentAlignment = Alignment.Center
     ) {
@@ -338,23 +321,25 @@ fun ZoomableImage(
 fun AdvancedVideoPlayer(
     filePath: String,
     modifier: Modifier = Modifier,
-    layerBackdrop: com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
+
 ) {
     var isControlsVisible by remember { mutableStateOf(true) }
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
     var isLongPressing by remember { mutableStateOf(false) }
-    var longPressDirection by remember { mutableStateOf(0) } // -1 for left, 1 for right
+    var longPressDirection by remember { mutableIntStateOf(0) }
+
+    val layerBackdrop = rememberLayerBackdrop()
 
     VideoPlayer(
         filePath = filePath,
         modifier = modifier,
-        loop = true,
-        mute = false,
+        playerSurfaceModifier = Modifier.layerBackdrop(layerBackdrop),
         playWhenReady = true,
         gestureHandler = {
             detectTapGestures(
                 onTap = { isControlsVisible = !isControlsVisible },
                 onLongPress = { offset ->
+                    // 增加安全检查：只有在播放器准备好后才允许长按操作
                     isLongPressing = true
                     longPressDirection = if (offset.x < size.width / 2) -1 else 1
                 },
@@ -367,16 +352,22 @@ fun AdvancedVideoPlayer(
         },
         playerControls = { player ->
             LaunchedEffect(isLongPressing, longPressDirection) {
-                if (isLongPressing) {
+                // 确保只有在 READY 状态下才执行 seek 或变速
+                if (isLongPressing && player.playbackState == Player.STATE_READY) {
+                    val originalSpeed = player.playbackParameters.speed
                     val targetSpeed = if (longPressDirection == 1) 2f else 0.5f
+
                     player.setPlaybackSpeed(targetSpeed)
-                    while (isLongPressing) {
-                        if (longPressDirection == -1) {
-                            player.seekTo(maxOf(0, player.currentPosition - 500))
+                    try {
+                        while (isLongPressing) {
+                            if (longPressDirection == -1) {
+                                player.seekTo(maxOf(0, player.currentPosition - 1000))
+                            }
+                            delay(200) // 增加延迟，减少底层压力
                         }
-                        delay(100)
+                    } finally {
+                        player.setPlaybackSpeed(playbackSpeed)
                     }
-                    player.setPlaybackSpeed(playbackSpeed)
                 }
             }
 
@@ -400,7 +391,7 @@ fun AdvancedVideoPlayer(
 fun BoxScope.VideoControlOverlay(
     player: ExoPlayer,
     isVisible: Boolean,
-    layerBackdrop: com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop,
+    layerBackdrop: LayerBackdrop,
     playbackSpeed: Float,
     onSpeedChange: (Float) -> Unit,
     isLongPressing: Boolean,
@@ -412,146 +403,71 @@ fun BoxScope.VideoControlOverlay(
 
     DisposableEffect(player) {
         isPlaying = player.isPlaying
-        duration = player.duration.coerceAtLeast(0L)
         val listener = object : Player.Listener {
-            override fun onIsPlayingChanged(playing: Boolean) {
-                isPlaying = playing
-            }
-
-            override fun onPlaybackStateChanged(playbackState: Int) {
-                if (playbackState == Player.STATE_READY) {
-                    duration = player.duration.coerceAtLeast(0L)
-                }
+            override fun onIsPlayingChanged(playing: Boolean) { isPlaying = playing }
+            override fun onPlaybackStateChanged(state: Int) {
+                if (state == Player.STATE_READY) duration = player.duration.coerceAtLeast(0L)
             }
         }
         player.addListener(listener)
         onDispose { player.removeListener(listener) }
     }
 
-    LaunchedEffect(player, isPlaying) {
+    LaunchedEffect(player) {
         while (true) {
-            position = player.currentPosition
+            if (player.isPlaying) {
+                position = player.currentPosition
+            }
             delay(500)
         }
     }
-
-    // Fast Forward/Backward visual indicator
-    AnimatedVisibility(
-        visible = isLongPressing,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.align(Alignment.Center)
-    ) {
+    AnimatedVisibility(visible = isLongPressing, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.align(Alignment.Center)) {
         Text(
             text = if (longPressDirection == 1) "2X >>" else "<< 0.5X",
-            color = Color.White,
-            fontSize = 24.sp,
-            fontWeight = FontWeight.Bold,
-            modifier = Modifier
-                .background(Color.Black.copy(0.4f), CircleShape)
-                .padding(horizontal = 24.dp, vertical = 12.dp)
+            color = Color.White, fontSize = 24.sp, fontWeight = FontWeight.Bold,
+            modifier = Modifier.background(Color.Black.copy(0.4f), CircleShape).padding(horizontal = 24.dp, vertical = 12.dp)
         )
     }
 
-    AnimatedVisibility(
-        visible = isVisible,
-        enter = fadeIn(),
-        exit = fadeOut(),
-        modifier = Modifier.fillMaxSize()
-    ) {
+    AnimatedVisibility(visible = isVisible, enter = fadeIn(), exit = fadeOut(), modifier = Modifier.fillMaxSize()) {
         Box(Modifier.fillMaxSize()) {
-            // Central Play/Pause
             LiquidSurface(
-                layerBackdrop,
-                Modifier
-                    .size(64.dp)
-                    .align(Alignment.Center),
+                layerBackdrop, Modifier.size(64.dp).align(Alignment.Center),
                 Modifier.clickable { if (player.isPlaying) player.pause() else player.play() },
                 effects = { vibrancy(); lens(16.dp.toPx(), 32.dp.toPx()) },
                 surfaceColor = Color.White.copy(0.2f)
             ) {
-                Icon(
-                    if (isPlaying) SFIcons.Pause_Fill else SFIcons.Play_Fill,
-                    null,
-                    Modifier
-                        .size(32.dp)
-                        .align(Alignment.Center),
-                    Color.White
-                )
+                Icon(if (isPlaying) SFIcons.Pause_Fill else SFIcons.Play_Fill, null, Modifier.size(32.dp).align(Alignment.Center), Color.White)
             }
 
-            // Bottom Controls
             Column(
-                modifier = Modifier
-                    .align(Alignment.BottomCenter)
-                    .padding(bottom = 100.dp)
-                    .fillMaxWidth()
-                    .padding(horizontal = 24.dp),
+                modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 100.dp).fillMaxWidth().padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                // Seek Bar
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(formatTime(position), color = Color.White, fontSize = 12.sp)
                     Slider(
                         value = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
                         onValueChange = { player.seekTo((it * duration).toLong()) },
-                        modifier = Modifier
-                            .weight(1f)
-                            .padding(horizontal = 12.dp)
+                        modifier = Modifier.weight(1f).padding(horizontal = 12.dp)
                     )
                     Text(formatTime(duration), color = Color.White, fontSize = 12.sp)
                 }
 
-                // Control Buttons
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceEvenly,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    // Speed Button
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly, verticalAlignment = Alignment.CenterVertically) {
                     Text(
                         text = "${playbackSpeed}x",
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(Color.White.copy(0.1f))
+                        modifier = Modifier.clip(CircleShape).background(Color.White.copy(0.1f))
                             .clickable {
                                 val nextSpeed = when (playbackSpeed) {
-                                    1f -> 1.5f
-                                    1.5f -> 2f
-                                    2f -> 0.5f
-                                    else -> 1f
+                                    1f -> 1.5f; 1.5f -> 2f; 2f -> 0.5f; else -> 1f
                                 }
                                 onSpeedChange(nextSpeed)
-                            }
-                            .padding(horizontal = 12.dp, vertical = 6.dp),
-                        color = Color.White,
-                        fontWeight = FontWeight.Bold
+                            }.padding(horizontal = 12.dp, vertical = 6.dp),
+                        color = Color.White, fontWeight = FontWeight.Bold
                     )
-
-                    // Rewind 15s
-                    Icon(
-                        SFIcons.`15_Arrow_Trianglehead_Counterclockwise`, null,
-                        Modifier
-                            .size(32.dp)
-                            .clickable { player.seekTo(maxOf(0, player.currentPosition - 15000)) },
-                        Color.White
-                    )
-
-                    // Forward 15s
-                    Icon(
-                        SFIcons.`15_Arrow_Trianglehead_Clockwise`, null,
-                        Modifier
-                            .size(32.dp)
-                            .clickable {
-                                player.seekTo(
-                                    minOf(
-                                        duration,
-                                        player.currentPosition + 15000
-                                    )
-                                )
-                            },
-                        Color.White
-                    )
+                    Icon(SFIcons.`15_Arrow_Trianglehead_Counterclockwise`, null, Modifier.size(32.dp).clickable { player.seekTo(maxOf(0, player.currentPosition - 15000)) }, Color.White)
+                    Icon(SFIcons.`15_Arrow_Trianglehead_Clockwise`, null, Modifier.size(32.dp).clickable { player.seekTo(minOf(duration, player.currentPosition + 15000)) }, Color.White)
                 }
             }
         }

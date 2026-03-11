@@ -20,6 +20,7 @@ import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import java.io.File
+import androidx.core.net.toUri
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -38,7 +39,7 @@ fun VideoPlayer(
     val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
             val uri = if (filePath.startsWith("http")) {
-                Uri.parse(filePath)
+                filePath.toUri()
             } else {
                 Uri.fromFile(File(filePath))
             }
