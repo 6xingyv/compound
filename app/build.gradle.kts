@@ -152,6 +152,7 @@ dependencies {
     implementation(libs.androidx.compose.ui)
     implementation(libs.androidx.compose.ui.graphics)
     implementation(libs.androidx.compose.ui.tooling.preview)
+    implementation(libs.androidx.compose.animation)
     implementation(libs.androidx.constraintlayout.compose)
 
     implementation(libs.koin.androidx.compose)

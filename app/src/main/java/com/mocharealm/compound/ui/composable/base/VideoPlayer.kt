@@ -37,7 +37,12 @@ fun VideoPlayer(
     val context = LocalContext.current
     val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
-            setMediaItem(MediaItem.fromUri(Uri.fromFile(File(filePath))))
+            val uri = if (filePath.startsWith("http")) {
+                Uri.parse(filePath)
+            } else {
+                Uri.fromFile(File(filePath))
+            }
+            setMediaItem(MediaItem.fromUri(uri))
             repeatMode = if (loop) Player.REPEAT_MODE_ALL else Player.REPEAT_MODE_OFF
             this.playWhenReady = playWhenReady
             volume = if (mute) 0f else 1f
