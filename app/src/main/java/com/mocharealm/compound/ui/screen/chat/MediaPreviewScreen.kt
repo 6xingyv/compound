@@ -8,7 +8,8 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.detectTapGestures
-import androidx.compose.foundation.gestures.detectTransformGestures
+import androidx.compose.foundation.gestures.rememberTransformableState
+import androidx.compose.foundation.gestures.transformable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
@@ -22,7 +23,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -82,7 +82,6 @@ import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
-import kotlin.math.roundToInt
 
 @Composable
 fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
@@ -127,9 +126,7 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
 
         HorizontalPager(
             state = pagerState,
-            modifier = Modifier
-                .fillMaxSize()
-                .layerBackdrop(layerBackdrop),
+            modifier = Modifier.fillMaxSize().layerBackdrop(layerBackdrop),
             pageSpacing = 16.dp,
             userScrollEnabled = isPagerEnabled
         ) { page ->
@@ -157,7 +154,7 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                         url = item.url,
                         thumbnailUrl = item.thumbnailUrl,
                         modifier = finalModifier,
-                        onZoomChanged = { isPagerEnabled = it <= 1f }
+                        onZoomStateChanged = { zoomed -> isPagerEnabled = !zoomed }
                     )
                 }
             }
@@ -227,10 +224,7 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                             .zIndex(10f)
                     ) {
                         val itemWidthPx = with(density) { thumbnailWidth.toPx() }
-                        val contentPadding =
-                            with(density) { (screenWidthPx / 2f - itemWidthPx / 2f).toDp() }.coerceAtLeast(
-                                0.dp
-                            )
+                        val contentPadding = with(density) { (screenWidthPx / 2f - itemWidthPx / 2f).toDp() }.coerceAtLeast(0.dp)
 
                         LazyRow(
                             state = listState,
@@ -289,40 +283,49 @@ fun ZoomableImage(
     url: String,
     thumbnailUrl: String?,
     modifier: Modifier = Modifier,
-    onZoomChanged: (Float) -> Unit
+    onZoomStateChanged: (Boolean) -> Unit
 ) {
     var scale by remember { mutableFloatStateOf(1f) }
     var offset by remember { mutableStateOf(Offset.Zero) }
+
+    val transformState = rememberTransformableState { zoomChange, offsetChange, _ ->
+        scale = (scale * zoomChange).coerceIn(1f, 5f)
+        if (scale > 1f) {
+            offset += offsetChange
+        } else {
+            offset = Offset.Zero
+        }
+        onZoomStateChanged(scale > 1f)
+    }
 
     Box(
         modifier = modifier
             .clip(RectangleShape)
             .pointerInput(Unit) {
-                detectTransformGestures { _, pan, zoom, _ ->
-                    scale = (scale * zoom).coerceIn(1f, 5f)
-                    if (scale > 1f) {
-                        offset += pan
-                    } else {
-                        offset = Offset.Zero
+                detectTapGestures(
+                    onDoubleTap = { tapOffset ->
+                        if (scale > 1f) {
+                            scale = 1f
+                            offset = Offset.Zero
+                        } else {
+                            scale = 3f
+                        }
+                        onZoomStateChanged(scale > 1f)
                     }
-                    onZoomChanged(scale)
-                }
+                )
             }
+            .transformable(state = transformState)
             .graphicsLayer {
                 scaleX = scale
                 scaleY = scale
-                translationX = offset.x * scale
-                translationY = offset.y * scale
+                translationX = offset.x
+                translationY = offset.y
             },
         contentAlignment = Alignment.Center
     ) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(
-                    if (url.startsWith("http")) url else if (url.isNotEmpty()) File(url) else File(
-                        thumbnailUrl ?: ""
-                    )
-                )
+                .data(if (url.startsWith("http")) url else if (url.isNotEmpty()) File(url) else File(thumbnailUrl ?: ""))
                 .build(),
             contentDescription = null,
             modifier = Modifier.fillMaxSize(),
@@ -341,8 +344,6 @@ fun AdvancedVideoPlayer(
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
     var isLongPressing by remember { mutableStateOf(false) }
     var longPressDirection by remember { mutableStateOf(0) } // -1 for left, 1 for right
-
-    val scope = rememberCoroutineScope()
 
     VideoPlayer(
         filePath = filePath,
@@ -407,16 +408,20 @@ fun BoxScope.VideoControlOverlay(
 ) {
     var position by remember { mutableLongStateOf(0L) }
     var duration by remember { mutableLongStateOf(0L) }
-    var isPlaying by remember { mutableStateOf(player.isPlaying) }
+    var isPlaying by remember { mutableStateOf(false) }
 
     DisposableEffect(player) {
+        isPlaying = player.isPlaying
+        duration = player.duration.coerceAtLeast(0L)
         val listener = object : Player.Listener {
             override fun onIsPlayingChanged(playing: Boolean) {
                 isPlaying = playing
             }
 
-            override fun onEvents(player: Player, events: Player.Events) {
-                duration = player.duration.coerceAtLeast(0L)
+            override fun onPlaybackStateChanged(playbackState: Int) {
+                if (playbackState == Player.STATE_READY) {
+                    duration = player.duration.coerceAtLeast(0L)
+                }
             }
         }
         player.addListener(listener)
@@ -424,7 +429,7 @@ fun BoxScope.VideoControlOverlay(
     }
 
     LaunchedEffect(player, isPlaying) {
-        while (isPlaying) {
+        while (true) {
             position = player.currentPosition
             delay(500)
         }
@@ -488,7 +493,7 @@ fun BoxScope.VideoControlOverlay(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Text(formatTime(position), color = Color.White, fontSize = 12.sp)
                     Slider(
-                        value = if (duration > 0) position.toFloat() / duration else 0f,
+                        value = if (duration > 0) (position.toFloat() / duration).coerceIn(0f, 1f) else 0f,
                         onValueChange = { player.seekTo((it * duration).toLong()) },
                         modifier = Modifier
                             .weight(1f)
