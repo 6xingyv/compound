@@ -119,6 +119,27 @@ class TdLibDataSource(
 
                     client.send(
                         TdApi.SetOption(
+                            "notification_group_count_max",
+                            TdApi.OptionValueInteger(25)
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
+                            "notification_group_size_max",
+                            TdApi.OptionValueInteger(10)
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
+                            "ignore_default_disable_notification",
+                            TdApi.OptionValueBoolean(true)
+                        )
+                    ) { }
+
+                    client.send(
+                        TdApi.SetOption(
                             "ignore_background_updates",
                             TdApi.OptionValueBoolean(false)
                         )

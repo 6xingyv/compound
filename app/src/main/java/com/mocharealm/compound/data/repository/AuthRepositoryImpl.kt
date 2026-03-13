@@ -102,7 +102,7 @@ class AuthRepositoryImpl(
         return try {
             tdLibDataSource.send(
                 TdApi.RegisterDevice(
-                    TdApi.DeviceTokenFirebaseCloudMessaging(token, false),
+                    TdApi.DeviceTokenFirebaseCloudMessaging(token, true),
                     longArrayOf() // Other user IDs if multiple accounts are used
                 )
             )
