@@ -3,12 +3,13 @@ package com.mocharealm.compound.data.dto
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.Message
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.model.User
 import org.drinkless.tdlib.TdApi
 
 data class ChatDto(
     val id: Long,
-    val title: String,
+    val title: Text,
     val lastMessage: Message? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
@@ -90,9 +91,18 @@ data class ChatDto(
             val isArchived = archivePosition != null
             val order = mainPosition?.order ?: 0L
 
+            val entities = mutableListOf<Text.TextEntity>()
+            chat.emojiStatus?.let { status ->
+                if (status.type is TdApi.EmojiStatusTypeCustomEmoji) {
+                    // Title entities could be added if TdApi provided them.
+                    // Since it only provides String title, we assume no entities in title for now
+                    // other than the custom emoji status if we wanted to display it.
+                }
+            }
+
             return ChatDto(
                 id = chat.id,
-                title = chat.title,
+                title = Text(chat.title, entities),
                 lastMessage = lastMessage,
                 lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
                 unreadCount = chat.unreadCount,

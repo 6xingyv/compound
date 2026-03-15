@@ -120,6 +120,7 @@ import com.mocharealm.compound.ui.composable.chat.PhotoBlock
 import com.mocharealm.compound.ui.composable.chat.StickerBlock
 import com.mocharealm.compound.ui.composable.chat.SystemMessage
 import com.mocharealm.compound.ui.composable.chat.TimestampLabel
+import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.composable.chat.VideoBlock
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.util.EmptyIndication
@@ -127,6 +128,7 @@ import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.PaddingValuesSide
 import com.mocharealm.compound.ui.util.takeOnly
+import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
@@ -387,7 +389,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         verticalArrangement = Arrangement.spacedBy((-6).dp),
                         horizontalAlignment = Alignment.CenterHorizontally) {
                         Avatar(
-                            initials = chatInfo.title.take(2),
+                            initials = chatInfo.title.content.take(2),
                             modifier = Modifier
                                 .size(48.dp)
                                 .zIndex(20f)
@@ -407,13 +409,11 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 Modifier.padding(8.dp),
                                 verticalAlignment = Alignment.CenterVertically,
                             ) {
-                                Text(
-                                    chatInfo.title,
-                                    style = MiuixTheme.textStyles.footnote1,
-                                    fontWeight = FontWeight.Bold,
+                                RichText(
+                                    text = chatInfo.title.toAnnotatedString(),
+                                    style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
                                     maxLines = 1,
-                                    overflow = TextOverflow.Ellipsis,
-                                    textAlign = TextAlign.Center
+                                    isInteractive = false
                                 )
                                 Icon(
                                     SFIcons.Chevron_Compact_Forward,

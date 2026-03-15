@@ -4,6 +4,7 @@ import com.mocharealm.compound.data.dto.ChatDto
 import com.mocharealm.compound.data.dto.UserDto
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.Chat
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.repository.PersonNameFormatterRepository
 import org.drinkless.tdlib.TdApi
 
@@ -20,7 +21,7 @@ class ChatMapper(
         if (tdChat.type is TdApi.ChatTypePrivate) {
             val userId = (tdChat.type as TdApi.ChatTypePrivate).userId
             tdLibDataSource.sendSafe(TdApi.GetUser(userId)).getOrNull()?.let { user ->
-                formattedTitle = nameFormatter.formatName(UserDto.fromTdApi(user, null).toDomain())
+                formattedTitle = Text(nameFormatter.formatName(UserDto.fromTdApi(user, null).toDomain()))
             }
         }
 

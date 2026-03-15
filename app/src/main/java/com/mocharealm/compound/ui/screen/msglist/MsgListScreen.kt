@@ -32,6 +32,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.text.AnnotatedString
+import androidx.compose.ui.text.buildAnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
@@ -40,6 +41,7 @@ import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
+import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.compound.ui.util.toPreviewAnnotatedString
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.RevealDirection
@@ -209,17 +211,25 @@ fun MsgListScreen(
                                 Avatar(
                                     modifier = Modifier.size(45.dp),
                                     photoPath = chat.photoUrl,
-                                    initials = chat.title.take(2)
+                                    initials = chat.title.content.take(2)
                                 )
                                 Column(Modifier.weight(1f)) {
                                     Row {
-                                        Text(
-                                            text = if (chat.isPinned) "📌 ${chat.title}" else chat.title,
-                                            style = MiuixTheme.textStyles.body1,
-                                            fontWeight = FontWeight.Bold,
+                                        RichText(
+                                            text = remember(chat.title, chat.isPinned) {
+                                                if (chat.isPinned) {
+                                                    buildAnnotatedString {
+                                                        append("📌 ")
+                                                        append(chat.title.toAnnotatedString())
+                                                    }
+                                                } else {
+                                                    chat.title.toAnnotatedString()
+                                                }
+                                            },
+                                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
                                             maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.weight(1f)
+                                            modifier = Modifier.weight(1f),
+                                            isInteractive = false
                                         )
                                         Text(
                                             text = chat.lastMessageDate.formatMessageTimestamp(),

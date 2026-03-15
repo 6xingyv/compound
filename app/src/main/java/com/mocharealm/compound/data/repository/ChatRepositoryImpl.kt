@@ -7,6 +7,7 @@ import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.InternalLink
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.repository.ChatRepository
 import org.drinkless.tdlib.TdApi
 
@@ -81,7 +82,7 @@ class ChatRepositoryImpl(
                 InternalLink.ChatInvite(
                     Chat(
                         id = info.chatId,
-                        title = info.title,
+                        title = Text(info.title),
                         lastMessage = null,
                         unreadCount = 0,
                         type = when (info.type) {

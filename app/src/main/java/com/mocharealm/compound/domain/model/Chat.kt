@@ -2,7 +2,7 @@ package com.mocharealm.compound.domain.model
 
 data class Chat(
     val id: Long,
-    val title: String,
+    val title: Text,
     val lastMessage: Message? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
