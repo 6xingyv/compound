@@ -206,8 +206,9 @@ fun MessageContent(
         if (hasReply) {
             val firstBlock = if (message.blocks.isNotEmpty()) message.blocks[0] else null
             val isOnlySticker = message.blocks.size == 1 && firstBlock is MessageBlock.StickerBlock
+            val hasContentBelow = message.blocks.isNotEmpty() || hasShare
             val replyTop = if (isOnlySticker) 0.dp else 10.dp
-            val replyBottom = if (message.blocks.isEmpty() && !hasShare) bottomPadding else 0.dp
+            val replyBottom = if (hasContentBelow) 8.dp else bottomPadding
 
             val replyText =
                 message.replyTo.blocks.find { b -> b is MessageBlock.TextBlock }.let { b ->
@@ -234,8 +235,27 @@ fun MessageContent(
         message.blocks.forEachIndexed { index, block ->
             val isFirstBlock = index == 0
             val isLastBlock = index == message.blocks.size - 1
-            val blockTop = if (isFirstBlock) (if (hasReply) 8.dp else 10.dp) else 4.dp
-            val blockBottom = if (isLastBlock && !hasShare) bottomPadding else 0.dp
+            val isMedia = block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.VenueBlock
+            
+            // Gap logic: 
+            // 1. If hasReply and this is first block -> 0dp (gap is handled by replyBottom=8dp).
+            // 2. If NO reply and this is first block:
+            //    - Media (Image/Video/Sticker/Location) -> 0dp (edge-to-edge).
+            //    - Others (Text/Document) -> 10dp (standard bubble top).
+            // 3. If this is NOT first block -> 8dp gap to previous block.
+            val blockTop = if (isFirstBlock) {
+                if (hasReply) 0.dp 
+                else if (isMedia) 0.dp
+                else 10.dp
+            } else {
+                8.dp
+            }
+
+            // If it's ONLY one media item and no reply/share, it should have no padding at all.
+            val isOnlyMedia = message.blocks.size == 1 && isMedia && !hasReply && !hasShare
+            val blockBottom = if (isLastBlock && !hasShare) {
+                if (isOnlyMedia) 0.dp else bottomPadding
+            } else 0.dp
 
             when (block) {
                 is MessageBlock.StickerBlock -> {
@@ -243,7 +263,8 @@ fun MessageContent(
                         block = block,
                         modifier =
                             Modifier
-                                .padding(top = if (hasReply) 8.dp else 0.dp)
+                                .padding(top = if (isFirstBlock && !hasReply && isMedia) 0.dp else blockTop)
+                                .padding(bottom = blockBottom)
                                 .size(120.dp)
                     )
                 }
@@ -260,13 +281,20 @@ fun MessageContent(
                         if (isFirstInAlbum) {
                             val albumBlocks = mediaBlocks.filter { it.mediaAlbumId == albumId }
                             val hasTextBlockInside = message.blocks.any { it is MessageBlock.TextBlock }
-                            MediaAlbumGrid(albumBlocks, hasTextBlock = hasTextBlockInside, modifier = Modifier.widthIn(max = 280.dp))
+                            MediaAlbumGrid(
+                                albumBlocks, 
+                                hasTextBlock = hasTextBlockInside, 
+                                modifier = Modifier
+                                    .padding(top = blockTop, bottom = blockBottom)
+                                    .widthIn(max = 280.dp)
+                            )
                         }
                     } else {
+                        val mediaModifier = Modifier.padding(top = blockTop, bottom = blockBottom)
                         if (block.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO) {
-                            PhotoBlock(block)
+                            PhotoBlock(block, modifier = mediaModifier)
                         } else {
-                            VideoBlock(block)
+                            VideoBlock(block, modifier = mediaModifier)
                         }
                     }
                 }
