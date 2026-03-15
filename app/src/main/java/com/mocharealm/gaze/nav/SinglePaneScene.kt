@@ -5,12 +5,10 @@ import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.CompositionLocalProvider
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
 import androidx.navigation3.scene.SceneStrategyScope
-import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 
 internal data class SinglePaneScene<T : Any>(
     override val key: Any,
@@ -29,9 +27,7 @@ internal data class SinglePaneScene<T : Any>(
             },
             label = "SinglePaneContentTransition"
         ) { targetEntry ->
-            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                targetEntry.Content()
-            }
+            targetEntry.Content()
         }
     }
 
@@ -52,7 +48,8 @@ internal data class SinglePaneScene<T : Any>(
             previousEntries.hashCode() * 31 +
             entries.hashCode() * 31
 
-    override fun toString(): String = "SinglePaneScene(key=$key, entry=$entry, previousEntries=$previousEntries, entries=$entries)"
+    override fun toString(): String =
+        "SinglePaneScene(key=$key, entry=$entry, previousEntries=$previousEntries, entries=$entries)"
 }
 
 /**
@@ -61,9 +58,10 @@ internal data class SinglePaneScene<T : Any>(
  */
 class SinglePaneSceneStrategy<T : Any> : SceneStrategy<T> {
 
-    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T> = SinglePaneScene(
-        key = "SinglePaneRoot",
-        entry = entries.last(),
-        previousEntries = entries.dropLast(1),
-    )
+    override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T> =
+        SinglePaneScene(
+            key = "SinglePaneRoot",
+            entry = entries.last(),
+            previousEntries = entries.dropLast(1),
+        )
 }
