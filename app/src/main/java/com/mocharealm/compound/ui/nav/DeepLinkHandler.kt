@@ -12,6 +12,10 @@ class DeepLinkHandler(
      * Returns null if the URI cannot be resolved or is not a supported link type.
      */
     suspend fun resolve(uri: Uri): Screen? {
+        if (uri.scheme == "compound" && uri.host == "chat") {
+            val chatId = uri.lastPathSegment?.toLongOrNull()
+            if (chatId != null) return Screen.Chat(chatId)
+        }
         val result = getInternalLink(uri.toString())
         return result.getOrNull()?.toScreen()
     }

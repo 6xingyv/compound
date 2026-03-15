@@ -59,8 +59,8 @@ class MainActivity : ComponentActivity() {
                 val isReady by navViewModel.isReady.collectAsState()
                 if (!isReady) return@CompoundTheme
 
-                val startScreen by navViewModel.startScreen.collectAsState()
-                val backStack = rememberNavBackStack(startScreen)
+                val initialBackstack by navViewModel.initialBackstack.collectAsState()
+                val backStack = rememberNavBackStack(*initialBackstack.toTypedArray())
                 val navigator = remember { Navigator(backStack) }
                 val onBack = remember(navigator) { { navigator.pop() } }
 

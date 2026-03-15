@@ -1,5 +1,6 @@
 package com.mocharealm.compound.ui.composable.chat
 
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -16,6 +17,7 @@ import androidx.compose.foundation.text.selection.LocalTextSelectionColors
 import androidx.compose.foundation.text.selection.TextSelectionColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -184,7 +186,7 @@ fun MessageContent(
         else MiuixTheme.colorScheme.primary
     val revealedSpoilers = rememberSaveable(message.id) { mutableStateOf(setOf<Int>()) }
 
-    val bottomPadding = if (hasTail) 18.dp else 10.dp
+    val bottomPadding by animateDpAsState(if (hasTail) 18.dp else 10.dp)
     val hasReply = message.replyTo != null
     val hasShare = message.shareInfo != null
 

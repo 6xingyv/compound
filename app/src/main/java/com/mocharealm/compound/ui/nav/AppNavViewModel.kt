@@ -18,8 +18,8 @@ class AppNavViewModel(
     private val awaitAuthState: AwaitAuthenticationStateUseCase,
 ) : ViewModel() {
 
-    private val _startScreen = MutableStateFlow<Screen>(Screen.Intro)
-    val startScreen: StateFlow<Screen> = _startScreen
+    private val _initialBackstack = MutableStateFlow<List<Screen>>(listOf(Screen.Intro))
+    val initialBackstack: StateFlow<List<Screen>> = _initialBackstack
 
     private val _isReady = MutableStateFlow(false)
     val isReady: StateFlow<Boolean> = _isReady
@@ -50,11 +50,11 @@ class AppNavViewModel(
                 }
             }
 
-            _startScreen.value = when {
-                !isLoggedIn -> Screen.Intro
-                sharePickerScreen != null -> sharePickerScreen
-                deepLinkScreen != null -> deepLinkScreen
-                else -> Screen.Home
+            _initialBackstack.value = when {
+                !isLoggedIn -> listOf(Screen.Intro)
+                sharePickerScreen != null -> listOf(Screen.Home, sharePickerScreen)
+                deepLinkScreen != null -> listOf(Screen.Home, deepLinkScreen)
+                else -> listOf(Screen.Home)
             }
 
             _isReady.value = true

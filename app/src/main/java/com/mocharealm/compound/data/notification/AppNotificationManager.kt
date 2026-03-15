@@ -9,12 +9,21 @@ import android.content.Context
 import android.content.Intent
 import android.graphics.Bitmap
 import android.graphics.BitmapFactory
+import android.graphics.Canvas
+import android.graphics.Paint
+import android.graphics.PorterDuff
+import android.graphics.PorterDuffXfermode
+import android.graphics.Rect
+import android.net.Uri
 import android.os.Bundle
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.Person
 import androidx.core.app.RemoteInput
+import androidx.core.content.pm.ShortcutInfoCompat
+import androidx.core.content.pm.ShortcutManagerCompat
 import androidx.core.graphics.drawable.IconCompat
+import com.mocharealm.compound.MainActivity
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -33,27 +42,44 @@ class AppNotificationManager(
     
     // 追踪前台 Activity 正在查看的对话
     private var currentChatId: Long? = null
+    private var me: TdApi.User? = null
 
     // 缓存每个对话的消息历史，用于构建 MessagingStyle
     private val messagesHistory = ConcurrentHashMap<Long, MutableList<NotificationCompat.MessagingStyle.Message>>()
 
     init {
-        createNotificationChannel()
+        scope.launch {
+            me = try { tdLibDataSource.send(TdApi.GetMe()) } catch (e: Exception) { null }
+            createNotificationChannelGroup(me)
+        }
         listenForUpdates()
         if (context is Application) {
             context.registerActivityLifecycleCallbacks(this)
         }
     }
 
-    private fun createNotificationChannel() {
-        val name = "Chat Notifications"
-        val descriptionText = "Notifications for new messages"
-        val importance = NotificationManager.IMPORTANCE_HIGH
-        val channel = NotificationChannel(CHANNEL_ID, name, importance).apply {
-            description = descriptionText
-            setShowBadge(true)
+    private fun createNotificationChannelGroup(me: TdApi.User?) {
+        val groupId = "account_${me?.id ?: 0}"
+        val groupName = if (me != null) "${me.firstName} ${me.lastName}".trim() else "Compound"
+        
+        notificationManager.createNotificationChannelGroup(
+            android.app.NotificationChannelGroup(groupId, groupName)
+        )
+    }
+
+    private fun getOrCreateChatChannel(chat: TdApi.Chat): String {
+        val meId = me?.id ?: 0L
+        val channelId = "chat_${meId}_${chat.id}"
+        if (notificationManager.getNotificationChannel(channelId) == null) {
+            val name = chat.title
+            val importance = NotificationManager.IMPORTANCE_HIGH
+            val channel = NotificationChannel(channelId, name, importance).apply {
+                group = "account_$meId"
+                setShowBadge(true)
+            }
+            notificationManager.createNotificationChannel(channel)
         }
-        notificationManager.createNotificationChannel(channel)
+        return channelId
     }
 
     private fun listenForUpdates() {
@@ -152,10 +178,28 @@ class AppNotificationManager(
         return downloadedFile?.local?.path?.let { path ->
             if (path.isNotEmpty()) {
                 withContext(Dispatchers.IO) {
-                    try { BitmapFactory.decodeFile(path) } catch (e: Exception) { null }
+                    try { 
+                        val bitmap = BitmapFactory.decodeFile(path)
+                        bitmap?.let { getCircleBitmap(it) }
+                    } catch (e: Exception) { null }
                 }
             } else null
         }
+    }
+
+    private fun getCircleBitmap(bitmap: Bitmap): Bitmap {
+        val output = Bitmap.createBitmap(bitmap.width, bitmap.height, Bitmap.Config.ARGB_8888)
+        val canvas = Canvas(output)
+        val color = -0xbdbdbe
+        val paint = Paint()
+        val rect = Rect(0, 0, bitmap.width, bitmap.height)
+        paint.isAntiAlias = true
+        canvas.drawARGB(0, 0, 0, 0)
+        paint.color = color
+        canvas.drawCircle((bitmap.width / 2).toFloat(), (bitmap.height / 2).toFloat(), (bitmap.width / 2).toFloat(), paint)
+        paint.xfermode = PorterDuffXfermode(PorterDuff.Mode.SRC_IN)
+        canvas.drawBitmap(bitmap, rect, rect, paint)
+        return output
     }
 
     private fun getMessageText(content: TdApi.MessageContent): String {
@@ -173,7 +217,10 @@ class AppNotificationManager(
 
     private fun showTgxStyledNotification(chat: TdApi.Chat?, senderName: String, senderIcon: IconCompat?, text: String, date: Int, notificationId: Int) {
         val chatId = chat?.id ?: 0L
-        val isGroup = chat?.let { it.type !is TdApi.ChatTypePrivate } ?: false
+        if (chat == null) return
+
+        val channelId = getOrCreateChatChannel(chat)
+        val isGroup = chat.type !is TdApi.ChatTypePrivate
         
         // 1. 构建 Person (发送者)
         val person = Person.Builder()
@@ -196,48 +243,63 @@ class AppNotificationManager(
         // 3. 创建样式
         val myself = Person.Builder().setName("Me").build()
         val messagingStyle = NotificationCompat.MessagingStyle(myself)
-            .setConversationTitle(if (isGroup) chat?.title else null)
+            .setConversationTitle(if (isGroup) chat.title else null)
             .setGroupConversation(isGroup)
 
         history.forEach { messagingStyle.addMessage(it) }
 
-        // 4. 构建 Action (已读和回复)
-        val finalNotificationId = if (chatId != 0L) (chatId and 0x7FFFFFFF).toInt() else notificationId
+        // 4. 构建 Action 和 Shortcut
+        val finalNotificationId = (chatId and 0x7FFFFFFF).toInt()
+        val shortcutId = "shortcut_$chatId"
+
+        val contentIntent = Intent(context, MainActivity::class.java).apply {
+            data = Uri.parse("compound://chat/$chatId")
+            putExtra("chat_id", chatId)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK or Intent.FLAG_ACTIVITY_CLEAR_TOP)
+        }
         
-        val readIntent = Intent(context, NotificationReadReceiver::class.java).apply {
-            putExtra("chat_id", chatId)
+        // 如果是群组，Shortcut 图标应该用群组头像
+        scope.launch {
+            val chatIcon = if (isGroup) {
+                chat.photo?.small?.let { loadBitmap(it) }?.let { IconCompat.createWithBitmap(it) }
+            } else {
+                senderIcon
+            }
+
+            // 发布 Shortcut 以支持 Conversations
+            val shortcut = ShortcutInfoCompat.Builder(context, shortcutId)
+                .setShortLabel(chat.title)
+                .setIntent(contentIntent.setAction(Intent.ACTION_VIEW))
+                .setPerson(person)
+                .setIcon(chatIcon ?: IconCompat.createWithResource(context, android.R.drawable.ic_dialog_email))
+                .setLongLived(true)
+                .build()
+            ShortcutManagerCompat.pushDynamicShortcut(context, shortcut)
+
+            val contentPendingIntent = PendingIntent.getActivity(
+                context, finalNotificationId, contentIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
+            )
+
+            // 5. 构建通知
+            val builder = NotificationCompat.Builder(context, channelId)
+                .setSmallIcon(android.R.drawable.ic_dialog_email)
+                .setLargeIcon(chatIcon?.toIcon(context)?.let { null } ?: chatIcon?.let { 
+                    // 这里直接用 Bitmap
+                    chat.photo?.small?.let { loadBitmap(it) }
+                })
+                .setStyle(messagingStyle)
+                .setContentIntent(contentPendingIntent)
+                .setShortcutId(shortcutId)
+                .setLocusId(androidx.core.content.LocusIdCompat(shortcutId))
+                .setWhen(date.toLong() * 1000)
+                .setShowWhen(true)
+                .setAutoCancel(true)
+                .setCategory(NotificationCompat.CATEGORY_MESSAGE)
+                .setPriority(NotificationCompat.PRIORITY_HIGH)
+                .addPerson(person)
+
+            notificationManager.notify(finalNotificationId, builder.build())
         }
-        val readPendingIntent = PendingIntent.getBroadcast(
-            context, finalNotificationId, readIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_IMMUTABLE
-        )
-        val readAction = NotificationCompat.Action.Builder(0, "Mark as Read", readPendingIntent).build()
-
-        val remoteInput = RemoteInput.Builder(NotificationReplyReceiver.KEY_TEXT_REPLY)
-            .setLabel("Reply...")
-            .build()
-        val replyIntent = Intent(context, NotificationReplyReceiver::class.java).apply {
-            putExtra("chat_id", chatId)
-        }
-        val replyPendingIntent = PendingIntent.getBroadcast(
-            context, finalNotificationId, replyIntent, PendingIntent.FLAG_UPDATE_CURRENT or PendingIntent.FLAG_MUTABLE
-        )
-        val replyAction = NotificationCompat.Action.Builder(0, "Reply", replyPendingIntent)
-            .addRemoteInput(remoteInput)
-            .build()
-
-        // 5. 构建通知
-        val builder = NotificationCompat.Builder(context, CHANNEL_ID)
-            .setSmallIcon(android.R.drawable.ic_dialog_email)
-            .setStyle(messagingStyle)
-            .setWhen(date.toLong() * 1000)
-            .setShowWhen(true)
-            .setAutoCancel(true)
-            .setCategory(NotificationCompat.CATEGORY_MESSAGE)
-            .setPriority(NotificationCompat.PRIORITY_HIGH)
-            .addAction(replyAction)
-            .addAction(readAction)
-
-        notificationManager.notify(finalNotificationId, builder.build())
     }
 
     private data class Four<A, B, C, D>(val a: A, val b: B, val c: C, val d: D)
