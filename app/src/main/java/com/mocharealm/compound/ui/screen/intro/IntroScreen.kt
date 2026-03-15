@@ -260,10 +260,12 @@ fun IntroScreen() {
                 }
             }
             SuperBottomSheet(
-                show = showBottomSheet,
+                show = showBottomSheet.value,
+                modifier = Modifier,
                 title = tdString("login_with_telegram"),
                 insideMargin = DpSize.Zero,
                 onDismissRequest = { showBottomSheet.value = false },
+                renderInRootScaffold = false,
             ) { Column(Modifier.fillMaxSize()) { SignInScreen() } }
         }
     }
