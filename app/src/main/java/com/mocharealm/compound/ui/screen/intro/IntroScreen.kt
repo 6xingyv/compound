@@ -4,12 +4,15 @@ import androidx.compose.animation.core.Animatable
 import androidx.compose.animation.core.tween
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.sizeIn
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.mutableStateOf
@@ -129,145 +132,149 @@ fun IntroScreen() {
                     }
             )
 
-        Column(
-            Modifier
-                .fillMaxSize()
-                .graphicsLayer {
-                    clip = false
-                    compositingStrategy = CompositingStrategy.Offscreen
-                    translationY = 200f * (1f - animation.value)
+        Box(
+            Modifier.fillMaxSize()
+            .graphicsLayer {
+                clip = false
+                compositingStrategy = CompositingStrategy.Offscreen
+                translationY = 200f * (1f - animation.value)
+            }
+            .drawWithCache {
+                onDrawWithContent {
+                    drawContent()
+                    drawRect(
+                        brush =
+                            fadeVerticalBrush(
+                                animation.value,
+                                startColor = Color.White.copy(0f),
+                                endColor = Color.White
+                            ),
+                        blendMode = BlendMode.DstIn
+                    )
                 }
-                .drawWithCache {
-                    onDrawWithContent {
-                        drawContent()
-                        drawRect(
-                            brush =
-                                fadeVerticalBrush(
-                                    animation.value,
-                                    startColor = Color.White.copy(0f),
-                                    endColor = Color.White
-                                ),
-                            blendMode = BlendMode.DstIn
+            }
+        ) {
+            Column(
+                Modifier.fillMaxHeight().widthIn(max=600.dp).align(Alignment.Center),
+                horizontalAlignment = Alignment.CenterHorizontally,
+                verticalArrangement = Arrangement.SpaceBetween
+            ) {
+                val surfaceColor = MiuixTheme.colorScheme.surface
+                val primaryColor = MiuixTheme.colorScheme.primary
+                val layerBackdrop = rememberLayerBackdrop {
+                    drawRect(surfaceColor)
+                    drawContent()
+                }
+                Column(
+                    Modifier
+                        .fillMaxWidth()
+                        .padding(innerPadding.takeExcept(PaddingValuesSide.Bottom))
+                        .padding(16.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy((-64).dp)
+                ) {
+                    Image(
+                        painterResource(R.drawable.ic_launcher_foreground),
+                        "",
+                        Modifier
+                            .aspectRatio(1f)
+                            .sizeIn(maxHeight = 480.dp)
+                            .graphicsLayer {
+                                val width = size.width
+                                val height = size.height
+
+                                val progress = interactiveHighlight.pressProgress
+                                val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
+
+                                val maxOffset = size.minDimension
+                                val initialDerivative = 0.05f
+                                val offset = interactiveHighlight.offset
+                                translationX =
+                                    maxOffset *
+                                            tanh(initialDerivative * offset.x / maxOffset)
+                                translationY =
+                                    maxOffset *
+                                            tanh(initialDerivative * offset.y / maxOffset)
+
+                                val maxDragScale = 4f.dp.toPx() / size.height
+                                val offsetAngle = atan2(offset.y, offset.x)
+                                scaleX =
+                                    scale +
+                                            maxDragScale *
+                                            abs(
+                                                cos(offsetAngle) * offset.x /
+                                                        size.maxDimension
+                                            ) *
+                                            (width / height).fastCoerceAtMost(1f)
+                                scaleY =
+                                    scale +
+                                            maxDragScale *
+                                            abs(
+                                                sin(offsetAngle) * offset.y /
+                                                        size.maxDimension
+                                            ) *
+                                            (height / width).fastCoerceAtMost(1f)
+                            }
+                            .then(interactiveHighlight.gestureModifier)
+                    )
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            "Compound",
+                            style = MiuixTheme.textStyles.title1,
+                            textAlign = TextAlign.Center
+                        )
+                        Text(
+                            "A beautiful messenger app.",
+                            Modifier.alpha(0.6f),
+                            style = MiuixTheme.textStyles.body1,
+                            textAlign = TextAlign.Center
                         )
                     }
-                },
-            horizontalAlignment = Alignment.CenterHorizontally,
-            verticalArrangement = Arrangement.SpaceBetween
-        ) {
-            val surfaceColor = MiuixTheme.colorScheme.surface
-            val primaryColor = MiuixTheme.colorScheme.primary
-            val layerBackdrop = rememberLayerBackdrop {
-                drawRect(surfaceColor)
-                drawContent()
-            }
-            Column(
-                Modifier
-                    .fillMaxWidth()
-                    .padding(innerPadding.takeExcept(PaddingValuesSide.Bottom))
-                    .padding(16.dp),
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy((-28).dp)
-            ) {
-                Image(
-                    painterResource(R.drawable.ic_compound),
-                    "",
-                    Modifier
-                        .aspectRatio(1f)
-                        .sizeIn(maxHeight = 480.dp)
-                        .graphicsLayer {
-                            val width = size.width
-                            val height = size.height
-
-                            val progress = interactiveHighlight.pressProgress
-                            val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
-
-                            val maxOffset = size.minDimension
-                            val initialDerivative = 0.05f
-                            val offset = interactiveHighlight.offset
-                            translationX =
-                                maxOffset *
-                                        tanh(initialDerivative * offset.x / maxOffset)
-                            translationY =
-                                maxOffset *
-                                        tanh(initialDerivative * offset.y / maxOffset)
-
-                            val maxDragScale = 4f.dp.toPx() / size.height
-                            val offsetAngle = atan2(offset.y, offset.x)
-                            scaleX =
-                                scale +
-                                        maxDragScale *
-                                        abs(
-                                            cos(offsetAngle) * offset.x /
-                                                    size.maxDimension
-                                        ) *
-                                        (width / height).fastCoerceAtMost(1f)
-                            scaleY =
-                                scale +
-                                        maxDragScale *
-                                        abs(
-                                            sin(offsetAngle) * offset.y /
-                                                    size.maxDimension
-                                        ) *
-                                        (height / width).fastCoerceAtMost(1f)
-                        }
-                        .then(interactiveHighlight.gestureModifier)
-                )
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    Text(
-                        "Compound",
-                        style = MiuixTheme.textStyles.title1,
-                        textAlign = TextAlign.Center
-                    )
-                    Text(
-                        "A beautiful messenger app.",
-                        Modifier.alpha(0.6f),
-                        style = MiuixTheme.textStyles.body1,
-                        textAlign = TextAlign.Center
-                    )
                 }
-            }
-            Column(
-                horizontalAlignment = Alignment.CenterHorizontally,
-                verticalArrangement = Arrangement.spacedBy(8.dp)
-            ) {
-                val context = LocalContext.current
-                val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
-
-                Text(
-                    "${packageInfo.versionName ?: "Unknown"} (${BuildConfig.GIT_COMMIT_HASH})",
-                    Modifier.alpha(0.6f),
-                    style = MiuixTheme.textStyles.footnote1,
-                    textAlign = TextAlign.Center
-                )
-                Button(
-                    { showBottomSheet.value = true },
-                    layerBackdrop,
-                    Modifier
-                        .padding(innerPadding.takeExcept(PaddingValuesSide.Top))
-                        .fillMaxWidth()
-                        .padding(16.dp),
-                    tint = primaryColor
+                Column(
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
+                    val context = LocalContext.current
+                    val packageInfo = context.packageManager.getPackageInfo(context.packageName, 0)
+
                     Text(
-                        tdString("login_with_telegram"),
+                        "${packageInfo.versionName ?: "Unknown"} (${BuildConfig.GIT_COMMIT_HASH})",
+                        Modifier.alpha(0.6f),
+                        style = MiuixTheme.textStyles.footnote1,
+                        textAlign = TextAlign.Center
+                    )
+                    Button(
+                        { showBottomSheet.value = true },
+                        layerBackdrop,
                         Modifier
+                            .padding(innerPadding.takeExcept(PaddingValuesSide.Top))
                             .fillMaxWidth()
                             .padding(16.dp),
-                        style = MiuixTheme.textStyles.body1,
-                        color = Color.White,
-                        textAlign = TextAlign.Center
-                    )
+                        tint = primaryColor
+                    ) {
+                        Text(
+                            tdString("login_with_telegram"),
+                            Modifier
+                                .fillMaxWidth()
+                                .padding(16.dp),
+                            style = MiuixTheme.textStyles.body1,
+                            color = Color.White,
+                            textAlign = TextAlign.Center
+                        )
+                    }
                 }
+                SuperBottomSheet(
+                    show = showBottomSheet.value,
+                    modifier = Modifier,
+                    title = tdString("login_with_telegram"),
+                    insideMargin = DpSize.Zero,
+                    onDismissRequest = { showBottomSheet.value = false },
+                    renderInRootScaffold = false,
+                ) { Column(Modifier.fillMaxSize()) { SignInScreen() } }
             }
-            SuperBottomSheet(
-                show = showBottomSheet.value,
-                modifier = Modifier,
-                title = tdString("login_with_telegram"),
-                insideMargin = DpSize.Zero,
-                onDismissRequest = { showBottomSheet.value = false },
-                renderInRootScaffold = false,
-            ) { Column(Modifier.fillMaxSize()) { SignInScreen() } }
         }
+
     }
 }
 
