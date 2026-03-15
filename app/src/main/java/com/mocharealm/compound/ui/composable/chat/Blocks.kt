@@ -8,12 +8,12 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -133,34 +133,47 @@ fun ReplyPreview(
 fun PhotoBlock(
     block: MessageBlock.MediaBlock,
     modifier: Modifier = Modifier.wrapContentWidth(),
-    imageModifier: Modifier = Modifier
-        .heightIn(max = 300.dp)
-        .wrapContentWidth(),
+    imageModifier: Modifier = Modifier.fillMaxSize(),
     contentScale: ContentScale = ContentScale.Fit
 ) {
     val onMediaClick = LocalOnMediaClick.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
 
-    val baseModifier = modifier.clickable { onMediaClick(block.id) }
-    val finalModifier = with(sharedTransitionScope) {
-        baseModifier.sharedElement(
+    val maxWidth = 280.dp
+    val aspectRatio =
+        if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
+        else 1f
+
+    val finalContainerModifier = modifier
+        .widthIn(max = maxWidth)
+        .aspectRatio(aspectRatio.coerceIn(0.5f, 2f))
+        .clip(RoundedCornerShape(4.dp))
+        .background(MiuixTheme.colorScheme.surfaceContainerHighest)
+        .clickable { onMediaClick(block.id) }
+
+    val sharedModifier = with(sharedTransitionScope) {
+        Modifier.sharedElement(
             rememberSharedContentState(key = "media_${block.id}"),
             animatedVisibilityScope = animatedVisibilityScope
         )
     }
 
-    if (!block.file.fileUrl.isNullOrEmpty()) {
-        SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalModifier) {
+    val displayUrl = block.file.fileUrl ?: block.thumbnail?.fileUrl
+
+    SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalContainerModifier) {
+        if (!displayUrl.isNullOrEmpty()) {
             AsyncImage(
                 model =
-                    ImageRequest.Builder(LocalContext.current)
-                        .data(block.file.fileUrl)
-                        .build(),
+                ImageRequest.Builder(LocalContext.current)
+                    .data(displayUrl)
+                    .build(),
                 contentDescription = "Photo",
-                modifier = imageModifier,
+                modifier = imageModifier.then(sharedModifier),
                 contentScale = contentScale
             )
+        } else {
+            Box(imageModifier.then(sharedModifier))
         }
     }
 }
@@ -175,19 +188,20 @@ fun VideoBlock(
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
 
-    val actualVideoModifier = videoModifier ?: run {
-        val maxWidth = 280.dp
-        val aspectRatio =
-            if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
-            else 16f / 9f
-        Modifier
-            .width(maxWidth)
-            .height(maxWidth / aspectRatio)
-    }
+    val maxWidth = 280.dp
+    val aspectRatio =
+        if (block.width > 0 && block.height > 0) block.width.toFloat() / block.height.toFloat()
+        else 16f / 9f
 
-    val baseModifier = modifier.clickable { onMediaClick(block.id) }
-    val finalContainerModifier = with(sharedTransitionScope) {
-        baseModifier.sharedElement(
+    val finalVideoModifier = videoModifier ?: Modifier.fillMaxSize()
+
+    val finalContainerModifier = modifier
+        .width(maxWidth)
+        .aspectRatio(aspectRatio.coerceIn(0.5f, 2f))
+        .clickable { onMediaClick(block.id) }
+
+    val sharedModifier = with(sharedTransitionScope) {
+        Modifier.sharedElement(
             rememberSharedContentState(key = "media_${block.id}"),
             animatedVisibilityScope = animatedVisibilityScope
         )
@@ -195,9 +209,9 @@ fun VideoBlock(
 
     SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalContainerModifier) {
         if (!block.file.fileUrl.isNullOrEmpty()) {
-            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = actualVideoModifier)
+            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = finalVideoModifier.then(sharedModifier))
         } else {
-            VideoThumbnailOverlay(block = block, modifier = actualVideoModifier)
+            VideoThumbnailOverlay(block = block, modifier = finalVideoModifier.then(sharedModifier))
         }
     }
 }
