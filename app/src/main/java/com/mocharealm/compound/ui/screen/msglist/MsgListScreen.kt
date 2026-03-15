@@ -184,77 +184,76 @@ fun MsgListScreen(
                                     )
                                 }
                             }
-                        },
-                        content = { _, _ ->
-                            Row(
-                                Modifier
-                                    .fillMaxWidth()
-                                    .background(MiuixTheme.colorScheme.surface)
-                                    .drawWithCache {
-                                        onDrawBehind {
-                                            drawLine(
-                                                separatorColor,
-                                                start =
-                                                    Offset(
-                                                        paddingPx + avatarPx + spacePx,
-                                                        size.height
-                                                    ),
-                                                end = Offset(size.width - paddingPx, size.height),
-                                                strokeWidth = 1f
-                                            )
-                                        }
-                                    }
-                                    .clickable {
-                                        onChatClick(chat.id)
-                                    }
-                                    .padding(28.dp, 16.dp),
-                                horizontalArrangement = Arrangement.spacedBy(12.dp),
-                                verticalAlignment = Alignment.CenterVertically
-                            ) {
-                                Avatar(
-                                    modifier = Modifier.size(45.dp),
-                                    photoPath = chat.photoUrl,
-                                    initials = chat.title.content.take(2)
-                                )
-                                Column(Modifier.weight(1f)) {
-                                    Row {
-                                        RichText(
-                                            text = remember(chat.title, chat.isPinned) {
-                                                if (chat.isPinned) {
-                                                    buildAnnotatedString {
-                                                        append("📌 ")
-                                                        append(chat.title.toAnnotatedString())
-                                                    }
-                                                } else {
-                                                    chat.title.toAnnotatedString()
-                                                }
-                                            },
-                                            style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
-                                            maxLines = 1,
-                                            modifier = Modifier.weight(1f),
-                                            isInteractive = false
-                                        )
-                                        Text(
-                                            text = chat.lastMessageDate.formatMessageTimestamp(),
-                                            style = MiuixTheme.textStyles.body1,
-                                            maxLines = 1,
-                                            overflow = TextOverflow.Ellipsis,
-                                            modifier = Modifier.alpha(0.6f)
+                        }
+                    ) { _, _ ->
+                        Row(
+                            Modifier
+                                .fillMaxWidth()
+                                .background(MiuixTheme.colorScheme.surface)
+                                .drawWithCache {
+                                    onDrawBehind {
+                                        drawLine(
+                                            separatorColor,
+                                            start =
+                                                Offset(
+                                                    paddingPx + avatarPx + spacePx,
+                                                    size.height
+                                                ),
+                                            end = Offset(size.width - paddingPx, size.height),
+                                            strokeWidth = 1f
                                         )
                                     }
+                                }
+                                .clickable {
+                                    onChatClick(chat.id)
+                                }
+                                .padding(28.dp, 16.dp),
+                            horizontalArrangement = Arrangement.spacedBy(12.dp),
+                            verticalAlignment = Alignment.CenterVertically
+                        ) {
+                            Avatar(
+                                modifier = Modifier.size(45.dp),
+                                photoPath = chat.photoUrl,
+                                initials = chat.title.content.take(2)
+                            )
+                            Column(Modifier.weight(1f)) {
+                                Row {
                                     RichText(
-                                        text = chat.lastMessage?.toPreviewAnnotatedString(chat)
-                                            ?: AnnotatedString(""),
-                                        style = MiuixTheme.textStyles.body1,
-                                        modifier = Modifier.alpha(0.6f),
-                                        maxLines = 2,
-                                        minLines = 2,
+                                        text = remember(chat.title, chat.isPinned) {
+                                            if (chat.isPinned) {
+                                                buildAnnotatedString {
+                                                    append("📌 ")
+                                                    append(chat.title.toAnnotatedString())
+                                                }
+                                            } else {
+                                                chat.title.toAnnotatedString()
+                                            }
+                                        },
+                                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1,
+                                        modifier = Modifier.weight(1f),
                                         isInteractive = false
                                     )
+                                    Text(
+                                        text = chat.lastMessageDate.formatMessageTimestamp(),
+                                        style = MiuixTheme.textStyles.body1,
+                                        maxLines = 1,
+                                        overflow = TextOverflow.Ellipsis,
+                                        modifier = Modifier.alpha(0.6f)
+                                    )
                                 }
+                                RichText(
+                                    text = chat.lastMessage?.toPreviewAnnotatedString(chat)
+                                        ?: AnnotatedString(""),
+                                    style = MiuixTheme.textStyles.body1,
+                                    modifier = Modifier.alpha(0.6f),
+                                    maxLines = 2,
+                                    minLines = 2,
+                                    isInteractive = false
+                                )
                             }
                         }
-                    )
+                    }
                 }
                 if (state.loadingMore) {
                     item {
