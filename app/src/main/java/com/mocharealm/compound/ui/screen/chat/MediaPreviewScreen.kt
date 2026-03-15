@@ -29,6 +29,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
+import androidx.compose.foundation.layout.widthIn
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -83,6 +84,7 @@ import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.LayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
+import com.mocharealm.gaze.glassy.liquid.effect.drawBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
@@ -93,7 +95,6 @@ import com.mocharealm.tci18n.core.tdString
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 import top.yukonga.miuix.kmp.basic.Icon
-import top.yukonga.miuix.kmp.basic.Slider
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
@@ -285,7 +286,8 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
 
                             Box(
                                 modifier = Modifier
-                                    .size(size)
+                                    .height(size)
+                                    .widthIn(30.dp, 56.dp)
                                     .clip(ContinuousRoundedRectangle(12.dp))
                                     .border(
                                         width = if (isSelected) 2.dp else 0.dp,
@@ -298,7 +300,8 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                                                 index
                                             )
                                         }
-                                    }) {
+                                    }
+                            ) {
                                 AsyncImage(
                                     model = ImageRequest.Builder(LocalContext.current).data(
                                         if ((item.thumbnailUrl
@@ -308,7 +311,6 @@ fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
                                         )
                                     ).build(),
                                     contentDescription = null,
-                                    modifier = Modifier.fillMaxSize(),
                                     contentScale = ContentScale.Crop
                                 )
                             }
@@ -585,7 +587,10 @@ fun BoxScope.VideoControlOverlay(
                     layerBackdrop,
                     Modifier.size(64.dp),
                     Modifier.clickable { if (player.isPlaying) player.pause() else player.play() },
-                    effects = { vibrancy(); lens(16.dp.toPx(), 32.dp.toPx()) },
+                    effects = {
+                        vibrancy()
+                        lens(16.dp.toPx(), 32.dp.toPx())
+                    },
                     surfaceColor = Color.White.copy(0.2f)
                 ) {
                     Icon(
@@ -613,7 +618,6 @@ fun BoxScope.VideoControlOverlay(
                 )
             }
 
-
             Column(
                 modifier = Modifier
                     .align(Alignment.BottomCenter)
@@ -622,21 +626,34 @@ fun BoxScope.VideoControlOverlay(
                     .padding(horizontal = 24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
-
-                Row(verticalAlignment = Alignment.CenterVertically) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(16.dp)
+                ) {
                     ManualRollingNumber(
                         formatTime(position),
                         Color.White,
                         MiuixTheme.textStyles.body1.copy(fontFamily = FontFamily.Monospace)
                     )
-                    Slider(
-                        value = if (duration > 0) (position.toFloat() / duration).coerceIn(
-                            0f, 1f
-                        ) else 0f,
-                        onValueChange = { player.seekTo((it * duration).toLong()) },
-                        modifier = Modifier
+                    Box(
+                        Modifier
                             .weight(1f)
-                            .padding(horizontal = 12.dp)
+                            .height(8.dp)
+                            .drawBackdrop(
+                                layerBackdrop,
+                                shape = { ContinuousRoundedRectangle(4.dp) },
+                                effects = {
+                                    vibrancy()
+                                    lens(16.dp.toPx(), 32.dp.toPx(), false)
+                                },
+                                onDrawFront = {
+                                    val width =
+                                        size.width * if (duration > 0) (position.toFloat() / duration).coerceIn(
+                                            0f, 1f
+                                        ) else 0f
+                                    drawRect(Color.White, size = size.copy(width))
+                                }
+                            )
                     )
                     ManualRollingNumber(
                         formatTime(duration),
