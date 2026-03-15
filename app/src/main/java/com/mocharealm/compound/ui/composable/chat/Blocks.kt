@@ -134,7 +134,7 @@ fun PhotoBlock(
     block: MessageBlock.MediaBlock,
     modifier: Modifier = Modifier.wrapContentWidth(),
     imageModifier: Modifier = Modifier.fillMaxSize(),
-    contentScale: ContentScale = ContentScale.Fit
+    contentScale: ContentScale = ContentScale.Crop
 ) {
     val onMediaClick = LocalOnMediaClick.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
@@ -148,8 +148,6 @@ fun PhotoBlock(
     val finalContainerModifier = modifier
         .widthIn(max = maxWidth)
         .aspectRatio(aspectRatio.coerceIn(0.5f, 2f))
-        .clip(RoundedCornerShape(4.dp))
-        .background(MiuixTheme.colorScheme.surfaceContainerHighest)
         .clickable { onMediaClick(block.id) }
 
     val sharedModifier = with(sharedTransitionScope) {
@@ -403,8 +401,6 @@ fun VideoThumbnailOverlay(block: MessageBlock.MediaBlock, modifier: Modifier = M
     Box(
         modifier =
             modifier
-                .clip(RoundedCornerShape(4.dp))
-                .background(MiuixTheme.colorScheme.surfaceContainerHighest)
                 .clickable { if (downloadPercent == null) onDownloadVideo(block.id) },
         contentAlignment = Alignment.Center
     ) {

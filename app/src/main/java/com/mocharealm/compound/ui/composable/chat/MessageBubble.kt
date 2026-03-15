@@ -60,7 +60,7 @@ fun MessageBubble(
         message.blocks.any { b -> b is MessageBlock.StickerBlock } && message.blocks.size == 1
     
     val hasTextBlock = message.blocks.any { it is MessageBlock.TextBlock }
-    val isOnlyAlbum = !hasTextBlock && message.shareInfo == null && message.blocks.all { it is MessageBlock.MediaBlock && it.mediaAlbumId != 0L }
+    !hasTextBlock && message.shareInfo == null && message.blocks.all { it is MessageBlock.MediaBlock && it.mediaAlbumId != 0L }
 
     val topPad = if (isFirst) 8.dp else 2.dp
     val bottomPad = if (isLast) 8.dp else 2.dp
@@ -141,7 +141,7 @@ fun MessageBubble(
                     backgroundColor = contentColor.copy(0.2f)
                 )
             ) {
-                if (hasSticker || isOnlyAlbum) {
+                if (hasSticker) {
                     MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
                 } else {
                     Box(
@@ -179,7 +179,7 @@ fun MessageContent(
     hasTail: Boolean,
     onReplyClick: (Long) -> Unit = {},
 ) {
-    val uriHandler = androidx.compose.ui.platform.LocalUriHandler.current
+    androidx.compose.ui.platform.LocalUriHandler.current
     val contentColor = LocalContentColor.current
     val linkColor =
         if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
@@ -253,10 +253,9 @@ fun MessageContent(
                 8.dp
             }
 
-            // If it's ONLY one media item and no reply/share, it should have no padding at all.
-            val isOnlyMedia = message.blocks.size == 1 && isMedia && !hasReply && !hasShare
+            // If it's a media item and no share follows, it should have no bottom padding to stay edge-to-edge.
             val blockBottom = if (isLastBlock && !hasShare) {
-                if (isOnlyMedia) 0.dp else bottomPadding
+                if (isMedia) 0.dp else bottomPadding
             } else 0.dp
 
             when (block) {
