@@ -73,9 +73,12 @@ fun MsgListScreen(
     CompositionLocalProvider(
         LocalCustomEmojiStickers provides state.customEmojiStickers
     ) {
-        // 当滚动到无法再往下滚动时加载更多聊天
         val shouldLoadMore by remember {
-            derivedStateOf { !listState.canScrollForward && listState.layoutInfo.totalItemsCount > 0 }
+            derivedStateOf {
+                val layoutInfo = listState.layoutInfo
+                val lastVisibleItem = layoutInfo.visibleItemsInfo.lastOrNull()
+                lastVisibleItem != null && lastVisibleItem.index >= layoutInfo.totalItemsCount - 25
+            }
         }
 
         val density = LocalDensity.current
@@ -86,8 +89,8 @@ fun MsgListScreen(
 
         val separatorColor = (if (isSystemInDarkTheme()) Color.White else Color.Black).copy(0.12f)
 
-        LaunchedEffect(shouldLoadMore) {
-            if (shouldLoadMore && !state.loading && state.hasMore) {
+        LaunchedEffect(shouldLoadMore, state.loadingMore, state.loading) {
+            if (shouldLoadMore && !state.loadingMore && !state.loading && state.hasMore) {
                 viewModel.loadMoreChats()
             }
         }
