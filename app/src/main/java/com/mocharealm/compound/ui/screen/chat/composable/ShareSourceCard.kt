@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -28,7 +27,7 @@ import com.mocharealm.compound.domain.model.ShareInfo
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import androidx.core.net.toUri
-import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
 
 /**

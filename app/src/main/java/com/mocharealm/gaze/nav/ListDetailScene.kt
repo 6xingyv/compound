@@ -18,32 +18,32 @@ package com.mocharealm.gaze.nav
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
-import androidx.compose.animation.animateContentSize
-import androidx.compose.animation.expandHorizontally
-import androidx.compose.animation.shrinkHorizontally
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
 import androidx.compose.animation.slideInHorizontally
 import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.animation.togetherWith
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxWithConstraints
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.offset
 import androidx.compose.foundation.layout.width
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
+import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.compositionLocalOf
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.unit.IntOffset
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
-import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 import androidx.navigation3.runtime.NavEntry
 import androidx.navigation3.scene.Scene
 import androidx.navigation3.scene.SceneStrategy
@@ -53,16 +53,16 @@ import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXPANDED_L
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_EXTRA_LARGE_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_LARGE_LOWER_BOUND
 import androidx.window.core.layout.WindowSizeClass.Companion.WIDTH_DP_MEDIUM_LOWER_BOUND
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.Compact
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.Default
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.DefaultV2
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.Expanded
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.ExtraLarge
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.Large
+import com.mocharealm.gaze.nav.DpWidthSizeClasses.Medium
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.DETAIL_KEY
-import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
-import androidx.compose.animation.core.animateFloatAsState
-import androidx.compose.foundation.layout.offset
-import androidx.compose.ui.unit.IntOffset
-import androidx.compose.animation.fadeIn
-import androidx.compose.animation.fadeOut
-import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.runtime.MutableState
 import com.mocharealm.gaze.nav.ListDetailScene.Companion.FULLSCREEN_KEY
+import com.mocharealm.gaze.nav.ListDetailScene.Companion.LIST_KEY
 
 /**
  * This `CompositionLocal` can be used by a detail `NavEntry` to toggle whether the detail pane 
@@ -89,7 +89,7 @@ class ListDetailScene<T : Any>(
             BoxWithConstraints(modifier = Modifier.fillMaxSize()) {
                 val totalWidth = maxWidth
                 val isExpanded = isExpandedState.value
-                
+
                 val expansionProgress by animateFloatAsState(
                     targetValue = if (isExpanded) 1f else 0f,
                     label = "expansionProgress"
@@ -97,7 +97,7 @@ class ListDetailScene<T : Any>(
 
                 val listWidth = totalWidth * 0.4f
                 val detailWidthNormal = totalWidth * 0.6f
-                
+
                 val listOffset = -listWidth * expansionProgress
                 val detailOffset = listWidth * (1f - expansionProgress)
                 val detailWidth = detailWidthNormal + (listWidth * expansionProgress)
@@ -116,9 +116,7 @@ class ListDetailScene<T : Any>(
                             .offset { IntOffset(listOffset.roundToPx(), 0) }
                     ) {
                         AnimatedVisibility(visible = true) {
-                            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                                listEntry.Content()
-                            }
+                            listEntry.Content()
                         }
                     }
 
@@ -146,9 +144,7 @@ class ListDetailScene<T : Any>(
                                             },
                                             label = "DetailContentTransition"
                                         ) { targetEntry ->
-                                            CompositionLocalProvider(LocalAnimatedVisibilityScope provides this) {
-                                                targetEntry.Content()
-                                            }
+                                            targetEntry.Content()
                                         }
                                     }
                                 }
@@ -190,7 +186,7 @@ class ListDetailScene<T : Any>(
  * a back button. Default is `true`. It is set to `false` for a detail `NavEntry` when being
  * displayed in a `ListDetailScene`.
  */
-val LocalBackButtonVisibility = compositionLocalOf{ true }
+val LocalBackButtonVisibility = compositionLocalOf { true }
 
 @Suppress("PrimitiveInCollection")
 private object DpWidthSizeClasses {
@@ -250,7 +246,7 @@ fun <T : Any> rememberListDetailSceneStrategy(): ListDetailSceneStrategy<T> {
     val windowSize =
         with(LocalDensity.current) { LocalWindowInfo.current.containerSize.toSize().toDpSize() }
 
-    val windowSizeClass =  WindowSizeClass(
+    val windowSizeClass = WindowSizeClass(
         DpWidthSizeClasses.DefaultV2.filter { windowSize.width >= it }.maxOf { it.value },
         DpWidthSizeClasses.DefaultV2.filter { windowSize.height >= it }.maxOf { it.value },
     )

@@ -30,7 +30,7 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
-import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.screen.chat.GroupPosition
 import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
 import com.mocharealm.compound.ui.shape.BubbleAlignment

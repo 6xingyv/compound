@@ -1,4 +1,4 @@
-package com.mocharealm.compound.ui.composable
+package com.mocharealm.compound.ui.composable.base
 
 import android.annotation.SuppressLint
 import androidx.compose.foundation.background
@@ -17,6 +17,7 @@ import androidx.compose.ui.unit.dp
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import top.yukonga.miuix.kmp.basic.Text
+import java.io.File
 
 @SuppressLint("ModifierParameter")
 @Composable
@@ -28,7 +29,7 @@ fun Avatar(
     if (!photoPath.isNullOrEmpty()) {
         AsyncImage(
             model = ImageRequest.Builder(LocalContext.current)
-                .data(java.io.File(photoPath))
+                .data(File(photoPath))
                 .build(),
             contentDescription = "Avatar",
             modifier = modifier

@@ -38,6 +38,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.net.toUri
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import coil3.compose.AsyncImage
 import coil3.request.ImageRequest
 import com.airbnb.lottie.RenderMode
@@ -56,7 +57,6 @@ import com.mocharealm.compound.ui.composable.base.VpxVideoPlayer
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
 import com.mocharealm.compound.ui.screen.chat.LocalOnMediaClick
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
-import com.mocharealm.compound.ui.util.LocalAnimatedVisibilityScope
 import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
@@ -138,17 +138,15 @@ fun PhotoBlock(
 ) {
     val onMediaClick = LocalOnMediaClick.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
 
     val baseModifier = modifier.clickable { onMediaClick(block.id) }
-    val finalModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-        with(sharedTransitionScope) {
-            baseModifier.sharedElement(
-                rememberSharedContentState(key = "media_${block.id}"),
-                animatedVisibilityScope = animatedVisibilityScope
-            )
-        }
-    } else baseModifier
+    val finalModifier = with(sharedTransitionScope) {
+        baseModifier.sharedElement(
+            rememberSharedContentState(key = "media_${block.id}"),
+            animatedVisibilityScope = animatedVisibilityScope
+        )
+    }
 
     if (!block.file.fileUrl.isNullOrEmpty()) {
         SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalModifier) {
@@ -173,7 +171,7 @@ fun VideoBlock(
 ) {
     val onMediaClick = LocalOnMediaClick.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalAnimatedVisibilityScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
 
     val actualVideoModifier = videoModifier ?: run {
         val maxWidth = 280.dp
@@ -186,14 +184,12 @@ fun VideoBlock(
     }
 
     val baseModifier = modifier.clickable { onMediaClick(block.id) }
-    val finalContainerModifier = if (sharedTransitionScope != null && animatedVisibilityScope != null) {
-        with(sharedTransitionScope) {
-            baseModifier.sharedElement(
-                rememberSharedContentState(key = "media_${block.id}"),
-                animatedVisibilityScope = animatedVisibilityScope
-            )
-        }
-    } else baseModifier
+    val finalContainerModifier = with(sharedTransitionScope) {
+        baseModifier.sharedElement(
+            rememberSharedContentState(key = "media_${block.id}"),
+            animatedVisibilityScope = animatedVisibilityScope
+        )
+    }
 
     SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalContainerModifier) {
         if (!block.file.fileUrl.isNullOrEmpty()) {

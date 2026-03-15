@@ -36,7 +36,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
 import com.mocharealm.compound.ui.util.formatMessageTimestamp

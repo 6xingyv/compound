@@ -106,14 +106,14 @@ import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
+import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import com.maplibre.compose.MapView
 import com.maplibre.compose.camera.CameraState
 import com.maplibre.compose.rememberSaveableMapViewCamera
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.ShareFileInfo
-import com.mocharealm.compound.ui.EmptyIndication
-import com.mocharealm.compound.ui.composable.Avatar
+import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.composable.chat.DocumentBlock
 import com.mocharealm.compound.ui.composable.chat.MessageBubble
 import com.mocharealm.compound.ui.composable.chat.PhotoBlock
@@ -122,6 +122,8 @@ import com.mocharealm.compound.ui.composable.chat.SystemMessage
 import com.mocharealm.compound.ui.composable.chat.TimestampLabel
 import com.mocharealm.compound.ui.composable.chat.VideoBlock
 import com.mocharealm.compound.ui.nav.LocalNavigator
+import com.mocharealm.compound.ui.util.EmptyIndication
+import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.PaddingValuesSide
 import com.mocharealm.compound.ui.util.takeOnly
@@ -165,13 +167,15 @@ import kotlin.math.tanh
 
 val LocalVideoDownloadProgress = staticCompositionLocalOf<Map<Long, Int>> { emptyMap() }
 val LocalOnDownloadVideo = staticCompositionLocalOf<(Long) -> Unit> { {} }
-val LocalCustomEmojiStickers = staticCompositionLocalOf<Map<Long, MessageBlock.StickerBlock>> { emptyMap() }
+val LocalCustomEmojiStickers =
+    staticCompositionLocalOf<Map<Long, MessageBlock.StickerBlock>> { emptyMap() }
 val LocalOnMediaClick = staticCompositionLocalOf<(Long) -> Unit> { {} }
 
 @OptIn(ExperimentalLayoutApi::class, FlowPreview::class)
 @Composable
 fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val state by viewModel.uiState.collectAsStateWithLifecycle()
+
     val navigator = LocalNavigator.current
     val listState = rememberLazyListState()
 
@@ -203,6 +207,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val menuOpened = remember { mutableStateOf(false) }
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
+
+    val sharedTransitionScope = LocalSharedTransitionScope.current
+    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
 
     BackHandler(enabled = state.stickerPanelVisible || state.locationPanelVisible) {
         if (state.stickerPanelVisible) viewModel.hideStickerPanel()
@@ -237,6 +244,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             firstVisibleItem != null && firstVisibleItem.index <= 25
         }
     }
+
+
 
     LaunchedEffect(shouldLoadMore, state.loadingMore, state.loading) {
         if (shouldLoadMore && !state.loadingMore && !state.loading && state.hasMore) {
@@ -288,11 +297,38 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     verticalAlignment = Alignment.CenterVertically,
                     horizontalArrangement = Arrangement.SpaceBetween
                 ) {
-                    if (LocalBackButtonVisibility.current) {
+                    Row {
+                        AnimatedVisibility(LocalBackButtonVisibility.current) {
+                            LiquidSurface(
+                                layerBackdrop,
+                                Modifier.size(48.dp),
+                                Modifier.clickable { navigator.pop() },
+                                effects = {
+                                    vibrancy()
+                                    blur(1.dp.toPx())
+                                    lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
+                                },
+                                shadow = {
+                                    Shadow(
+                                        radius = 24f.dp,
+                                        offset = DpOffset(0.dp, 0.dp),
+                                        color = Color.Black.copy(alpha = 0.1f),
+                                        alpha = 1f,
+                                        blendMode = DrawScope.DefaultBlendMode
+                                    )
+                                },
+                            ) {
+                                Icon(
+                                    SFIcons.Chevron_Backward, null, Modifier.align(Alignment.Center)
+                                )
+                            }
+                        }
+                    }
+
+                    Row {
                         LiquidSurface(
                             layerBackdrop,
                             Modifier.size(48.dp),
-                            Modifier.clickable { navigator.pop() },
                             effects = {
                                 vibrancy()
                                 blur(1.dp.toPx())
@@ -307,33 +343,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                     blendMode = DrawScope.DefaultBlendMode
                                 )
                             },
-                        ) {
-                            Icon(
-                                SFIcons.Chevron_Backward, null, Modifier.align(Alignment.Center)
-                            )
-                        }
-                    } else {
-                        Spacer(Modifier.size(48.dp))
+                        ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
                     }
-
-                    LiquidSurface(
-                        layerBackdrop,
-                        Modifier.size(48.dp),
-                        effects = {
-                            vibrancy()
-                            blur(1.dp.toPx())
-                            lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
-                        },
-                        shadow = {
-                            Shadow(
-                                radius = 24f.dp,
-                                offset = DpOffset(0.dp, 0.dp),
-                                color = Color.Black.copy(alpha = 0.1f),
-                                alpha = 1f,
-                                blendMode = DrawScope.DefaultBlendMode
-                            )
-                        },
-                    ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
                 }
                 state.chatInfo?.let { chatInfo ->
                     val animationScope = rememberCoroutineScope()
@@ -542,8 +553,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
                                 }
-                            }
-                            else {
+                            } else {
                                 LiquidSurface(
                                     layerBackdrop,
                                     Modifier
@@ -1106,7 +1116,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                 }
                 val initialIndex = allMediaItems.indexOfFirst { it.id == blockId }.coerceAtLeast(0)
                 if (allMediaItems.isNotEmpty()) {
-                    navigator.push(com.mocharealm.compound.ui.nav.Screen.MediaPreview(allMediaItems, initialIndex))
+                    navigator.push(
+                        com.mocharealm.compound.ui.nav.Screen.MediaPreview(
+                            allMediaItems,
+                            initialIndex
+                        )
+                    )
                 }
             }
         ) {
