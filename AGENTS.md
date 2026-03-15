@@ -2,12 +2,15 @@
 
 Welcome to the Mocha Compound project! This is an unofficial chat application client based on Kotlin deeply integrated with Telegram's TDLib. This guide is specifically prepared for agents and automated development assistants to quickly familiarize themselves with the underlying architecture, naming conventions, and standard workflows for feature expansion.
 
-## 🎯 Key Commands
+## 🎯 Key Tech Stack
 
-*   **Build Android Debug APK**: `./gradlew app:assembleDebug`
-*   **Clean & Re-sync**: When dealing with changes in the underlying layer or system dependencies (like JNI or Gradle environment variables), you can optionally clean the project: `./gradlew clean`
-*   **Full-text Search**: `grep_search`
-*   **List Directory**: `list_dir` (Combined with `find_by_name`)
+*   **Language**: Kotlin (with C++ JNI for TDLib)
+*   **UI Framework**: Jetpack Compose
+*   **Navigation**: Navigation 3
+*   **Core Engine**: TDLib (via JNI wrapper)
+*   **Dependency Injection**: Koin
+*   **Internationalization**: Custom `tci18n` (KSP-powered localized string system)
+*   **Media**: Media3 / ExoPlayer & Coil for image loading
 
 ## 📁 Core Project Structure
 
@@ -19,54 +22,82 @@ compound
 │   ├── build.gradle.kts           # App module top-level configuration
 │   └── src/main/
 │       ├── java/com/mocharealm/compound/
-│       │   ├── data/              # [Data Layer] Data fetching and persistence implementation
+│       │   ├── data/              # [Data Layer] TDLib interactions and persistence
 │       │   │   ├── dto/           # Data Transfer Objects
-│       │   │   └── source/        # Data source implementations (e.g., `TelegramRepositoryImpl`)
-│       │   ├── domain/            # [Domain Layer] Core business abstractions
-│       │   │   ├── model/         # Internal standard business models (e.g., `Chat`, `Message`)
-│       │   │   ├── repository/    # Repository abstract interface definitions (for decoupling implementations)
-│       │   │   └── usecase/       # Atomic business logic use cases (e.g., `SendMessageUseCase`)
-│       │   ├── di/                # [DI Layer] Koin Dependency Injection configurations
-│       │   │   ├── DataModule.kt  # Repository and external data instances registration
-│       │   │   ├── DomainModule.kt# UseCase instances registration
-│       │   │   └── UIModule.kt    # ViewModel instances registration
-│       │   ├── ui/                # [Presentation Layer] UI interaction and views
-│       │   │   ├── composable/    # Reusable, component-based Compose foundation widgets
-│       │   │   └── screen/        # Page-level UI and controllers (e.g., `ChatScreen`, `ChatViewModel`)
-│       │   └── MainActivity.kt
-│       └── cpp/                   # C/C++ JNI native implementations (e.g., customized underlying dependencies)
-├── tci18n/                        # Abstracted multi-language internationalization module
-└── gradle/libs.versions.toml      # Unified version management configuration for dependency libraries
+│       │   │   ├── mapper/        # Converters between TDLib objects and Domain models
+│       │   │   └── source/        # Concrete implementation of Repositories (e.g., `TelegramRepositoryImpl`)
+│       │   ├── domain/            # [Domain Layer] Business logic (Pure Kotlin)
+│       │   │   ├── model/         # Internal business models (e.g., `Chat`, `Message`)
+│       │   │   ├── repository/    # Repository interfaces
+│       │   │   └── usecase/       # Single-responsibility business actions
+│       │   ├── di/                # [DI Layer] Koin modules
+│       │   ├── ui/                # [Presentation Layer] MVI + Compose
+│       │   │   ├── composable/    # Reusable UI widgets
+│       │   │   ├── screen/        # Screen-level UI (View + ViewModel)
+│       │   │   └── theme/         # App styling and colors
+│       │   └── App.kt             # Application class (DI initialization)
+│       ├── cpp/                   # C++ JNI code for TDLib and native enhancements
+│       └── java/org/drinkless/tdlib/ # TDLib Java binding (DO NOT MODIFY)
+├── tci18n/                        # Custom Internationalization Module
+│   ├── core/                      # Runtime logic for localized strings
+│   └── processor/                 # KSP Processor for static analysis and preloading
+└── gradle/libs.versions.toml      # Centralized dependency management
 ```
 
 ## 🛠️ Standard Workflow for Adding Features
 
-For most system feature additions, you must strictly follow this serialized workflow. **It is STRICTLY PROHIBITED to pierce through the UI layer directly to the underlying API/Repository skipping the Domain layer, unless specifically justified**:
+Strictly follow this workflow to maintain architectural integrity. **Do NOT skip layers**.
 
-### 1. Update Data Models (Domain Model & DTO)
-*   **Modify Business Rules**: If a new feature requires expanding concepts with new properties or fields, navigate to `domain/model` to append or modify them first (e.g., `Chat.kt`).
-*   **Append Network Mapping Methods**: Update the corresponding new/old field structures inside `data/dto`, and supplement the conversion workflow sequence to map the raw TDLib object instances returned to internal Domain object instances.
+### 1. Update Domain Model & DTOs
+*   Define or update business models in `domain/model/`.
+*   If data comes from TDLib, check if `data/dto/` needs updates.
+*   Update/Add mappers in `data/mapper/` to handle the conversion.
 
-### 2. Define Contracts and Behaviors (Domain Repository)
-*   Navigate to `domain/repository/TelegramRepository.kt` to declare new abstractions. All remote communication/asynchronous functions are recommended to be wrapped within `suspend fun doSomething(id: Long): Result<[Domain Model]>` to safely expose the expected operations.
+### 2. Define Repository Contract
+*   Add the new method to `domain/repository/TelegramRepository.kt`.
+*   Use `Result<T>` or `Flow<T>` for asynchronous data streams.
 
-### 3. Implement Data Source Agent (Data Source Implementation)
-*   Navigate to `data/source/TelegramRepositoryImpl.kt` and implement the new methods defined in step 2. Execute concrete call logic against lower layers (such as TDLib Object APIs), utilizing `runCatching` to wrap execution return values: utilize patterns like `send(TdApi...())` to invoke native request network protocols.
+### 3. Implement in Data Source
+*   Implement the method in `data/source/TelegramRepositoryImpl.kt`.
+*   Use `send(TdApi.Request())` to interact with TDLib.
 
-### 4. Encapsulate Composable System Use Cases (Domain UseCase)
-*   Create a single-responsibility new business action class in the `domain/usecase/` directory, for example: `CloseChatUseCase`.
-*   **Inject Dependencies**: The exact and only constructor dependency of this class must be the appropriate data-handling `TelegramRepository` (or other relevant Repositories).
-*   **Implement Functionality**: Override the method signature behavior as `suspend operator fun invoke(...)`. This method often proxies calls to the underlying Repo, adding upfront filtering like validation, caching strategies, and business rule legality checks.
+### 4. Create/Update UseCase
+*   Create a new class in `domain/usecase/` (e.g., `GetChatDetailsUseCase.kt`).
+*   Inject the `TelegramRepository` into the constructor.
+*   Implement `suspend operator fun invoke(...)`.
 
-### 5. Assemble Dependency Injection Factory (DI Modules)
-*   Add the Koin configuration snippet in `di/DomainModule.kt`: `factory { YourNewUseCase(get()) }`
-*   Ensure the UseCase is properly injected and managed throughout the dependency graph's visible lifecycle.
+### 5. Register in DI
+*   Register the UseCase in `di/DomainModule.kt`.
+*   Ensure the Repository is registered in `di/DataModule.kt`.
 
-### 6. Orchestrate the Presentation Controller (UI ViewModel)
-*   Inject the previously created `UseCase` into the relevant UI controller's ViewModel parameters. Replace and scrub any direct `Repository` instance references that might have existed there.
-*   **Critically Important**: Immediately synchronize with `di/UIModule.kt` to add a `get()` parameter constructor requirement for the modified ViewModel. If omitted, crash errors might not appear immediately during compilation but will cause fatal application crashes when lazy-loading the ViewModel during page navigation.
-*   Modify/Expand the `uiState: DefaultData(val param = X)` held by this ViewModel, and process StateFlow event emissions based on newly fetched response contexts to orchestrate the functionality.
+### 6. Update ViewModel & UI State
+*   Inject the UseCase into the relevant ViewModel in `ui/screen/`.
+*   Update the `UiState` data class to reflect new data.
+*   Expose a `StateFlow<UiState>` for the UI to consume.
+*   **Remember**: Register new ViewModels in `di/UIModule.kt`.
 
-### 7. Connect to the User View Render Layer (UI Composable)
-*   Open the most upstream `ui/screen/.../*Screen.kt` application file.
-*   Reflect the newly acquired State data emitted from the ViewModel back into the visual rendering tier during UI binding. Delegate interactive Compose callback events (e.g., button clicks) back to the ViewModel, ultimately completing the business loop.
+### 7. Implementation in Compose
+*   Bind the `UiState` in the `*Screen.kt` file.
+*   Use `tdString("Key")` for any user-visible text.
+
+## 🌍 Internationalization with `tci18n`
+
+Mocha Compound uses a custom localization system that bridges TDLib's dynamic string loading with Compose.
+
+*   **Usage**: `tdString("Your_Key_Here")` inside a `@Composable` function.
+*   **Dynamic Args**: `tdString("WelcomeUser", "name" to userName)`.
+*   **How it works**: The `tci18n` processor scans for these calls and informs the `TdStringProvider` to preload these keys when navigating to a screen.
+*   **Provider**: Registered in `DataModule.kt`. It fetches strings from TDLib's `getLocalizationTargetInfo` and `getLanguagePackString` equivalents.
+
+## 🎯 Key Commands
+
+*   **Build Android Debug APK**: `./gradlew app:assembleDebug`
+*   **Clean & Re-sync**: `./gradlew clean`
+*   **Check Lint**: `./gradlew app:lint`
+
+## ⚠️ Important Rules
+
+1.  **Never** use `TdApi` directly in the UI layer. All TDLib interactions must be abstracted via Repositories and UseCases.
+2.  **MVI Pattern**: ViewModels should emit States and receive Intents/Events. Avoid exposing mutable state directly.
+3.  **Thread Safety**: TDLib operations are generally handled on a dedicated thread by the Repository implementation. Use `Dispatchers.IO` for repository logic.
+4.  **UI Consistency**: Use components from `ui/composable` or `miuix` to maintain the app's aesthetic.
