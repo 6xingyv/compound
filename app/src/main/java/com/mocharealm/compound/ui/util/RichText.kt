@@ -75,3 +75,27 @@ fun Text.toAnnotatedString(
         }
     }
 }
+
+
+fun buildRichText(builderAction: RichTextBuilder.() -> Unit): Text {
+    val builder = RichTextBuilder()
+    builder.builderAction()
+    return builder.build()
+}
+
+class RichTextBuilder {
+    private val stringBuilder = StringBuilder()
+    private val entities = mutableListOf<Text.TextEntity>()
+
+    fun append(text: String) {
+        stringBuilder.append(text)
+    }
+
+    fun append(text: String, type: Text.TextEntityType) {
+        val start = stringBuilder.length
+        stringBuilder.append(text)
+        entities.add(Text.TextEntity(start, text.length, type))
+    }
+
+    fun build() = Text(stringBuilder.toString(), entities)
+}

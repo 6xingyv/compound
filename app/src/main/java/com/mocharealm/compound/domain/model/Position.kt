@@ -1,7 +1,7 @@
 package com.mocharealm.compound.domain.model
 
-data class Venue(
+data class Position(
     val longitude: Double,
     val latitude: Double,
-    val name: String,
+    val name: String = ""
 )

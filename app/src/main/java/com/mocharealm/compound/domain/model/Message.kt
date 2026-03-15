@@ -89,9 +89,9 @@ sealed interface MessageBlock {
         }
     }
 
-    data class VenueBlock(
+    data class PositionBlock(
         override val id: Long,
         override val timestamp: Long,
-        val venue: Venue
+        val position: Position
     ) : MessageBlock
 }

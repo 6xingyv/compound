@@ -3,8 +3,9 @@ package com.mocharealm.compound.data.dto
 import com.mocharealm.compound.domain.model.Document
 import com.mocharealm.compound.domain.model.File
 import com.mocharealm.compound.domain.model.MessageBlock
+import com.mocharealm.compound.domain.model.Position
 import com.mocharealm.compound.domain.model.Text
-import com.mocharealm.compound.domain.model.Venue
+import com.mocharealm.compound.ui.util.buildRichText
 import org.drinkless.tdlib.TdApi
 
 /**
@@ -250,23 +251,42 @@ object MessageDto {
 
             is TdApi.MessageVenue ->
                 listOf(
-                    MessageBlock.VenueBlock(
+                    MessageBlock.PositionBlock(
                         id = messageId,
                         timestamp = timestamp,
-                        venue =
-                            Venue(
-                                longitude =
-                                    content.venue
-                                        .location
-                                        .longitude,
-                                latitude =
-                                    content.venue
-                                        .location
-                                        .latitude,
+                        position =
+                            Position(
+                                longitude = content.venue.location.longitude,
+                                latitude = content.venue.location.latitude,
                                 name = content.venue.title,
                             ),
+                    ),
+                    MessageBlock.TextBlock(
+                        id = messageId,
+                        timestamp = timestamp,
+                        content = buildRichText {
+                            append(content.venue.title, Text.TextEntityType.Bold)
+                            append("\n")
+                            append(content.venue.address)
+                            append("\n")
+                            append(content.venue.type)
+                        }
                     )
                 )
+
+            is TdApi.MessageLocation -> {
+                listOf(
+                    MessageBlock.PositionBlock(
+                        id = messageId,
+                        timestamp = timestamp,
+                        position =
+                            Position(
+                                longitude = content.location.longitude,
+                                latitude = content.location.latitude,
+                            ),
+                    ),
+                )
+            }
 
             else ->
                 listOf(

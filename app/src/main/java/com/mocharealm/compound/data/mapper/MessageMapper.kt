@@ -133,7 +133,7 @@ class MessageMapper(
                         is MessageBlock.StickerBlock -> "Sticker"
                         is MessageBlock.DocumentBlock -> first.document.fileName
                         is MessageBlock.SystemActionBlock -> "System message"
-                        is MessageBlock.VenueBlock -> first.venue.name
+                        is MessageBlock.PositionBlock -> first.position.name
                     }
                 } else {
                     reply.content?.let {

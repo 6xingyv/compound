@@ -237,7 +237,7 @@ fun MessageContent(
         message.blocks.forEachIndexed { index, block ->
             val isFirstBlock = index == 0
             val isLastBlock = index == message.blocks.size - 1
-            val isMedia = block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.VenueBlock
+            val isMedia = block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.PositionBlock
             
             // Gap logic: 
             // 1. If hasReply and this is first block -> 0dp (gap is handled by replyBottom=8dp).
@@ -341,8 +341,8 @@ fun MessageContent(
                 }
 
                 is MessageBlock.SystemActionBlock -> {}
-                is MessageBlock.VenueBlock -> {
-                    VenueBlock(block)
+                is MessageBlock.PositionBlock -> {
+                    PositionBlock(block)
                 }
             }
         }

@@ -2,6 +2,7 @@ package com.mocharealm.compound.ui.composable.chat
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -163,9 +164,9 @@ fun PhotoBlock(
         if (!displayUrl.isNullOrEmpty()) {
             AsyncImage(
                 model =
-                ImageRequest.Builder(LocalContext.current)
-                    .data(displayUrl)
-                    .build(),
+                    ImageRequest.Builder(LocalContext.current)
+                        .data(displayUrl)
+                        .build(),
                 contentDescription = "Photo",
                 modifier = imageModifier.then(sharedModifier),
                 contentScale = contentScale
@@ -207,7 +208,10 @@ fun VideoBlock(
 
     SpoilerImage(hasSpoiler = block.hasSpoiler, modifier = finalContainerModifier) {
         if (!block.file.fileUrl.isNullOrEmpty()) {
-            MessageVideoPlayer(filePath = block.file.fileUrl, modifier = finalVideoModifier.then(sharedModifier))
+            MessageVideoPlayer(
+                filePath = block.file.fileUrl,
+                modifier = finalVideoModifier.then(sharedModifier)
+            )
         } else {
             VideoThumbnailOverlay(block = block, modifier = finalVideoModifier.then(sharedModifier))
         }
@@ -313,12 +317,12 @@ fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifi
 }
 
 @Composable
-fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
+fun PositionBlock(block: MessageBlock.PositionBlock, modifier: Modifier = Modifier) {
     val camera = rememberSaveableMapViewCamera(
         MapViewCamera(
             CameraState.Centered(
-                block.venue.latitude,
-                block.venue.longitude,
+                block.position.latitude,
+                block.position.longitude,
             ),
         )
     )
@@ -335,7 +339,9 @@ fun VenueBlock(block: MessageBlock.VenueBlock, modifier: Modifier = Modifier) {
     MapView(
         modifier = modifier.aspectRatio(1.2f),
         camera = camera,
-        styleUrl = "https://tiles.openfreemap.org/styles/bright",
+        styleUrl =
+            if (isSystemInDarkTheme()) "https://tiles.openfreemap.org/styles/dark"
+            else "https://tiles.openfreemap.org/styles/bright",
         mapOptions = mapOptions
     ) {
     }

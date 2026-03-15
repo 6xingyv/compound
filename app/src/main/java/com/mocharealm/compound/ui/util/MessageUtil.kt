@@ -1,7 +1,6 @@
 package com.mocharealm.compound.ui.util
 
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.SpanStyle
 import androidx.compose.ui.text.buildAnnotatedString
@@ -11,7 +10,6 @@ import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
-import com.mocharealm.compound.ui.util.formatName
 import com.mocharealm.tci18n.core.tdString
 
 /** Extracts a human-readable preview with styles from a [Message] for display in the chat list. */
@@ -82,8 +80,8 @@ fun Message.toPreviewAnnotatedString(chat: Chat): AnnotatedString {
                     }
                 )
             }
-            first is MessageBlock.VenueBlock -> {
-                append(first.venue.name)
+            first is MessageBlock.PositionBlock -> {
+                append(first.position.name)
             }
         }
     }
@@ -130,6 +128,6 @@ fun Message.toPreviewText(): String {
                     "${t.actorName} pinned a message"
                 }
             }
-        is MessageBlock.VenueBlock -> first.venue.name
+        is MessageBlock.PositionBlock -> first.position.name
     }
 }
