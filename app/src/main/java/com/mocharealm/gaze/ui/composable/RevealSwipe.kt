@@ -154,26 +154,29 @@ enum class RevealValue {
 @Composable
 fun rememberRevealState(
     key: Any? = Unit,
-    maxRevealDp: Dp = 75.dp,
+    maxRevealDp: Dp = 80.dp,
     directions: Set<RevealDirection> = setOf(RevealDirection.StartToEnd, RevealDirection.EndToStart),
-    positionalThreshold: (totalDistance: Float) -> Float = { distance -> distance * 0.5f }
+    positionalThreshold: (totalDistance: Float) -> Float = { distance -> distance * 0.9f },
+    velocityThreshold: Dp = 2500.dp
 ): RevealState {
     val density = LocalDensity.current
-    return remember(key, maxRevealDp, directions) {
+    return remember(key, maxRevealDp, directions, velocityThreshold) {
         RevealState(
             maxRevealDp = maxRevealDp,
             directions = directions,
             density = density,
-            positionalThreshold = positionalThreshold
+            positionalThreshold = positionalThreshold,
+            velocityThreshold = velocityThreshold
         )
     }
 }
 
 class RevealState(
-    val maxRevealDp: Dp = 75.dp,
+    val maxRevealDp: Dp = 80.dp,
     val directions: Set<RevealDirection>,
     private val density: Density,
     val positionalThreshold: (totalDistance: Float) -> Float,
+    val velocityThreshold: Dp = 2500.dp,
     initialValue: RevealValue = RevealValue.Default,
 ) {
     val anchoredDraggableState = AnchoredDraggableState(
@@ -188,7 +191,7 @@ class RevealState(
             }
         },
         positionalThreshold = positionalThreshold,
-        velocityThreshold = { with(density) { 125.dp.toPx() } },
+        velocityThreshold = { with(density) { velocityThreshold.toPx() } },
         snapAnimationSpec = tween(),
         decayAnimationSpec = exponentialDecay()
     )
