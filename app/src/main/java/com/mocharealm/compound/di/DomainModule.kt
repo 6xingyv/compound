@@ -5,6 +5,8 @@ import com.mocharealm.compound.domain.usecase.auth.CheckAuthenticationPasswordUs
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
+import com.mocharealm.compound.domain.usecase.SaveFileToDownloadsUseCase
+import com.mocharealm.compound.domain.usecase.OpenFileUseCase
 import com.mocharealm.compound.domain.usecase.FormatPersonNameUseCase
 import com.mocharealm.compound.domain.usecase.phonenumber.FormatPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.auth.AwaitAuthenticationStateUseCase
@@ -78,6 +80,12 @@ val domainModule = module {
     }
     factory {
         DownloadFileWithProgressUseCase(get())
+    }
+    factory {
+        SaveFileToDownloadsUseCase(get())
+    }
+    factory {
+        OpenFileUseCase(get())
     }
     factory {
         FormatPhoneNumberUseCase(get())

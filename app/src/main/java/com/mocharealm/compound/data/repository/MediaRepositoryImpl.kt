@@ -1,5 +1,10 @@
 package com.mocharealm.compound.data.repository
 
+import android.content.ContentValues
+import android.content.Context
+import android.content.Intent
+import android.provider.MediaStore
+import androidx.core.content.FileProvider
 import com.mocharealm.compound.data.dto.MessageDto
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.DownloadProgress
@@ -11,8 +16,11 @@ import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.channelFlow
 import kotlinx.coroutines.flow.filter
 import org.drinkless.tdlib.TdApi
+import java.io.File
+import java.io.IOException
 
 class MediaRepositoryImpl(
+    private val context: Context,
     private val tdLibDataSource: TdLibDataSource
 ) : MediaRepository {
 
@@ -49,6 +57,47 @@ class MediaRepositoryImpl(
                 send(DownloadProgress.Downloading(percent))
             }
         }
+    }
+
+    override suspend fun saveFileToDownloads(filePath: String, fileName: String): Result<Unit> = runCatching {
+        val sourceFile = File(filePath)
+        if (!sourceFile.exists()) throw IOException("Source file not found")
+
+        val resolver = context.contentResolver
+        val contentValues = ContentValues().apply {
+            put(MediaStore.MediaColumns.DISPLAY_NAME, fileName)
+            put(MediaStore.MediaColumns.RELATIVE_PATH, "Download/Compound")
+        }
+
+        val uri = resolver.insert(MediaStore.Downloads.EXTERNAL_CONTENT_URI, contentValues)
+            ?: throw IOException("Failed to create new MediaStore record.")
+
+        resolver.openOutputStream(uri)?.use { outputStream ->
+            sourceFile.inputStream().use { inputStream ->
+                inputStream.copyTo(outputStream)
+            }
+        } ?: throw IOException("Failed to open output stream.")
+    }
+
+    override suspend fun openFile(filePath: String, mimeType: String): Result<Unit> = runCatching {
+        val file = File(filePath)
+        if (!file.exists()) throw IOException("File not found")
+
+        val uri = FileProvider.getUriForFile(
+            context,
+            "${context.packageName}.fileprovider",
+            file
+        )
+
+        val intent = Intent(Intent.ACTION_VIEW).apply {
+            setDataAndType(uri, mimeType)
+            addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        }
+
+        context.startActivity(Intent.createChooser(intent, "Open with").apply {
+            addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+        })
     }
 
     override suspend fun getInstalledStickerSets(): Result<List<StickerSetInfo>> = runCatching {

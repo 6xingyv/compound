@@ -10,4 +10,6 @@ interface MediaRepository {
     fun downloadFileWithProgress(fileId: Int): Flow<DownloadProgress>
     suspend fun getInstalledStickerSets(): Result<List<StickerSetInfo>>
     suspend fun getStickerSetStickers(setId: Long): Result<List<MessageBlock.StickerBlock>>
+    suspend fun saveFileToDownloads(filePath: String, fileName: String): Result<Unit>
+    suspend fun openFile(filePath: String, mimeType: String): Result<Unit>
 }

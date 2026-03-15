@@ -60,6 +60,12 @@ interface TelegramRepository {
     /** 下载文件并通过 Flow 发送进度 */
     fun downloadFileWithProgress(fileId: Int): Flow<DownloadProgress>
 
+    /** 保存文件到系统下载文件夹 */
+    suspend fun saveFileToDownloads(filePath: String, fileName: String): Result<Unit>
+
+    /** 调用系统菜单打开文件 */
+    suspend fun openFile(filePath: String, mimeType: String): Result<Unit>
+
     /** 发送文本消息 */
     suspend fun sendMessage(
         chatId: Long,

@@ -54,6 +54,8 @@ import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.ui.composable.base.SpoilerImage
 import com.mocharealm.compound.ui.composable.base.VideoPlayer
 import com.mocharealm.compound.ui.composable.base.VpxVideoPlayer
+import com.mocharealm.compound.ui.screen.chat.LocalDocumentDownloadProgress
+import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadDocument
 import com.mocharealm.compound.ui.screen.chat.LocalOnDownloadVideo
 import com.mocharealm.compound.ui.screen.chat.LocalOnMediaClick
 import com.mocharealm.compound.ui.screen.chat.LocalVideoDownloadProgress
@@ -245,19 +247,53 @@ fun StickerBlock(
 
 @Composable
 fun DocumentBlock(block: MessageBlock.DocumentBlock, modifier: Modifier = Modifier) {
-    Row(modifier = modifier, verticalAlignment = Alignment.CenterVertically) {
-        Icon(SFIcons.Document_Fill, null, Modifier.size(32.dp), LocalContentColor.current)
+    val onDownloadDocument = LocalOnDownloadDocument.current
+    val downloadPercent = LocalDocumentDownloadProgress.current[block.id]
+    val isDownloaded = !block.document.file.fileUrl.isNullOrEmpty()
+
+    Row(
+        modifier = modifier.clickable { onDownloadDocument(block.id) },
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Box(contentAlignment = Alignment.Center) {
+            Icon(
+                if (isDownloaded) SFIcons.Document_Fill else SFIcons.Arrow_Down_Document,
+                null,
+                Modifier.size(32.dp),
+                LocalContentColor.current
+            )
+            if (downloadPercent != null) {
+                Box(
+                    Modifier
+                        .size(32.dp)
+                        .background(Color.Black.copy(0.4f), RoundedCornerShape(4.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "$downloadPercent%",
+                        style = MiuixTheme.textStyles.footnote1,
+                        color = Color.White,
+                        fontSize = 10.sp,
+                        fontWeight = FontWeight.Bold
+                    )
+                }
+            }
+        }
         Spacer(Modifier.width(12.dp))
         Column(Modifier.weight(1f)) {
             Text(
                 text = block.document.fileName,
                 style = MiuixTheme.textStyles.body2,
                 fontWeight = FontWeight.Bold,
-                maxLines = 1,
+                maxLines = 2,
                 overflow = TextOverflow.Ellipsis
             )
             Text(
-                text = block.document.mimeType,
+                text = when {
+                    downloadPercent != null -> tdString("Loading")
+                    isDownloaded -> tdString("MessageOpen")
+                    else -> block.document.mimeType
+                },
                 style = MiuixTheme.textStyles.footnote1,
             )
         }

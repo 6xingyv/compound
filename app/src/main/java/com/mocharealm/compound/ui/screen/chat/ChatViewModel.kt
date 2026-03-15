@@ -20,6 +20,8 @@ import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
+import com.mocharealm.compound.domain.usecase.SaveFileToDownloadsUseCase
+import com.mocharealm.compound.domain.usecase.OpenFileUseCase
 import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
 import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
 import com.mocharealm.compound.domain.usecase.OpenChatUseCase
@@ -93,6 +95,7 @@ data class ChatUiState(
     val error: String? = null,
     val scrollToMessageId: Long? = null,
     val videoDownloadProgress: Map<Long, Int> = emptyMap(),
+    val documentDownloadProgress: Map<Long, Int> = emptyMap(),
     val customEmojiStickers: Map<Long, MessageBlock.StickerBlock> = emptyMap(),
     val stickerSets: List<StickerSetInfo> = emptyList(),
     val currentSetStickers: List<MessageBlock.StickerBlock> = emptyList(),
@@ -136,7 +139,9 @@ class ChatViewModel(
     private val setChatDraftMessage: SetChatDraftMessageUseCase,
     private val saveChatReadPosition: SaveChatReadPositionUseCase,
     private val getChatReadPosition: GetChatReadPositionUseCase,
-    private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase
+    private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase,
+    private val saveFileToDownloads: SaveFileToDownloadsUseCase,
+    private val openFile: OpenFileUseCase
 ) : ViewModel() {
 
     companion object {
@@ -588,6 +593,12 @@ class ChatViewModel(
                                     file = block.file.copy(fileUrl = path)
                                 ) else block
 
+                                is MessageBlock.DocumentBlock -> if (block.id == blockId) block.copy(
+                                    document = block.document.copy(
+                                        file = block.document.file.copy(fileUrl = path)
+                                    )
+                                ) else block
+
                                 else -> block
                             }
                         })
@@ -645,6 +656,48 @@ class ChatViewModel(
                                 videoDownloadProgress = state.videoDownloadProgress - messageId
                             )
                         }
+                    }
+                }
+            }
+        }
+    }
+
+    fun downloadDocument(blockId: Long) {
+        val msg = _uiState.value.messages.find { it.blocks.any { b -> b.id == blockId } } ?: return
+        val docBlock = msg.blocks.find { it.id == blockId } as? MessageBlock.DocumentBlock ?: return
+        val fileId = docBlock.document.file.fileId ?: return
+
+        // If already has local path, just open it
+        val localPath = docBlock.document.file.fileUrl
+        if (!localPath.isNullOrEmpty()) {
+            viewModelScope.launch {
+                openFile(localPath, docBlock.document.mimeType)
+            }
+            return
+        }
+
+        if (_uiState.value.documentDownloadProgress.containsKey(blockId)) return
+
+        viewModelScope.launch {
+            downloadFileWithProgress(fileId).collect { progress ->
+                when (progress) {
+                    is DownloadProgress.Downloading -> {
+                        _uiState.update { state ->
+                            state.copy(
+                                documentDownloadProgress = state.documentDownloadProgress + (blockId to progress.percent)
+                            )
+                        }
+                    }
+
+                    is DownloadProgress.Completed -> {
+                        _uiState.update { state ->
+                            state.copy(
+                                documentDownloadProgress = state.documentDownloadProgress - blockId
+                            )
+                        }
+                        updateBlockFile(msg.primaryId, blockId, progress.path)
+                        saveFileToDownloads(progress.path, docBlock.document.fileName)
+                        openFile(progress.path, docBlock.document.mimeType)
                     }
                 }
             }

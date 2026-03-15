@@ -70,7 +70,9 @@ val uiModule = module {
             setChatDraftMessage = get(),
             saveChatReadPosition = get(),
             getChatReadPosition = get(),
-            getCustomEmojiStickers = get()
+            getCustomEmojiStickers = get(),
+            saveFileToDownloads = get(),
+            openFile = get()
         )
     }
 

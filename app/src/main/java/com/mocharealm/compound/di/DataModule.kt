@@ -66,7 +66,7 @@ val dataModule = module {
     single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
     single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), get()) }
     single<MessageRepository> { MessageRepositoryImpl(get(), get()) }
-    single<MediaRepository> { MediaRepositoryImpl(get()) }
+    single<MediaRepository> { MediaRepositoryImpl(get(), get()) }
 
     // Main Facade Repository
     single<TelegramRepository> {

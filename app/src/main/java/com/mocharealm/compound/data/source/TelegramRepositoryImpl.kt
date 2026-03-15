@@ -57,6 +57,8 @@ class TelegramRepositoryImpl(
     // Media Repository Delegation
     override suspend fun downloadFile(fileId: Int) = mediaRepository.downloadFile(fileId)
     override fun downloadFileWithProgress(fileId: Int) = mediaRepository.downloadFileWithProgress(fileId)
+    override suspend fun saveFileToDownloads(filePath: String, fileName: String) = mediaRepository.saveFileToDownloads(filePath, fileName)
+    override suspend fun openFile(filePath: String, mimeType: String) = mediaRepository.openFile(filePath, mimeType)
     override suspend fun getInstalledStickerSets() = mediaRepository.getInstalledStickerSets()
     override suspend fun getStickerSetStickers(setId: Long) = mediaRepository.getStickerSetStickers(setId)
 
