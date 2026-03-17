@@ -98,7 +98,6 @@ import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -117,16 +116,18 @@ import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.composable.chat.DocumentBlock
 import com.mocharealm.compound.ui.composable.chat.MessageBubble
 import com.mocharealm.compound.ui.composable.chat.PhotoBlock
+import com.mocharealm.compound.ui.composable.chat.ReplyPreview
+import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.composable.chat.StickerBlock
 import com.mocharealm.compound.ui.composable.chat.SystemMessage
 import com.mocharealm.compound.ui.composable.chat.TimestampLabel
-import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.composable.chat.VideoBlock
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.util.EmptyIndication
 import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.PaddingValuesSide
+import com.mocharealm.compound.ui.util.formatName
 import com.mocharealm.compound.ui.util.takeOnly
 import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
@@ -140,10 +141,13 @@ import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.nav.LocalBackButtonVisibility
 import com.mocharealm.gaze.ui.animation.InteractiveHighlight
 import com.mocharealm.gaze.ui.composable.Button
+import com.mocharealm.gaze.ui.composable.ElasticRevealSwipe
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
 import com.mocharealm.gaze.ui.composable.PopupMenu
+import com.mocharealm.gaze.ui.composable.RevealDirection
 import com.mocharealm.gaze.ui.composable.TextField
+import com.mocharealm.gaze.ui.composable.rememberElasticRevealState
 import com.mocharealm.gaze.ui.layout.imeNestedScroll
 import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.tci18n.core.tdString
@@ -212,8 +216,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    val sharedTransitionScope = LocalSharedTransitionScope.current
-    val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+    LocalSharedTransitionScope.current
+    LocalNavAnimatedContentScope.current
 
     BackHandler(enabled = state.stickerPanelVisible || state.locationPanelVisible) {
         if (state.stickerPanelVisible) viewModel.hideStickerPanel()
@@ -614,7 +618,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         .heightIn(min = 24.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { it },
                                         exit = fadeOut() + slideOutHorizontally { it }) {
@@ -640,13 +644,49 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
 
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
                                         exit = fadeOut() + slideOutHorizontally { -it }) {
                                         Column(
-                                            Modifier.animateContentSize()
+                                            Modifier
+                                                .animateContentSize()
+                                                .padding(end = 12.dp)
                                         ) {
+                                            AnimatedVisibility(state.replyingToMessage != null) {
+                                                state.replyingToMessage?.let { replyTo ->
+                                                    val replyText =
+                                                        replyTo.blocks.find { b -> b is MessageBlock.TextBlock }
+                                                            .let { b ->
+                                                                if (b is MessageBlock.TextBlock) b.content.content else "Media"
+                                                            }
+                                                    Row(
+                                                        Modifier
+                                                            .fillMaxWidth()
+                                                            .padding(bottom = 8.dp),
+                                                        verticalAlignment = Alignment.CenterVertically
+                                                    ) {
+                                                        ReplyPreview(
+                                                            senderName = replyTo.sender.formatName(),
+                                                            text = replyText,
+                                                            accentColor = primaryColor,
+                                                            modifier = Modifier.weight(1f)
+                                                        )
+                                                        Spacer(Modifier.width(8.dp))
+                                                        Icon(
+                                                            SFIcons.Xmark,
+                                                            null,
+                                                            Modifier
+                                                                .size(24.dp)
+                                                                .clickable {
+                                                                    viewModel.setReplyingTo(
+                                                                        null
+                                                                    )
+                                                                }
+                                                        )
+                                                    }
+                                                }
+                                            }
                                             AnimatedVisibility(
                                                 visible = state.selectedFiles.isNotEmpty(),
                                                 enter = expandVertically() + fadeIn(),
@@ -825,13 +865,13 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 }
 
                                 AnimatedVisibility(
-                                    visible = (inAudioMode || (viewModel.inputState.text.lines().size <= 1 && state.selectedFiles.isEmpty())) && !state.loading,
+                                    visible = (inAudioMode || (viewModel.inputState.text.lines().size <= 1 && state.selectedFiles.isEmpty() && state.replyingToMessage == null)) && !state.loading,
                                     enter = fadeIn(),
                                     exit = fadeOut()
                                 ) {
                                     Box(
                                         modifier = Modifier
-                                            .padding(horizontal = 12.dp)
+                                            .padding(end = 12.dp)
                                             .clickable {
                                                 inAudioMode = !inAudioMode
                                             }) {
@@ -1222,6 +1262,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
 
                         val msgIndex = state.messageItems.size - 1 - index
                         val messageItem = state.messageItems[msgIndex]
+                        val message = messageItem.message
 
                         Column(
                             Modifier
@@ -1229,19 +1270,56 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 .animateItem()
                         ) {
                             if (messageItem.showTimestamp) {
-                                TimestampLabel(timestamp = messageItem.message.blocks.first().timestamp)
+                                TimestampLabel(timestamp = message.blocks.first().timestamp)
                             }
 
-                            if (messageItem.message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
+                            if (message.blocks.firstOrNull() is MessageBlock.SystemActionBlock) {
                                 SystemMessage(
-                                    messageItem.message.blocks.first() as MessageBlock.SystemActionBlock
+                                    message.blocks.first() as MessageBlock.SystemActionBlock
                                 )
                             } else {
-                                MessageBubble(
-                                    message = messageItem.message,
-                                    groupPosition = messageItem.position,
-                                    showAvatar = state.chatInfo?.type == ChatType.GROUP,
-                                    onReplyClick = onReplyClick,
+                                val elasticRevealState = rememberElasticRevealState(
+                                    directions = setOf(RevealDirection.EndToStart),
+                                    maxRevealDp = 64.dp
+                                )
+
+                                ElasticRevealSwipe(
+                                    state = elasticRevealState,
+                                    shape = RoundedCornerShape(0.dp),
+                                    onTrigger = { direction ->
+                                        if (direction == RevealDirection.EndToStart) {
+                                            viewModel.setReplyingTo(message)
+                                        }
+                                    },
+                                    swipe = { direction, progress ->
+                                        if (direction == RevealDirection.EndToStart) {
+                                            Box(
+                                                modifier = Modifier
+                                                    .fillMaxSize(),
+                                                contentAlignment = Alignment.CenterEnd
+                                            ) {
+                                                Icon(
+                                                    imageVector = SFIcons.Arrowshape_Turn_Up_Left_Fill,
+                                                    contentDescription = "Reply",
+                                                    modifier = Modifier
+                                                        .padding(end = 16.dp)
+                                                        .size(24.dp)
+                                                        .graphicsLayer {
+                                                            alpha = progress
+                                                        }
+                                                )
+                                            }
+                                        }
+                                    },
+                                    content = { _, _ ->
+                                        MessageBubble(
+                                            message = message,
+                                            groupPosition = messageItem.position,
+                                            showAvatar = state.chatInfo?.type == ChatType.GROUP,
+                                            onReplyClick = onReplyClick,
+//                                            modifier = Modifier.background(surfaceColor).fillMaxWidth()
+                                        )
+                                    }
                                 )
                             }
                         }

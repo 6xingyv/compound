@@ -20,12 +20,12 @@ import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
 import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
-import com.mocharealm.compound.domain.usecase.SaveFileToDownloadsUseCase
-import com.mocharealm.compound.domain.usecase.OpenFileUseCase
 import com.mocharealm.compound.domain.usecase.GetInstalledStickerSetsUseCase
 import com.mocharealm.compound.domain.usecase.GetStickerSetStickersUseCase
 import com.mocharealm.compound.domain.usecase.OpenChatUseCase
+import com.mocharealm.compound.domain.usecase.OpenFileUseCase
 import com.mocharealm.compound.domain.usecase.SaveChatReadPositionUseCase
+import com.mocharealm.compound.domain.usecase.SaveFileToDownloadsUseCase
 import com.mocharealm.compound.domain.usecase.SendFilesUseCase
 import com.mocharealm.compound.domain.usecase.SendLocationUseCase
 import com.mocharealm.compound.domain.usecase.SendMessageUseCase
@@ -104,6 +104,7 @@ data class ChatUiState(
     val stickersLoading: Boolean = false,
     val locationPanelVisible: Boolean = false,
     val selectedFiles: List<ShareFileInfo> = emptyList(),
+    val replyingToMessage: Message? = null,
 ) {
     fun withMessages(newMessages: List<Message>): ChatUiState {
         return copy(
@@ -255,21 +256,29 @@ class ChatViewModel(
     fun sendMessage() {
         val text = inputState.text.toString()
         val files = _uiState.value.selectedFiles
+        val replyToId = _uiState.value.replyingToMessage?.primaryId ?: 0L
 
         if (text.isBlank() && files.isEmpty()) return
 
         if (files.isNotEmpty()) {
             viewModelScope.launch {
-                sendFiles(chatId, files, text).onSuccess {
+                sendFiles(chatId, files, text, replyToMessageId = replyToId).onSuccess {
                     inputState.clearText()
-                    _uiState.update { it.copy(selectedFiles = emptyList()) }
+                    _uiState.update { it.copy(selectedFiles = emptyList(), replyingToMessage = null) }
                 }.onFailure { e -> }
             }
         } else {
             viewModelScope.launch {
-                sendMessage(chatId, text).onSuccess { inputState.clearText() }.onFailure { e -> }
+                sendMessage(chatId, text, replyToMessageId = replyToId).onSuccess {
+                    inputState.clearText()
+                    _uiState.update { it.copy(replyingToMessage = null) }
+                }.onFailure { e -> }
             }
         }
+    }
+
+    fun setReplyingTo(message: Message?) {
+        _uiState.update { it.copy(replyingToMessage = message) }
     }
 
     fun loadMessages() {
