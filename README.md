@@ -13,7 +13,10 @@
     <img src="https://img.shields.io/badge/Testflight-Telegram-blue.svg" alt="Testflight">
 </a>
 
-A beautiful Telegram messaging app, currently for Android.
+A beautiful Telegram messaging app, for Android.
+
+> [!IMPORTANT]
+> Compound is currently in active de development. You might meet frequent testflight, unexpected error.
 
 ## 👓 Preview
 
@@ -26,6 +29,15 @@ A beautiful Telegram messaging app, currently for Android.
         <td><img src="docs/img/screenshot/MediaPreviewScreen.jpg" width="180" alt="Media Preview Screen" /></td>
     </tr>
 </table>
+
+## ✨ Features
+
+* **Beautiful UI:** Built with Jetpack Compose. Cupertino design.
+* **Fully i18ned:** Synced with official Telegram translation.
+* **Exclusive features:**
+  * Smart person name formatting (eg: 哲睿 张 -> 张哲睿, Simon Scholz -> Simon Scholz)
+  * Stacked photo in chat
+  * Share source display for apps supporting Compound Share Protocol
 
 ## ⚖️ License
 
@@ -67,6 +79,11 @@ This project is licensed under **CC BY-ND 4.0**.
     ```bash
     ./gradlew app:assembleDebug
     ```
+
+## Developing
+
+### Tech Stack
+
 
 ## 🤝 Contributing
 
