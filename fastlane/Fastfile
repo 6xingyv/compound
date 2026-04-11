@@ -1,0 +1,15 @@
+default_platform(:android)
+
+platform :android do
+  desc "Generate screenshots"
+  lane :screenshots do
+    # Run the UI tests to generate screenshots
+    capture_android_screenshots(
+      app_package_name: "com.mocharealm.compound",
+      tests_package_name: "com.mocharealm.compound.test",
+      use_tests_in_classes: ["com.mocharealm.compound.ScreenshotTest"],
+      # Locales to capture screenshots for
+      locales: ["en-US", "zh-CN"]
+    )
+  end
+end

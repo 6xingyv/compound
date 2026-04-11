@@ -59,6 +59,7 @@ kotlinpoet-core = { module = "com.squareup:kotlinpoet", version.ref = "kotlinpoe
 kotlinpoet-ksp = { module = "com.squareup:kotlinpoet-ksp", version.ref = "kotlinpoet" }
 maplibre-compose = { module = "io.github.rallista:maplibre-compose", version = "1.6.0" }
 hiddenapi-bypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version = "6.1" }
+screengrab = { module = "tools.fastlane:screengrab", version = "2.1.1" }
 firebase-bom = {module="com.google.firebase:firebase-bom",version.ref="firebaseBom"}
 firebase-analytics = {group="com.google.firebase",name = "firebase-analytics"}
 firebase-messaging = {group="com.google.firebase",name="firebase-messaging"}

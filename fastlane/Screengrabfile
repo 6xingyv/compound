@@ -1,0 +1,14 @@
+# The package name of the app under test
+app_package_name('com.mocharealm.compound')
+
+# The package name of the tests
+tests_package_name('com.mocharealm.compound.test')
+
+# The class name of the test to run
+use_tests_in_classes(['com.mocharealm.compound.ScreenshotTest'])
+
+# The locales to capture screenshots for
+locales(['en-US', 'zh-CN'])
+
+# The directory where screenshots should be saved
+# screenshots_path('./fastlane/metadata/android')
