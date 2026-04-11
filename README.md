@@ -1,6 +1,31 @@
+<img src="./docs/img/icon.webp" width="100" alt="App Icon" />
+
 # Compound
 
-**Compound** is a streamlined Android messaging client built on top of **TDLib**.
+<a href="https://github.com/6xingyv/compound/stargazers">
+    <img src="https://img.shields.io/github/stars/6xingyv/compound?style=social" alt="Stars">
+</a>
+
+<a href="#️-license">
+    <img src="https://img.shields.io/badge/License-purple.svg" alt="License">
+</a>
+<a href="https://t.me/+RXZSTJ7ojVAwYjY1">
+    <img src="https://img.shields.io/badge/Testflight-Telegram-blue.svg" alt="Testflight">
+</a>
+
+A beautiful Telegram messaging app, currently for Android.
+
+## 👓 Preview
+
+<table>
+    <tr>
+        <td><img src="docs/img/screenshot/MsgListScreen.jpg" width="180" alt="Message List Screen" /></td>
+        <td><img src="docs/img/screenshot/ChatScreen_EmojiPanel.jpg" width="180" alt="Chat Screen with Emoji Panel" /></td>
+        <td><img src="docs/img/screenshot/ChatScreen_PhotoStack.jpg" width="180" alt="Chat Screen with Photo Stack" /></td>
+        <td><img src="docs/img/screenshot/ChatScreen_Reply.jpg" width="180" alt="Chat Screen" /></td>
+        <td><img src="docs/img/screenshot/MediaPreviewScreen.jpg" width="180" alt="Media Preview Screen" /></td>
+    </tr>
+</table>
 
 ## ⚖️ License
 
@@ -11,10 +36,10 @@ This project is licensed under **CC BY-ND 4.0**.
 
 > **Note to Contributors:** To prevent ecosystem fragmentation and ensure security, all improvements must be submitted via PR to the official repository. Publicly hosting a modified fork is not permitted.
 
-
 ## 📦 Build
 
 1. **Clone the repository**:
+
     ```bash
     git clone https://github.com/6xingyv/compound.git
     ```
@@ -22,6 +47,7 @@ This project is licensed under **CC BY-ND 4.0**.
 2. **Setup configs**:
 
    Before building the project, you must configure your environment. Create a local.properties file in the root directory and add the following:
+
    ```properties
    # Telegram API ID and Hash
    API_ID=YOUR_API_ID
@@ -32,9 +58,15 @@ This project is licensed under **CC BY-ND 4.0**.
    RELEASE_KEY_ALIAS=your_alias
    RELEASE_KEY_PASSWORD=your_password
    ```
-   Where the **Telegram API ID and Hash** can be obtained from https://my.telegram.org.
+
+   Where the **Telegram API ID and Hash** can be obtained from <https://my.telegram.org>.
 
 3. **Build**
+    Use the following Gradle command to build a debug APK:
+
+    ```bash
+    ./gradlew app:assembleDebug
+    ```
 
 ## 🤝 Contributing
 
