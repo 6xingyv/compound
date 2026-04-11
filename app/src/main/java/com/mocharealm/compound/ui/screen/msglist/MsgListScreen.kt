@@ -105,7 +105,7 @@ fun MsgListScreen(
         val pullConnection = remember(onOpenArchived, listState, maxPullPx, triggerPullPx) {
             object : NestedScrollConnection {
                 override fun onPreScroll(available: Offset, source: NestedScrollSource): Offset {
-                    if (onOpenArchived == null || source != NestedScrollSource.Drag) return Offset.Zero
+                    if (onOpenArchived == null || source != NestedScrollSource.UserInput) return Offset.Zero
 
                     val atTop = listState.firstVisibleItemIndex == 0 && listState.firstVisibleItemScrollOffset == 0
                     if (available.y > 0f && atTop) {

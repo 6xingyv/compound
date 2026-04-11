@@ -626,7 +626,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         .heightIn(min = 24.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    AnimatedVisibility(
+                                    androidx.compose.animation.AnimatedVisibility(
                                         visible = inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { it },
                                         exit = fadeOut() + slideOutHorizontally { it }) {
@@ -652,7 +652,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
 
-                                    AnimatedVisibility(
+                                    androidx.compose.animation.AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
                                         exit = fadeOut() + slideOutHorizontally { -it }) {
