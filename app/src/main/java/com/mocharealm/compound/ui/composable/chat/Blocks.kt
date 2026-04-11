@@ -68,6 +68,9 @@ import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
+import com.mocharealm.gaze.icons.Arrow_Down_Document
+import com.mocharealm.gaze.icons.Document_Fill
+import com.mocharealm.gaze.icons.Play_Fill
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import com.mocharealm.tci18n.core.tdString

@@ -30,6 +30,8 @@ import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
+import com.mocharealm.gaze.icons.Pause_Fill
+import com.mocharealm.gaze.icons.Play_Fill
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.LiquidSurface
 import kotlinx.coroutines.delay

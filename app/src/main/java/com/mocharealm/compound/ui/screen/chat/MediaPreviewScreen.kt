@@ -88,6 +88,11 @@ import com.mocharealm.gaze.glassy.liquid.effect.drawBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
+import com.mocharealm.gaze.icons.`15_Arrow_Trianglehead_Clockwise`
+import com.mocharealm.gaze.icons.`15_Arrow_Trianglehead_Counterclockwise`
+import com.mocharealm.gaze.icons.Chevron_Backward
+import com.mocharealm.gaze.icons.Pause_Fill
+import com.mocharealm.gaze.icons.Play_Fill
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.nav.LocalListDetailExpanded
 import com.mocharealm.gaze.ui.composable.LiquidSurface
