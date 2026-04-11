@@ -80,10 +80,22 @@ This project is licensed under **CC BY-ND 4.0**.
     ./gradlew app:assembleDebug
     ```
 
-## Developing
+## 💻 Developing
 
 ### Tech Stack
 
+Compound is built with modern Android development standards:
+
+* **Language**: Kotlin (with C++ JNI for TDLib)
+* **UI Framework**: Jetpack Compose
+* **Visual Effects**: [Gaze Glassy](https://github.com/6xingyv/gaze-glassy)
+* **Architecture**: Clean Architecture + Unidirectional Data Flow (MVI)
+* **Core Engine**: TDLib
+* **Dependency Injection**: Koin
+* **Media**: Media3 & Coil & `VpxPlayer`(for webm stickers)
+* **i18n**: `tci18n` (KSP-powered localized string system)
+
+For more detailed information on our architecture and how to get started with development, please read our [Developer Guide](AGENTS.md).
 
 ## 🤝 Contributing
 
