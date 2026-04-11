@@ -33,6 +33,7 @@ import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
 import kotlinx.coroutines.FlowPreview
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
@@ -40,6 +41,11 @@ import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.update
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.Semaphore
+import kotlinx.coroutines.sync.withLock
+import kotlinx.coroutines.sync.withPermit
+import kotlinx.coroutines.withContext
 
 enum class GroupPosition {
     FIRST, MIDDLE, LAST, SINGLE
@@ -147,10 +153,22 @@ class ChatViewModel(
 
     companion object {
         private const val PAGE_SIZE = 50
+        private const val MAX_CONCURRENT_DOWNLOADS = 4
     }
 
     private val _uiState = MutableStateFlow(ChatUiState())
     val uiState = _uiState.asStateFlow()
+
+    private val messageStateMutex = Mutex()
+    private val messageIdMutex = Mutex()
+    private val messageIdIndex = HashSet<Long>()
+
+    private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
+    private val downloadingFileMutex = Mutex()
+    private val downloadingFileIds = HashSet<Long>()
+
+    private val customEmojiLoadingMutex = Mutex()
+    private val customEmojiLoadingIds = HashSet<Long>()
 
     val inputState = TextFieldState()
 
@@ -303,62 +321,60 @@ class ChatViewModel(
                 offset = offset,
                 onlyLocal = true
             )
-            localResult.onSuccess { localMessages ->
-                if (localMessages.isNotEmpty()) {
-                    _uiState.update {
-                        it.withMessages(localMessages.sortedBy { it.primaryTimestamp }).copy(
-                            loading = false,
-                            initialLoaded = true,
-                            scrollToMessageId = if (readPos > 0) readPos else null
-                        )
-                    }
-                    downloadMissingFiles(localMessages)
+            val localMessages = localResult.getOrNull().orEmpty()
+            if (localMessages.isNotEmpty()) {
+                val sortedLocal = localMessages.sortedBy { it.primaryTimestamp }
+                setMessages(sortedLocal) {
+                    it.copy(
+                        loading = false,
+                        initialLoaded = true,
+                        scrollToMessageId = if (readPos > 0) readPos else null
+                    )
                 }
+                downloadMissingFiles(sortedLocal)
             }
 
-            getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset).fold(
-                onSuccess = { networkMessages ->
-                    _uiState.update { state ->
-                        // Merge file URLs from already-downloaded local messages
-                        val existingFileUrls = state.messages.flatMap { msg ->
-                            msg.blocks.filterIsInstance<MessageBlock.MediaBlock>()
-                                .filter { it.file.fileUrl != null }
-                                .map { it.id to it.file.fileUrl!! }
-                        }.toMap()
+            val networkResult = getChatMessages(chatId, PAGE_SIZE, fromMessageId = readPos, offset = offset)
+            if (networkResult.isSuccess) {
+                val networkMessages = networkResult.getOrNull().orEmpty()
+                val existingFileUrls = _uiState.value.messages.flatMap { msg ->
+                    msg.blocks.filterIsInstance<MessageBlock.MediaBlock>()
+                        .filter { it.file.fileUrl != null }
+                        .map { it.id to it.file.fileUrl!! }
+                }.toMap()
 
-                        val merged = networkMessages.map { msg ->
-                            msg.copy(
-                                blocks = msg.blocks.map { block ->
-                                    if (block is MessageBlock.MediaBlock && block.file.fileUrl == null) {
-                                        existingFileUrls[block.id]?.let { url ->
-                                            block.copy(
-                                                file = block.file.copy(
-                                                    fileUrl = url
-                                                )
-                                            )
-                                        } ?: block
-                                    } else block
-                                })
+                val merged = networkMessages.map { msg ->
+                    msg.copy(
+                        blocks = msg.blocks.map { block ->
+                            if (block is MessageBlock.MediaBlock && block.file.fileUrl == null) {
+                                existingFileUrls[block.id]?.let { url ->
+                                    block.copy(file = block.file.copy(fileUrl = url))
+                                } ?: block
+                            } else block
                         }
+                    )
+                }
 
-                        state.withMessages(merged.sortedBy { it.primaryTimestamp }).copy(
-                            loading = false,
-                            hasMore = networkMessages.size >= PAGE_SIZE,
-                            initialLoaded = true,
-                            scrollToMessageId = if (readPos > 0) readPos else state.scrollToMessageId
-                        )
+                val sortedMerged = merged.sortedBy { it.primaryTimestamp }
+                setMessages(sortedMerged) { state ->
+                    state.copy(
+                        loading = false,
+                        hasMore = networkMessages.size >= PAGE_SIZE,
+                        initialLoaded = true,
+                        scrollToMessageId = if (readPos > 0) readPos else state.scrollToMessageId
+                    )
+                }
+                downloadMissingFiles(networkMessages)
+            } else {
+                val error = networkResult.exceptionOrNull()
+                _uiState.update { state ->
+                    if (state.messages.isEmpty()) {
+                        state.copy(error = error?.message, loading = false)
+                    } else {
+                        state.copy(loading = false, initialLoaded = true)
                     }
-                    downloadMissingFiles(networkMessages)
-                },
-                onFailure = { error ->
-                    _uiState.update { state ->
-                        if (state.messages.isEmpty()) {
-                            state.copy(error = error.message, loading = false)
-                        } else {
-                            state.copy(loading = false, initialLoaded = true)
-                        }
-                    }
-                })
+                }
+            }
         }
     }
 
@@ -370,17 +386,20 @@ class ChatViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
-            getChatMessages(
+            val result = getChatMessages(
                 chatId,
                 PAGE_SIZE,
                 fromMessageId = oldestMessageId
-            ).fold(onSuccess = { olderMessages ->
+            )
+
+            if (result.isSuccess) {
+                val olderMessages = result.getOrNull().orEmpty()
                 if (olderMessages.isEmpty()) {
                     _uiState.update {
                         it.copy(loadingMore = false, hasMore = false)
                     }
                 } else {
-                    val existingIds = state.messages.map { it.primaryId }.toSet()
+                    val existingIds = snapshotMessageIds()
                     val newMessages = olderMessages.filter { it.primaryId !in existingIds }
 
                     val combinedMessages = if (newMessages.isNotEmpty()) {
@@ -389,19 +408,20 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    _uiState.update {
-                        it.withMessages(combinedMessages).copy(
+                    setMessages(combinedMessages) {
+                        it.copy(
                             loadingMore = false,
                             hasMore = newMessages.isNotEmpty(),
                         )
                     }
                     downloadMissingFiles(newMessages)
                 }
-            }, onFailure = { error ->
+            } else {
+                val error = result.exceptionOrNull()
                 _uiState.update {
-                    it.copy(loadingMore = false, error = error.message)
+                    it.copy(loadingMore = false, error = error?.message)
                 }
-            })
+            }
         }
     }
 
@@ -413,18 +433,21 @@ class ChatViewModel(
 
         viewModelScope.launch {
             _uiState.update { it.copy(loadingNewer = true) }
-            getChatMessages(
+            val result = getChatMessages(
                 chatId,
                 PAGE_SIZE,
                 fromMessageId = newestMessageId,
                 offset = -PAGE_SIZE + 1
-            ).fold(onSuccess = { newerMessages ->
+            )
+
+            if (result.isSuccess) {
+                val newerMessages = result.getOrNull().orEmpty()
                 if (newerMessages.isEmpty()) {
                     _uiState.update {
                         it.copy(loadingNewer = false, hasMoreNewer = false)
                     }
                 } else {
-                    val existingIds = state.messages.map { it.primaryId }.toSet()
+                    val existingIds = snapshotMessageIds()
                     val newMessages = newerMessages.filter { it.primaryId !in existingIds }
 
                     val combinedMessages = if (newMessages.isNotEmpty()) {
@@ -433,17 +456,18 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    _uiState.update {
-                        it.withMessages(combinedMessages).copy(
+                    setMessages(combinedMessages) {
+                        it.copy(
                             loadingNewer = false,
                             hasMoreNewer = newMessages.isNotEmpty(),
                         )
                     }
                     downloadMissingFiles(newMessages)
                 }
-            }, onFailure = { error ->
-                _uiState.update { it.copy(loadingNewer = false, error = error.message) }
-            })
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.update { it.copy(loadingNewer = false, error = error?.message) }
+            }
         }
     }
 
@@ -454,26 +478,27 @@ class ChatViewModel(
         }
         viewModelScope.launch {
             _uiState.update { it.copy(loadingMore = true) }
-            getChatMessages(chatId, PAGE_SIZE, fromMessageId = messageId, offset = -1).fold(
-                onSuccess = { loaded ->
-                    val existingIds = _uiState.value.messages.map { it.primaryId }.toSet()
-                    val newMessages = loaded.filter { it.primaryId !in existingIds }
-                    val combinedMessages = (newMessages + _uiState.value.messages).sortedBy {
-                        it.primaryTimestamp
-                    }
-                    _uiState.update { state ->
-                        state.withMessages(combinedMessages).copy(
-                            loadingMore = false,
-                            scrollToMessageId = messageId
-                        )
-                    }
-                    downloadMissingFiles(newMessages)
-                },
-                onFailure = { error ->
-                    _uiState.update {
-                        it.copy(loadingMore = false, error = error.message)
-                    }
-                })
+            val result = getChatMessages(chatId, PAGE_SIZE, fromMessageId = messageId, offset = -1)
+            if (result.isSuccess) {
+                val loaded = result.getOrNull().orEmpty()
+                val existingIds = snapshotMessageIds()
+                val newMessages = loaded.filter { it.primaryId !in existingIds }
+                val combinedMessages = (newMessages + _uiState.value.messages).sortedBy {
+                    it.primaryTimestamp
+                }
+                setMessages(combinedMessages) {
+                    it.copy(
+                        loadingMore = false,
+                        scrollToMessageId = messageId
+                    )
+                }
+                downloadMissingFiles(newMessages)
+            } else {
+                val error = result.exceptionOrNull()
+                _uiState.update {
+                    it.copy(loadingMore = false, error = error?.message)
+                }
+            }
         }
     }
 
@@ -494,10 +519,77 @@ class ChatViewModel(
         }
     }
 
-    private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {
+    private suspend fun snapshotMessageIds(): Set<Long> {
+        return messageIdMutex.withLock { messageIdIndex.toSet() }
+    }
+
+    private suspend fun setMessages(
+        newMessages: List<Message>,
+        stateTransform: (ChatUiState) -> ChatUiState = { it }
+    ) {
+        val newItems = withContext(Dispatchers.Default) {
+            newMessages.toMessageItems()
+        }
+        messageIdMutex.withLock {
+            messageIdIndex.clear()
+            newMessages.forEach { messageIdIndex.add(it.primaryId) }
+        }
         _uiState.update { state ->
-            val newMessages = updateFn(state.messages)
-            state.withMessages(newMessages)
+            stateTransform(state).copy(messages = newMessages, messageItems = newItems)
+        }
+    }
+
+    private fun updateMessagesState(updateFn: (List<Message>) -> List<Message>) {
+        viewModelScope.launch {
+            messageStateMutex.withLock {
+                val currentMessages = _uiState.value.messages
+                val newMessages = updateFn(currentMessages)
+                if (newMessages == currentMessages) return@withLock
+                setMessages(newMessages)
+            }
+        }
+    }
+
+    private fun enqueueFileDownload(fileId: Long, onSuccess: suspend (String) -> Unit) {
+        viewModelScope.launch {
+            val shouldDownload = downloadingFileMutex.withLock { downloadingFileIds.add(fileId) }
+            if (!shouldDownload) return@launch
+
+            try {
+                downloadSemaphore.withPermit {
+                    downloadFile(fileId).onSuccess { path ->
+                        onSuccess(path)
+                    }
+                }
+            } finally {
+                downloadingFileMutex.withLock { downloadingFileIds.remove(fileId) }
+            }
+        }
+    }
+
+    private fun enqueueCustomEmojiLoad(customEmojiId: Long) {
+        viewModelScope.launch {
+            val shouldLoad = customEmojiLoadingMutex.withLock {
+                if (_uiState.value.customEmojiStickers.containsKey(customEmojiId)) {
+                    false
+                } else {
+                    customEmojiLoadingIds.add(customEmojiId)
+                }
+            }
+            if (!shouldLoad) return@launch
+
+            try {
+                getCustomEmojiStickers(listOf(customEmojiId)).onSuccess { stickers ->
+                    stickers.firstOrNull()?.let { sticker ->
+                        _uiState.update { state ->
+                            state.copy(customEmojiStickers = state.customEmojiStickers + (customEmojiId to sticker))
+                        }
+                        downloadCustomEmojiFiles(listOf(sticker))
+                    }
+                }
+            } finally {
+                customEmojiLoadingMutex.withLock { customEmojiLoadingIds.remove(customEmojiId) }
+            }
         }
     }
 
@@ -509,10 +601,8 @@ class ChatViewModel(
                     is MessageBlock.MediaBlock -> {
                         val fileId = block.file.fileId
                         if (fileId != null && block.file.fileUrl == null && block.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO) {
-                            viewModelScope.launch {
-                                downloadFile(fileId).onSuccess { path ->
-                                    updateBlockFile(msg.primaryId, block.id, path)
-                                }
+                            enqueueFileDownload(fileId) { path ->
+                                updateBlockFile(msg.primaryId, block.id, path)
                             }
                         }
                         if (
@@ -520,10 +610,8 @@ class ChatViewModel(
                             && block.thumbnail.fileUrl == null
                             && block.mediaType == MessageBlock.MediaBlock.MediaType.VIDEO
                         ) {
-                            viewModelScope.launch {
-                                downloadFile(block.thumbnail.fileId).onSuccess { path ->
-                                    updateBlockThumbnail(msg.primaryId, block.id, path)
-                                }
+                            enqueueFileDownload(block.thumbnail.fileId) { path ->
+                                updateBlockThumbnail(msg.primaryId, block.id, path)
                             }
                         }
                     }
@@ -531,10 +619,8 @@ class ChatViewModel(
                     is MessageBlock.StickerBlock -> {
                         val fileId = block.file.fileId
                         if (fileId != null && block.file.fileUrl == null) {
-                            viewModelScope.launch {
-                                downloadFile(fileId).onSuccess { path ->
-                                    updateBlockFile(msg.primaryId, block.id, path)
-                                }
+                            enqueueFileDownload(fileId) { path ->
+                                updateBlockFile(msg.primaryId, block.id, path)
                             }
                         }
                     }
@@ -546,16 +632,7 @@ class ChatViewModel(
                             .filter { id -> !_uiState.value.customEmojiStickers.containsKey(id) }
 
                         customEmojiIds.forEach { id ->
-                            viewModelScope.launch {
-                                getCustomEmojiStickers(listOf(id)).onSuccess { stickers ->
-                                    stickers.firstOrNull()?.let { sticker ->
-                                        _uiState.update { state ->
-                                            state.copy(customEmojiStickers = state.customEmojiStickers + (id to sticker))
-                                        }
-                                        downloadCustomEmojiFiles(listOf(sticker))
-                                    }
-                                }
-                            }
+                            enqueueCustomEmojiLoad(id)
                         }
                     }
 
@@ -569,72 +646,87 @@ class ChatViewModel(
         for (sticker in stickers) {
             val fileId = sticker.file.fileId
             if (fileId != null && sticker.file.fileUrl == null) {
-                viewModelScope.launch {
-                    downloadFile(fileId).onSuccess { path ->
-                        _uiState.update { state ->
-                            state.copy(
-                                customEmojiStickers = state.customEmojiStickers.mapValues { (_, s) ->
-                                    if (s.file.fileId == fileId) {
-                                        s.copy(file = s.file.copy(fileUrl = path))
-                                    } else s
-                                }
-                            )
-                        }
+                enqueueFileDownload(fileId) { path ->
+                    _uiState.update { state ->
+                        state.copy(
+                            customEmojiStickers = state.customEmojiStickers.mapValues { (_, s) ->
+                                if (s.file.fileId == fileId) {
+                                    s.copy(file = s.file.copy(fileUrl = path))
+                                } else s
+                            }
+                        )
                     }
                 }
             }
         }
     }
 
+    private fun updateSingleMessageWithoutRegroup(messageId: Long, transform: (Message) -> Message) {
+        _uiState.update { state ->
+            val msgIndex = state.messages.indexOfFirst { it.primaryId == messageId }
+            if (msgIndex == -1) return@update state
+
+            val oldMessage = state.messages[msgIndex]
+            val newMessage = transform(oldMessage)
+            if (newMessage == oldMessage) return@update state
+
+            val newMessages = state.messages.toMutableList().also { it[msgIndex] = newMessage }
+            val itemIndex = state.messageItems.indexOfFirst { it.message.primaryId == messageId }
+            val newItems = if (itemIndex == -1) {
+                state.messageItems
+            } else {
+                state.messageItems.toMutableList().also { list ->
+                    list[itemIndex] = list[itemIndex].copy(message = newMessage)
+                }
+            }
+
+            state.copy(messages = newMessages, messageItems = newItems)
+        }
+    }
+
     /** Updates a block's file URL within a message */
     private fun updateBlockFile(messageId: Long, blockId: Long, path: String) {
-        updateMessagesState { currentMessages ->
-            currentMessages.map { msg ->
-                if (msg.primaryId == messageId) {
-                    msg.copy(
-                        blocks = msg.blocks.map { block ->
-                            when (block) {
-                                is MessageBlock.MediaBlock -> if (block.id == blockId) block.copy(
-                                    file = block.file.copy(fileUrl = path)
-                                ) else block
+        updateSingleMessageWithoutRegroup(messageId) { msg ->
+            msg.copy(
+                blocks = msg.blocks.map { block ->
+                    when (block) {
+                        is MessageBlock.MediaBlock -> if (block.id == blockId) block.copy(
+                            file = block.file.copy(fileUrl = path)
+                        ) else block
 
-                                is MessageBlock.StickerBlock -> if (block.id == blockId) block.copy(
-                                    file = block.file.copy(fileUrl = path)
-                                ) else block
+                        is MessageBlock.StickerBlock -> if (block.id == blockId) block.copy(
+                            file = block.file.copy(fileUrl = path)
+                        ) else block
 
-                                is MessageBlock.DocumentBlock -> if (block.id == blockId) block.copy(
-                                    document = block.document.copy(
-                                        file = block.document.file.copy(fileUrl = path)
-                                    )
-                                ) else block
+                        is MessageBlock.DocumentBlock -> if (block.id == blockId) block.copy(
+                            document = block.document.copy(
+                                file = block.document.file.copy(fileUrl = path)
+                            )
+                        ) else block
 
-                                else -> block
-                            }
-                        })
-                } else msg
-            }
+                        else -> block
+                    }
+                }
+            )
         }
     }
 
     /** Updates a block's thumbnail URL within a message */
     private fun updateBlockThumbnail(messageId: Long, blockId: Long, path: String) {
-        updateMessagesState { currentMessages ->
-            currentMessages.map { msg ->
-                if (msg.primaryId == messageId) {
-                    msg.copy(
-                        blocks = msg.blocks.map { block ->
-                            when {
-                                block is MessageBlock.MediaBlock && block.id == blockId -> block.copy(
-                                    thumbnail = block.thumbnail?.copy(
-                                        fileUrl = path
-                                    )
-                                )
+        updateSingleMessageWithoutRegroup(messageId) { msg ->
+            msg.copy(
+                blocks = msg.blocks.map { block ->
+                    when {
+                        block is MessageBlock.MediaBlock && block.id == blockId -> block.copy(
+                            thumbnail = block.thumbnail?.copy(
+                                fileUrl = path
+                            )
+                        )
 
-                                else -> block
-                            }
-                        })
-                } else msg
-            }
+                        else -> block
+                    }
+                }
+            )
         }
     }
 
@@ -746,31 +838,30 @@ class ChatViewModel(
         _uiState.update { it.copy(selectedStickerSetId = setId, stickersLoading = true) }
         viewModelScope.launch {
             getStickerSetStickers(setId).onSuccess { stickers ->
+                _uiState.update {
+                    it.copy(currentSetStickers = stickers, stickersLoading = false)
+                }
+
                 // Download thumbnails for stickers that don't have local files
                 for (sticker in stickers) {
                     val thumbFileId = sticker.thumbnail?.fileId ?: sticker.file.fileId
                     if (thumbFileId != null && sticker.thumbnail?.fileUrl == null && sticker.file.fileUrl == null) {
-                        launch {
-                            downloadFile(thumbFileId).onSuccess { path ->
-                                _uiState.update { state ->
-                                    state.copy(
-                                        currentSetStickers = state.currentSetStickers.map { s ->
-                                            if (s.id == sticker.id) {
-                                                if (thumbFileId == s.thumbnail?.fileId) {
-                                                    s.copy(thumbnail = s.thumbnail.copy(fileUrl = path))
-                                                } else {
-                                                    s.copy(file = s.file.copy(fileUrl = path))
-                                                }
-                                            } else s
-                                        }
-                                    )
-                                }
+                        enqueueFileDownload(thumbFileId) { path ->
+                            _uiState.update { state ->
+                                state.copy(
+                                    currentSetStickers = state.currentSetStickers.map { s ->
+                                        if (s.id == sticker.id) {
+                                            if (thumbFileId == s.thumbnail?.fileId) {
+                                                s.copy(thumbnail = s.thumbnail.copy(fileUrl = path))
+                                            } else {
+                                                s.copy(file = s.file.copy(fileUrl = path))
+                                            }
+                                        } else s
+                                    }
+                                )
                             }
                         }
                     }
-                }
-                _uiState.update {
-                    it.copy(currentSetStickers = stickers, stickersLoading = false)
                 }
             }.onFailure {
                 _uiState.update { it.copy(stickersLoading = false) }
