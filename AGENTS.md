@@ -1,6 +1,6 @@
-# 🤖 Agent Guide for Mocha Compound Project
+# Guide for Compound Project
 
-Welcome to the Mocha Compound project! This is an unofficial chat application client based on Kotlin deeply integrated with Telegram's TDLib. This guide is specifically prepared for agents and automated development assistants to quickly familiarize themselves with the underlying architecture, naming conventions, and standard workflows for feature expansion.
+Welcome to the Compound project! This is an unofficial chat application client based on Kotlin deeply integrated with Telegram's TDLib. This guide is specifically prepared for agents and automated development assistants to quickly familiarize themselves with the underlying architecture, naming conventions, and standard workflows for feature expansion.
 
 ## 🎯 Key Tech Stack
 
