@@ -27,6 +27,9 @@ sealed interface Screen : NavKey {
     data object SignIn : Screen
 
     @Serializable
+    data object ArchivedMsgList : Screen
+
+    @Serializable
     @TdRouteOverride("share")
     data class SharePicker(val payload: SharePayload) : Screen
 

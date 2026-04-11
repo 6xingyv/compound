@@ -18,20 +18,21 @@ class ChatRepositoryImpl(
     private val messageMapper: MessageMapper
 ) : ChatRepository {
 
-    override suspend fun getChats(limit: Int, offset: Int): Result<List<Chat>> =
+    override suspend fun getChats(limit: Int, offset: Int, archived: Boolean): Result<List<Chat>> =
         runCatching {
+            val chatListType = if (archived) TdApi.ChatListArchive() else TdApi.ChatListMain()
             // Continuously call LoadChats to load enough chats into TDLib internal list.
             val totalNeeded = offset + limit
             var loaded = 0
             while (loaded < totalNeeded) {
                 val batch = runCatching {
-                    tdLibDataSource.send(TdApi.LoadChats(TdApi.ChatListMain(), limit))
+                    tdLibDataSource.send(TdApi.LoadChats(chatListType, limit))
                 }
                 if (batch.isFailure) break // 404 = no more chats
                 loaded += limit
             }
 
-            val chatList = tdLibDataSource.send(TdApi.GetChats(TdApi.ChatListMain(), totalNeeded))
+            val chatList = tdLibDataSource.send(TdApi.GetChats(chatListType, totalNeeded))
             if (chatList !is TdApi.Chats) error("Invalid chat list response")
 
             val chatIds = chatList.chatIds.drop(offset).take(limit)

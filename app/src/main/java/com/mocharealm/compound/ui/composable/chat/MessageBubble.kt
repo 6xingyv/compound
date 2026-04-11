@@ -56,8 +56,9 @@ fun MessageBubble(
 ) {
     val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
     val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
-    val isBorderless = (message.blocks.size == 1 && message.blocks.first() is MessageBlock.StickerBlock) ||
-        (message.blocks.all { it is MessageBlock.MediaBlock && it.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO } && message.blocks.isNotEmpty() && message.shareInfo == null)
+    val isBorderless =
+        (message.blocks.size == 1 && message.blocks.first() is MessageBlock.StickerBlock) ||
+                (message.blocks.all { it is MessageBlock.MediaBlock && it.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO } && message.blocks.size > 1)
 
     val topPad = if (isFirst) 8.dp else 2.dp
     val bottomPad = if (isLast) 8.dp else 2.dp
@@ -139,7 +140,12 @@ fun MessageBubble(
                 )
             ) {
                 if (isBorderless) {
-                    MessageContent(message, isBorderless = true, hasTail = isLast, onReplyClick = onReplyClick)
+                    MessageContent(
+                        message,
+                        isBorderless = true,
+                        hasTail = isLast,
+                        onReplyClick = onReplyClick
+                    )
                 } else {
                     Box(
                         modifier =
@@ -205,7 +211,6 @@ fun MessageContent(
 
     Column(modifier = rootModifier) {
         if (hasReply) {
-            val isOnlySticker = isBorderless
             val hasContentBelow = message.blocks.isNotEmpty() || hasShare
             val replyTop = if (isBorderless) 0.dp else 10.dp
             val replyBottom = if (hasContentBelow) 8.dp else bottomPadding
@@ -224,7 +229,7 @@ fun MessageContent(
                     Modifier
                         .padding(top = replyTop, bottom = replyBottom)
                         .then(
-                            if (isOnlySticker) Modifier
+                            if (isBorderless) Modifier
                             else Modifier
                                 .padding(horizontal = 12.dp)
                                 .fillMaxWidth()
@@ -235,8 +240,9 @@ fun MessageContent(
         message.blocks.forEachIndexed { index, block ->
             val isFirstBlock = index == 0
             val isLastBlock = index == message.blocks.size - 1
-            val isMedia = block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.PositionBlock
-            
+            val isMedia =
+                block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.PositionBlock
+
             // Gap logic: 
             // 1. If hasReply and this is first block -> 0dp (gap is handled by replyBottom=8dp).
             // 2. If NO reply and this is first block:
@@ -244,7 +250,7 @@ fun MessageContent(
             //    - Others (Text/Document) -> 10dp (standard bubble top).
             // 3. If this is NOT first block -> 8dp gap to previous block.
             val blockTop = if (isFirstBlock) {
-                if (hasReply) 0.dp 
+                if (hasReply) 0.dp
                 else if (isMedia) 0.dp
                 else 10.dp
             } else {
@@ -279,11 +285,13 @@ fun MessageContent(
                             mediaBlocks.find { it.mediaAlbumId == albumId } == block
                         if (isFirstInAlbum) {
                             val albumBlocks = mediaBlocks.filter { it.mediaAlbumId == albumId }
-                            val hasTextBlockInside = message.blocks.any { it is MessageBlock.TextBlock }
+                            val hasTextBlockInside =
+                                message.blocks.any { it is MessageBlock.TextBlock }
                             MediaAlbumGrid(
-                                albumBlocks, 
-                                hasTextBlock = hasTextBlockInside, 
+                                albumBlocks,
+                                hasTextBlock = hasTextBlockInside,
                                 isOutgoing = message.isOutgoing,
+                                isBorderless = isBorderless,
                                 modifier = Modifier
                                     .padding(top = blockTop, bottom = blockBottom)
                                     .widthIn(max = 280.dp)

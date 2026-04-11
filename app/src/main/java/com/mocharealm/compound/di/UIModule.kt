@@ -2,6 +2,7 @@ package com.mocharealm.compound.di
 
 import com.mocharealm.compound.ui.nav.AppNavViewModel
 import com.mocharealm.compound.ui.nav.DeepLinkHandler
+import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
@@ -10,6 +11,8 @@ import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.intro.IntroScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
+import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListScreen
+import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
 import com.mocharealm.compound.ui.screen.share.SharePickerScreen
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
@@ -47,6 +50,16 @@ val uiModule = module {
             subscribeToMessageUpdates = get(),
             getChat = get(),
             toggleChatPin = get(),
+            toggleChatArchive = get(),
+            getCustomEmojiStickers = get()
+        )
+    }
+    viewModel {
+        ArchivedMsgListViewModel(
+            getChats = get(),
+            downloadFile = get(),
+            subscribeToMessageUpdates = get(),
+            getChat = get(),
             toggleChatArchive = get(),
             getCustomEmojiStickers = get()
         )
@@ -98,6 +111,14 @@ val uiModule = module {
     }
     navigation<Screen.SignIn> {
         SignInScreen()
+    }
+    navigation<Screen.ArchivedMsgList>(mapOf(LIST_KEY to true)) {
+        val navigator = LocalNavigator.current
+        ArchivedMsgListScreen(
+            onChatClick = { chatId ->
+                navigator.push(Screen.Chat(chatId), true)
+            }
+        )
     }
     navigation<Screen.SharePicker>(mapOf(LIST_KEY to true)) { route ->
         SharePickerScreen(payload = route.payload)

@@ -1,5 +1,6 @@
 package com.mocharealm.compound.ui.screen.home
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -13,19 +14,23 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
+import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
+import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListScreen
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
+import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
 import com.mocharealm.gaze.icons.SFIcons
@@ -37,12 +42,18 @@ import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
+import top.yukonga.miuix.kmp.extra.SuperBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private data class TopLevelNav(
     val title: String,
     val icon: @Composable () -> Unit
 )
+
+private enum class HomeMessagePage {
+    MAIN,
+    ARCHIVED
+}
 
 @Composable
 fun HomeScreen(
@@ -79,6 +90,12 @@ fun HomeScreen(
         )
     }
     val selectedIndex = remember { mutableIntStateOf(0) }
+    val messagePage = remember { mutableStateOf(HomeMessagePage.MAIN) }
+    val showSignInSheet = remember { mutableStateOf(false) }
+
+    BackHandler(enabled = selectedIndex.intValue == 0 && messagePage.value == HomeMessagePage.ARCHIVED) {
+        messagePage.value = HomeMessagePage.MAIN
+    }
 
     val navigator = LocalNavigator.current
 
@@ -107,7 +124,12 @@ fun HomeScreen(
             ) {
                 BottomTabs(
                     { selectedIndex.intValue },
-                    { selectedIndex.intValue = it },
+                    {
+                        if (selectedIndex.intValue == it && it == 0) {
+                            messagePage.value = HomeMessagePage.MAIN
+                        }
+                        selectedIndex.intValue = it
+                    },
                     layerBackdrop,
                     navigationItems.size
                 ) {
@@ -147,17 +169,51 @@ fun HomeScreen(
         AnimatedContent(selectedIndex.intValue, Modifier.layerBackdrop(layerBackdrop)) { index ->
             when (index) {
                 0 -> {
-                    MsgListScreen(
-                        padding = innerPadding,
-                        onChatClick = { chatId ->
-                            navigator.push(Screen.Chat(chatId), true)
-                        },
-                    )
+                    when (messagePage.value) {
+                        HomeMessagePage.MAIN -> {
+                            MsgListScreen(
+                                padding = innerPadding,
+                                onOpenArchived = {
+                                    messagePage.value = HomeMessagePage.ARCHIVED
+                                },
+                                onChatClick = { chatId ->
+                                    navigator.push(Screen.Chat(chatId), true)
+                                },
+                            )
+                        }
+
+                        HomeMessagePage.ARCHIVED -> {
+                            ArchivedMsgListScreen(
+                                padding = innerPadding,
+                                onChatClick = { chatId ->
+                                    navigator.push(Screen.Chat(chatId), true)
+                                }
+                            )
+                        }
+                    }
                 }
 
                 1 -> {
-                    MeScreen(padding = innerPadding)
+                    MeScreen(
+                        padding = innerPadding,
+                        onOpenSignInSheet = {
+                            showSignInSheet.value = true
+                        }
+                    )
                 }
+            }
+        }
+
+        SuperBottomSheet(
+            show = showSignInSheet.value,
+            modifier = Modifier,
+            title = tdString("login_with_telegram"),
+            insideMargin = DpSize.Zero,
+            onDismissRequest = { showSignInSheet.value = false },
+            renderInRootScaffold = false,
+        ) {
+            Column(Modifier.fillMaxSize()) {
+                SignInScreen()
             }
         }
     }

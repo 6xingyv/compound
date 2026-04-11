@@ -165,7 +165,7 @@ class ChatViewModel(
 
     private val downloadSemaphore = Semaphore(MAX_CONCURRENT_DOWNLOADS)
     private val downloadingFileMutex = Mutex()
-    private val downloadingFileIds = HashSet<Long>()
+    private val downloadingFileIds = HashSet<Int>()
 
     private val customEmojiLoadingMutex = Mutex()
     private val customEmojiLoadingIds = HashSet<Long>()
@@ -550,7 +550,7 @@ class ChatViewModel(
         }
     }
 
-    private fun enqueueFileDownload(fileId: Long, onSuccess: suspend (String) -> Unit) {
+    private fun enqueueFileDownload(fileId: Int, onSuccess: suspend (String) -> Unit) {
         viewModelScope.launch {
             val shouldDownload = downloadingFileMutex.withLock { downloadingFileIds.add(fileId) }
             if (!shouldDownload) return@launch

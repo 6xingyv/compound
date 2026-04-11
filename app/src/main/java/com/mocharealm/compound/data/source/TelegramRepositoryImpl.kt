@@ -28,8 +28,8 @@ class TelegramRepositoryImpl(
     override suspend fun awaitAuthState() = authRepository.awaitAuthState()
 
     // --- Chat Repository Delegation ---
-    override suspend fun getChats(limit: Int, offset: Int) =
-        chatRepository.getChats(limit, offset)
+    override suspend fun getChats(limit: Int, offset: Int, archived: Boolean) =
+        chatRepository.getChats(limit, offset, archived)
     override suspend fun getChat(chatId: Long) = chatRepository.getChat(chatId)
     override suspend fun getInternalLink(link: String) = chatRepository.getInternalLink(link)
     override suspend fun openChat(chatId: Long) = chatRepository.openChat(chatId)

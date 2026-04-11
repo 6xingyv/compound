@@ -184,7 +184,6 @@ dependencies {
     ksp(project(":tci18n:processor"))
 
     testImplementation(libs.junit)
-    debugImplementation(libs.screengrab)
     androidTestImplementation(libs.screengrab)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
