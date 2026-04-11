@@ -20,19 +20,19 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.graphics.Brush
-import androidx.compose.ui.unit.DpSize
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import com.mocharealm.compound.ui.composable.base.Avatar
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
-import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListScreen
 import com.mocharealm.compound.ui.screen.me.MeScreen
 import com.mocharealm.compound.ui.screen.me.MeViewModel
+import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListScreen
 import com.mocharealm.compound.ui.screen.msglist.MsgListScreen
-import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.layerBackdrop
 import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberLayerBackdrop
+import com.mocharealm.gaze.icons.Magnifyingglass
+import com.mocharealm.gaze.icons.Message_Fill
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.BottomTab
 import com.mocharealm.gaze.ui.composable.BottomTabs
@@ -42,7 +42,6 @@ import org.koin.androidx.compose.koinViewModel
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
-import top.yukonga.miuix.kmp.extra.SuperBottomSheet
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 private data class TopLevelNav(
@@ -91,7 +90,6 @@ fun HomeScreen(
     }
     val selectedIndex = remember { mutableIntStateOf(0) }
     val messagePage = remember { mutableStateOf(HomeMessagePage.MAIN) }
-    val showSignInSheet = remember { mutableStateOf(false) }
 
     BackHandler(enabled = selectedIndex.intValue == 0 && messagePage.value == HomeMessagePage.ARCHIVED) {
         messagePage.value = HomeMessagePage.MAIN
@@ -196,24 +194,8 @@ fun HomeScreen(
                 1 -> {
                     MeScreen(
                         padding = innerPadding,
-                        onOpenSignInSheet = {
-                            showSignInSheet.value = true
-                        }
                     )
                 }
-            }
-        }
-
-        SuperBottomSheet(
-            show = showSignInSheet.value,
-            modifier = Modifier,
-            title = tdString("login_with_telegram"),
-            insideMargin = DpSize.Zero,
-            onDismissRequest = { showSignInSheet.value = false },
-            renderInRootScaffold = false,
-        ) {
-            Column(Modifier.fillMaxSize()) {
-                SignInScreen()
             }
         }
     }

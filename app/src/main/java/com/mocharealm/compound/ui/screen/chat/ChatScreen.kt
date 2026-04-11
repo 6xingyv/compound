@@ -105,7 +105,6 @@ import androidx.compose.ui.util.fastCoerceAtMost
 import androidx.compose.ui.util.lerp
 import androidx.compose.ui.zIndex
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import androidx.navigation3.ui.LocalNavAnimatedContentScope
 import com.maplibre.compose.MapView
 import com.maplibre.compose.camera.CameraState
 import com.maplibre.compose.rememberSaveableMapViewCamera
@@ -124,7 +123,6 @@ import com.mocharealm.compound.ui.composable.chat.TimestampLabel
 import com.mocharealm.compound.ui.composable.chat.VideoBlock
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.util.EmptyIndication
-import com.mocharealm.compound.ui.util.LocalSharedTransitionScope
 import com.mocharealm.compound.ui.util.MarkdownTransformation
 import com.mocharealm.compound.ui.util.PaddingValuesSide
 import com.mocharealm.compound.ui.util.formatName
@@ -137,7 +135,20 @@ import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
 import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
 import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
 import com.mocharealm.gaze.glassy.liquid.effect.shadow.Shadow
+import com.mocharealm.gaze.icons.Arrowshape_Turn_Up_Left_Fill
+import com.mocharealm.gaze.icons.Chevron_Backward
+import com.mocharealm.gaze.icons.Chevron_Compact_Forward
+import com.mocharealm.gaze.icons.Document
+import com.mocharealm.gaze.icons.Face_Smiling
+import com.mocharealm.gaze.icons.Location_Fill
+import com.mocharealm.gaze.icons.Mappin_And_Ellipse
+import com.mocharealm.gaze.icons.Microphone
+import com.mocharealm.gaze.icons.Paperplane
+import com.mocharealm.gaze.icons.Photo_On_Rectangle_Angled
+import com.mocharealm.gaze.icons.Plus
 import com.mocharealm.gaze.icons.SFIcons
+import com.mocharealm.gaze.icons.Video_Fill
+import com.mocharealm.gaze.icons.Xmark
 import com.mocharealm.gaze.nav.LocalBackButtonVisibility
 import com.mocharealm.gaze.ui.animation.InteractiveHighlight
 import com.mocharealm.gaze.ui.composable.Button
@@ -615,7 +626,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         .heightIn(min = 24.dp),
                                     contentAlignment = Alignment.CenterStart
                                 ) {
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { it },
                                         exit = fadeOut() + slideOutHorizontally { it }) {
@@ -641,7 +652,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         }
                                     }
 
-                                    androidx.compose.animation.AnimatedVisibility(
+                                    AnimatedVisibility(
                                         visible = !inAudioMode,
                                         enter = fadeIn() + slideInHorizontally { -it },
                                         exit = fadeOut() + slideOutHorizontally { -it }) {

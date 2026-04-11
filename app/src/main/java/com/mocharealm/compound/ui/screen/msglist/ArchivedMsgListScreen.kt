@@ -43,6 +43,7 @@ import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
 import com.mocharealm.compound.ui.util.formatMessageTimestamp
 import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.compound.ui.util.toPreviewAnnotatedString
+import com.mocharealm.gaze.icons.Archivebox
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.ui.composable.RevealDirection
 import com.mocharealm.gaze.ui.composable.RevealSwipe
