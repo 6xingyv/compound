@@ -168,7 +168,7 @@ fun MsgListScreen(
                     ) {
                         if (pullOffsetPx > 0f) {
                             Text(
-                                text = if (progress >= 1f) tdString("AccReleaseForArchive") else tdString("ArchiveHiddenInfo"),
+                                text = if (progress >= 1f) tdString("AccReleaseForArchive") else tdString("AccSwipeForArchive"),
                                 style = MiuixTheme.textStyles.footnote1,
                                 color = MiuixTheme.colorScheme.onSurfaceVariantActions,
                                 modifier = Modifier.alpha(0.6f + progress * 0.4f)
