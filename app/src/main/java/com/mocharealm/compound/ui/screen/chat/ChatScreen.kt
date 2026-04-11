@@ -216,9 +216,6 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     val context = LocalContext.current
     val keyboardController = LocalSoftwareKeyboardController.current
 
-    LocalSharedTransitionScope.current
-    LocalNavAnimatedContentScope.current
-
     BackHandler(enabled = state.stickerPanelVisible || state.locationPanelVisible) {
         if (state.stickerPanelVisible) viewModel.hideStickerPanel()
         if (state.locationPanelVisible) viewModel.hideLocationPanel()

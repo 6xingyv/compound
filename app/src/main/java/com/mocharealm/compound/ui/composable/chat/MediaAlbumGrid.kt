@@ -69,6 +69,7 @@ class SwipedOutCard(
 fun MediaAlbumGrid(
     blocks: List<MessageBlock.MediaBlock>,
     hasTextBlock: Boolean = false,
+    isOutgoing: Boolean = false,
     modifier: Modifier = Modifier
 ) {
     val totalOriginal = blocks.size
@@ -342,7 +343,7 @@ fun MediaAlbumGrid(
         if (!hasTextBlock && totalOriginal > 0) {
             Text(
                 text = tdString("Of","%1\$d" to startIndex+1, "%2\$d" to totalOriginal),
-                color = MiuixTheme.colorScheme.primary,
+                color = if (isOutgoing) Color.White else MiuixTheme.colorScheme.primary,
                 style = MiuixTheme.textStyles.body1,
                 modifier = Modifier.padding(start = 12.dp, bottom = 8.dp)
             )

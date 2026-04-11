@@ -56,11 +56,8 @@ fun MessageBubble(
 ) {
     val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
     val isLast = groupPosition == GroupPosition.LAST || groupPosition == GroupPosition.SINGLE
-    val hasSticker =
-        message.blocks.any { b -> b is MessageBlock.StickerBlock } && message.blocks.size == 1
-    
-    val hasTextBlock = message.blocks.any { it is MessageBlock.TextBlock }
-    !hasTextBlock && message.shareInfo == null && message.blocks.all { it is MessageBlock.MediaBlock && it.mediaAlbumId != 0L }
+    val isBorderless = (message.blocks.size == 1 && message.blocks.first() is MessageBlock.StickerBlock) ||
+        (message.blocks.all { it is MessageBlock.MediaBlock && it.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO } && message.blocks.isNotEmpty() && message.shareInfo == null)
 
     val topPad = if (isFirst) 8.dp else 2.dp
     val bottomPad = if (isLast) 8.dp else 2.dp
@@ -141,8 +138,8 @@ fun MessageBubble(
                     backgroundColor = contentColor.copy(0.2f)
                 )
             ) {
-                if (hasSticker) {
-                    MessageContent(message, hasTail = isLast, onReplyClick = onReplyClick)
+                if (isBorderless) {
+                    MessageContent(message, isBorderless = true, hasTail = isLast, onReplyClick = onReplyClick)
                 } else {
                     Box(
                         modifier =
@@ -163,6 +160,7 @@ fun MessageBubble(
                     ) {
                         MessageContent(
                             message = message,
+                            isBorderless = false,
                             hasTail = isLast,
                             onReplyClick = onReplyClick,
                         )
@@ -176,6 +174,7 @@ fun MessageBubble(
 @Composable
 fun MessageContent(
     message: Message,
+    isBorderless: Boolean,
     hasTail: Boolean,
     onReplyClick: (Long) -> Unit = {},
 ) {
@@ -206,10 +205,9 @@ fun MessageContent(
 
     Column(modifier = rootModifier) {
         if (hasReply) {
-            val firstBlock = if (message.blocks.isNotEmpty()) message.blocks[0] else null
-            val isOnlySticker = message.blocks.size == 1 && firstBlock is MessageBlock.StickerBlock
+            val isOnlySticker = isBorderless
             val hasContentBelow = message.blocks.isNotEmpty() || hasShare
-            val replyTop = if (isOnlySticker) 0.dp else 10.dp
+            val replyTop = if (isBorderless) 0.dp else 10.dp
             val replyBottom = if (hasContentBelow) 8.dp else bottomPadding
 
             val replyText =
@@ -285,6 +283,7 @@ fun MessageContent(
                             MediaAlbumGrid(
                                 albumBlocks, 
                                 hasTextBlock = hasTextBlockInside, 
+                                isOutgoing = message.isOutgoing,
                                 modifier = Modifier
                                     .padding(top = blockTop, bottom = blockBottom)
                                     .widthIn(max = 280.dp)
