@@ -126,11 +126,17 @@ class MsgListViewModel(
 
     private fun fetchCustomEmojiStickers(messages: List<Message>) {
         val customEmojiIds = messages.flatMap { msg ->
-            msg.blocks.filterIsInstance<MessageBlock.TextBlock>().flatMap { block ->
+            val blockEmojis = msg.blocks.filterIsInstance<MessageBlock.TextBlock>().flatMap { block ->
                 block.content.entities
                     .filter { it.type is DomainText.TextEntityType.CustomEmoji }
                     .map { (it.type as DomainText.TextEntityType.CustomEmoji).customEmojiId }
             }
+            val reactionEmojis = msg.reactions.flatMap { reaction ->
+                reaction.reactionText.entities
+                    .filter { it.type is DomainText.TextEntityType.CustomEmoji }
+                    .map { (it.type as DomainText.TextEntityType.CustomEmoji).customEmojiId }
+            }
+            blockEmojis + reactionEmojis
         }.filter { id -> !_uiState.value.customEmojiStickers.containsKey(id) }.distinct()
 
         if (customEmojiIds.isEmpty()) return

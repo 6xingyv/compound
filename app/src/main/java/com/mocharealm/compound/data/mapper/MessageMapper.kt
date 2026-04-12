@@ -4,6 +4,7 @@ import com.mocharealm.compound.data.dto.MessageDto
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
+import com.mocharealm.compound.domain.model.MessageReaction
 import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.model.User
 import com.mocharealm.compound.domain.util.ShareProtocol
@@ -46,6 +47,22 @@ class MessageMapper(
                 }
             } else blocks
 
+        val reactions = msg.interactionInfo?.reactions?.reactions?.map { reaction ->
+            val textObj = when (val type = reaction.type) {
+                is TdApi.ReactionTypeEmoji -> Text(content = type.emoji)
+                is TdApi.ReactionTypeCustomEmoji -> Text(
+                    content = "☁", // Placeholder character for the inline emoji
+                    entities = listOf(Text.TextEntity(0, 1, Text.TextEntityType.CustomEmoji(type.customEmojiId)))
+                )
+                else -> Text(content = "👍")
+            }
+            MessageReaction(
+                reactionText = textObj,
+                count = reaction.totalCount,
+                isChosen = reaction.isChosen
+            )
+        } ?: emptyList()
+
         return Message(
             sender = sender,
             chatId = msg.chatId,
@@ -53,6 +70,7 @@ class MessageMapper(
             blocks = finalBlocks,
             replyTo = replyTo,
             shareInfo = shareInfo,
+            reactions = reactions
         )
     }
 
@@ -134,6 +152,7 @@ class MessageMapper(
                         is MessageBlock.DocumentBlock -> first.document.fileName
                         is MessageBlock.SystemActionBlock -> "System message"
                         is MessageBlock.PositionBlock -> first.position.name
+                        is MessageBlock.PollBlock -> "📊 ${first.question.content}"
                     }
                 } else {
                     reply.content?.let {

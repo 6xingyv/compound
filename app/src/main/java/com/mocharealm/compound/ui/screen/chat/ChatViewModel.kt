@@ -639,6 +639,18 @@ class ChatViewModel(
                     else -> {}
                 }
             }
+            
+            // Scan reactions for custom emojis
+            msg.reactions.forEach { reaction ->
+                val customEmojiIds = reaction.reactionText.entities
+                    .filter { it.type is Text.TextEntityType.CustomEmoji }
+                    .map { (it.type as Text.TextEntityType.CustomEmoji).customEmojiId }
+                    .filter { id -> !_uiState.value.customEmojiStickers.containsKey(id) }
+
+                customEmojiIds.forEach { id ->
+                    enqueueCustomEmojiLoad(id)
+                }
+            }
         }
     }
 

@@ -214,6 +214,31 @@ object MessageDto {
                 }
             }
 
+            is TdApi.MessagePoll -> {
+                val p = content.poll
+                val totalVotes = p.totalVoterCount
+                listOf(
+                    MessageBlock.PollBlock(
+                        id = messageId,
+                        timestamp = timestamp,
+                        idStr = p.id,
+                        question = mapFormattedText(p.question),
+                        options = p.options.map { opt ->
+                            val percent = if (totalVotes > 0) (opt.voterCount.toFloat() / totalVotes * 100).toInt() else 0
+                            MessageBlock.PollBlock.PollOption(
+                                text = mapFormattedText(opt.text),
+                                voterCount = opt.voterCount,
+                                votePercentage = percent,
+                                isChosen = opt.isChosen
+                            )
+                        },
+                        isClosed = p.isClosed,
+                        isAnonymous = p.isAnonymous,
+                        totalVoterCount = totalVotes
+                    )
+                )
+            }
+
             is TdApi.MessageAudio ->
                 listOf(
                     MessageBlock.TextBlock(

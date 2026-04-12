@@ -26,6 +26,8 @@ A beautiful Telegram messaging app, for Android.
         <td><img src="docs/img/screenshot/ChatScreen_EmojiPanel.jpg" width="180" alt="Chat Screen with Emoji Panel" /></td>
         <td><img src="docs/img/screenshot/ChatScreen_PhotoStack.jpg" width="180" alt="Chat Screen with Photo Stack" /></td>
         <td><img src="docs/img/screenshot/ChatScreen_Reply.jpg" width="180" alt="Chat Screen" /></td>
+    </tr>
+    <tr>
         <td><img src="docs/img/screenshot/MediaPreviewScreen.jpg" width="180" alt="Media Preview Screen" /></td>
     </tr>
 </table>

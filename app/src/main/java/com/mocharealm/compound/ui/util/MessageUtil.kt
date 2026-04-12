@@ -129,5 +129,6 @@ fun Message.toPreviewText(): String {
                 }
             }
         is MessageBlock.PositionBlock -> first.position.name
+        is MessageBlock.PollBlock -> "📊 ${first.question.content}"
     }
 }

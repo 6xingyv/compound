@@ -60,10 +60,12 @@ object MessageAggregator {
         
         val first = group[0]
         val allBlocks = group.flatMap { it.blocks }.toMutableList()
+        val allReactions = group.flatMap { it.reactions }.distinctBy { it.reactionText.content }.toMutableList()
+        val allShareInfo = group.mapNotNull { it.shareInfo }.firstOrNull()
         
         // Sort to ensure TextBlock(s) are at the end of the album.
         allBlocks.sortBy { it is MessageBlock.TextBlock }
         
-        return first.copy(blocks = allBlocks)
+        return first.copy(blocks = allBlocks, reactions = allReactions, shareInfo = allShareInfo)
     }
 }

@@ -10,6 +10,7 @@ import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.repository.MessageRepository
 import com.mocharealm.compound.domain.util.MarkdownParser
 import kotlinx.coroutines.flow.Flow
+import kotlinx.coroutines.flow.filterIsInstance
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.merge
 import kotlinx.coroutines.flow.transform
@@ -114,6 +115,10 @@ class MessageRepositoryImpl(
             if (msg != null) emit(
                 MessageUpdateEvent.MessageSendSucceeded(update.oldMessageId, messageMapper.mapSingleTdMessage(msg))
             )
+        },
+        tdLibDataSource.updates.filterIsInstance<TdApi.UpdateMessageInteractionInfo>().transform { update ->
+            val msg = tdLibDataSource.sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
+            if (msg != null) emit(MessageUpdateEvent.MessageUpdated(messageMapper.mapSingleTdMessage(msg)))
         }
     )
 
