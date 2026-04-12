@@ -1,17 +1,13 @@
 package com.mocharealm.compound.ui.shape
 
 import androidx.compose.foundation.shape.CornerSize
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.remember
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Outline
 import androidx.compose.ui.graphics.Path
 import androidx.compose.ui.graphics.PathFillType
 import androidx.compose.ui.graphics.PathOperation
 import androidx.compose.ui.graphics.Shape
-import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.unit.Density
-import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import com.mocharealm.gaze.capsule.Continuity
@@ -41,14 +37,33 @@ class BubbleContinuousShape(
             BubbleAlignment.End -> layoutDirection == LayoutDirection.Ltr
         }
 
-        val mainBox = continuity.createRoundedRectanglePathSegments(
-            width = w.toDouble(),
-            height = bodyHeight.toDouble(),
-            topLeft = r.toDouble(),
-            topRight = r.toDouble(),
-            bottomLeft = r.toDouble(),
-            bottomRight = r.toDouble()
-        ).toPath()
+        val mainPath = Path().apply {
+            val segments = continuity.createRoundedRectanglePathSegments(
+                width = w.toDouble(),
+                height = bodyHeight.toDouble(),
+                topLeft = r.toDouble(),
+                topRight = r.toDouble(),
+                bottomLeft = if (!isResolvedRight) 0.0 else r.toDouble(),
+                bottomRight = if (isResolvedRight) 0.0 else r.toDouble()
+            )
+            // Draw a diagonal line to cut off the sharp corner where the tail is
+            val mainOutline = segments.toPath()
+            val cutSize = r * 0.98f
+            val cutter = Path().apply {
+                if (isResolvedRight) {
+                    moveTo(w, bodyHeight - cutSize)
+                    lineTo(w, bodyHeight)
+                    lineTo(w - cutSize, bodyHeight)
+                    close()
+                } else {
+                    moveTo(0f, bodyHeight - cutSize)
+                    lineTo(0f, bodyHeight)
+                    lineTo(cutSize, bodyHeight)
+                    close()
+                }
+            }
+            op(mainOutline, cutter, PathOperation.Difference)
+        }
 
         val tail = Path().apply {
             if (isResolvedRight) {
@@ -79,7 +94,7 @@ class BubbleContinuousShape(
             close()
         }
 
-        path.op(mainBox, tail, PathOperation.Union)
+        path.op(mainPath, tail, PathOperation.Union)
         return Outline.Generic(path)
     }
 }
