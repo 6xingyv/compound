@@ -6,7 +6,7 @@ import com.mocharealm.compound.domain.repository.TelegramRepository
 class GetChatPinnedMessageUseCase(
     private val telegramRepository: TelegramRepository
 ) {
-    suspend operator fun invoke(chatId: Long): Result<Message?> {
-        return telegramRepository.getChatPinnedMessage(chatId)
+    suspend operator fun invoke(chatId: Long): Result<List<Message>> {
+        return telegramRepository.getChatPinnedMessages(chatId)
     }
 }

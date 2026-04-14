@@ -77,6 +77,7 @@ import androidx.compose.runtime.snapshotFlow
 import androidx.compose.runtime.staticCompositionLocalOf
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.draw.dropShadow
@@ -96,6 +97,7 @@ import androidx.compose.ui.platform.LocalFocusManager
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.platform.LocalSoftwareKeyboardController
 import androidx.compose.ui.platform.LocalWindowInfo
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.DpOffset
@@ -290,8 +292,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
     Scaffold(
         modifier = Modifier.fillMaxSize(),
         topBar = {
-            Box(
+            Column(
                 Modifier
+                    .fillMaxWidth()
                     .drawWithCache {
                         onDrawBehind {
                             drawRect(
@@ -304,21 +307,56 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                         }
                     }
                     .statusBarsPadding()
-                    .padding(captionBar.takeOnly(PaddingValuesSide.Top))) {
-                Row(
-                    Modifier
-                        .align(Alignment.CenterStart)
-                        .padding(horizontal = 16.dp)
-                        .fillMaxWidth(),
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween
-                ) {
-                    Row {
-                        AnimatedVisibility(LocalBackButtonVisibility.current) {
+                    .padding(captionBar.takeOnly(PaddingValuesSide.Top)),
+                verticalArrangement = Arrangement.spacedBy(16.dp)
+            ) {
+                Box {
+                    Row(
+                        Modifier
+                            .align(Alignment.CenterStart)
+                            .padding(horizontal = 16.dp)
+                            .fillMaxWidth(),
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.SpaceBetween
+                    ) {
+                        Row {
+                            AnimatedVisibility(LocalBackButtonVisibility.current) {
+                                LiquidSurface(
+                                    layerBackdrop,
+                                    Modifier.size(48.dp),
+                                    Modifier.clickable { navigator.pop() },
+                                    effects = {
+                                        vibrancy()
+                                        blur(1.dp.toPx())
+                                        lens(
+                                            16.dp.toPx(),
+                                            32.dp.toPx(),
+                                            chromaticAberration = false
+                                        )
+                                    },
+                                    shadow = {
+                                        Shadow(
+                                            radius = 24f.dp,
+                                            offset = DpOffset(0.dp, 0.dp),
+                                            color = Color.Black.copy(alpha = 0.1f),
+                                            alpha = 1f,
+                                            blendMode = DrawScope.DefaultBlendMode
+                                        )
+                                    },
+                                ) {
+                                    Icon(
+                                        SFIcons.Chevron_Backward,
+                                        null,
+                                        Modifier.align(Alignment.Center)
+                                    )
+                                }
+                            }
+                        }
+
+                        Row {
                             LiquidSurface(
                                 layerBackdrop,
                                 Modifier.size(48.dp),
-                                Modifier.clickable { navigator.pop() },
                                 effects = {
                                     vibrancy()
                                     blur(1.dp.toPx())
@@ -333,112 +371,140 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                         blendMode = DrawScope.DefaultBlendMode
                                     )
                                 },
+                            ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
+                        }
+                    }
+                    state.chatInfo?.let { chatInfo ->
+                        val animationScope = rememberCoroutineScope()
+
+                        val interactiveHighlight = remember(animationScope) {
+                            InteractiveHighlight(
+                                animationScope = animationScope
+                            )
+                        }
+                        Column(
+                            Modifier
+                                .align(Alignment.Center)
+                                .graphicsLayer {
+                                    val width = size.width
+                                    val height = size.height
+
+                                    val progress = interactiveHighlight.pressProgress
+                                    val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
+
+                                    val maxOffset = size.minDimension
+                                    val initialDerivative = 0.05f
+                                    val offset = interactiveHighlight.offset
+                                    translationX =
+                                        maxOffset * tanh(initialDerivative * offset.x / maxOffset)
+                                    translationY =
+                                        maxOffset * tanh(initialDerivative * offset.y / maxOffset)
+
+                                    val maxDragScale = 4f.dp.toPx() / size.height
+                                    val offsetAngle = atan2(offset.y, offset.x)
+                                    scaleX =
+                                        scale + maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) * (width / height).fastCoerceAtMost(
+                                            1f
+                                        )
+                                    scaleY =
+                                        scale + maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) * (height / width).fastCoerceAtMost(
+                                            1f
+                                        )
+                                }
+                                .then(interactiveHighlight.gestureModifier),
+                            verticalArrangement = Arrangement.spacedBy((-6).dp),
+                            horizontalAlignment = Alignment.CenterHorizontally) {
+                            Avatar(
+                                initials = chatInfo.title.content.take(2),
+                                modifier = Modifier
+                                    .size(48.dp)
+                                    .zIndex(20f)
+                                    .dropShadow(CircleShape) {
+                                        radius = 24f.dp.toPx()
+                                        offset = Offset(0f, radius / 6f)
+                                        color = Color.Black.copy(alpha = 0.1f)
+                                    },
+                                photoPath = chatInfo.photoUrl
+                            )
+                            LiquidSurface(
+                                layerBackdrop, Modifier.widthIn(
+                                    max = (containerWidth - 160.dp).coerceAtLeast(0.dp)
+                                ), isInteractive = false
                             ) {
-                                Icon(
-                                    SFIcons.Chevron_Backward, null, Modifier.align(Alignment.Center)
-                                )
+                                Row(
+                                    Modifier.padding(8.dp),
+                                    verticalAlignment = Alignment.CenterVertically,
+                                ) {
+                                    RichText(
+                                        text = chatInfo.title.toAnnotatedString(),
+                                        style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
+                                        maxLines = 1,
+                                        isInteractive = false
+                                    )
+                                    Icon(
+                                        SFIcons.Chevron_Compact_Forward,
+                                        null,
+                                        Modifier
+                                            .width(16.dp)
+                                            .graphicsLayer {
+                                                blendMode =
+                                                    if (isDark) BlendMode.Plus else BlendMode.Multiply
+                                                alpha = 0.6f
+                                            })
+                                }
                             }
                         }
                     }
+                }
 
-                    Row {
+                AnimatedVisibility(visible = state.pinnedMessages.isNotEmpty()) {
+                    state.pinnedMessages.firstOrNull()?.let { pinnedMessage ->
+                        val pinnedText =
+                            pinnedMessage.blocks.find { it is MessageBlock.TextBlock }
+                                .let { if (it is MessageBlock.TextBlock) it.content.content else "Media" }
                         LiquidSurface(
-                            layerBackdrop,
-                            Modifier.size(48.dp),
+                            backdrop = layerBackdrop,
+                            modifier = Modifier.padding(horizontal = 16.dp),
+                            afterModifier = Modifier.clickable(
+                                interactionSource = null,
+                                indication = null,
+                                role = Role.Button,
+                                onClick = {
+                                    viewModel.scrollToMessage(pinnedMessage.id)
+                                }
+                            ),
+                            shape = { ContinuousRoundedRectangle(16.dp) },
+                            surfaceColor = surfaceContainerColor.copy(alpha = 0.6f),
                             effects = {
                                 vibrancy()
-                                blur(1.dp.toPx())
-                                lens(16.dp.toPx(), 32.dp.toPx(), chromaticAberration = false)
+                                blur(4.dp.toPx())
                             },
-                            shadow = {
-                                Shadow(
-                                    radius = 24f.dp,
-                                    offset = DpOffset(0.dp, 0.dp),
-                                    color = Color.Black.copy(alpha = 0.1f),
-                                    alpha = 1f,
-                                    blendMode = DrawScope.DefaultBlendMode
-                                )
-                            },
-                        ) { Icon(SFIcons.Video_Fill, null, Modifier.align(Alignment.Center)) }
-                    }
-                }
-                state.chatInfo?.let { chatInfo ->
-                    val animationScope = rememberCoroutineScope()
-
-                    val interactiveHighlight = remember(animationScope) {
-                        InteractiveHighlight(
-                            animationScope = animationScope
-                        )
-                    }
-                    Column(
-                        Modifier
-                            .align(Alignment.Center)
-                            .graphicsLayer {
-                                val width = size.width
-                                val height = size.height
-
-                                val progress = interactiveHighlight.pressProgress
-                                val scale = lerp(1f, 1f + 4f.dp.toPx() / size.height, progress)
-
-                                val maxOffset = size.minDimension
-                                val initialDerivative = 0.05f
-                                val offset = interactiveHighlight.offset
-                                translationX =
-                                    maxOffset * tanh(initialDerivative * offset.x / maxOffset)
-                                translationY =
-                                    maxOffset * tanh(initialDerivative * offset.y / maxOffset)
-
-                                val maxDragScale = 4f.dp.toPx() / size.height
-                                val offsetAngle = atan2(offset.y, offset.x)
-                                scaleX =
-                                    scale + maxDragScale * abs(cos(offsetAngle) * offset.x / size.maxDimension) * (width / height).fastCoerceAtMost(
-                                        1f
-                                    )
-                                scaleY =
-                                    scale + maxDragScale * abs(sin(offsetAngle) * offset.y / size.maxDimension) * (height / width).fastCoerceAtMost(
-                                        1f
-                                    )
-                            }
-                            .then(interactiveHighlight.gestureModifier),
-                        verticalArrangement = Arrangement.spacedBy((-6).dp),
-                        horizontalAlignment = Alignment.CenterHorizontally) {
-                        Avatar(
-                            initials = chatInfo.title.content.take(2),
-                            modifier = Modifier
-                                .size(48.dp)
-                                .zIndex(20f)
-                                .dropShadow(CircleShape) {
-                                    radius = 24f.dp.toPx()
-                                    offset = Offset(0f, radius / 6f)
-                                    color = Color.Black.copy(alpha = 0.1f)
-                                },
-                            photoPath = chatInfo.photoUrl
-                        )
-                        LiquidSurface(
-                            layerBackdrop, Modifier.widthIn(
-                                max = (containerWidth - 160.dp).coerceAtLeast(0.dp)
-                            ), isInteractive = false
                         ) {
                             Row(
-                                Modifier.padding(8.dp),
-                                verticalAlignment = Alignment.CenterVertically,
+                                Modifier
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                                verticalAlignment = Alignment.CenterVertically
                             ) {
-                                RichText(
-                                    text = chatInfo.title.toAnnotatedString(),
-                                    style = MiuixTheme.textStyles.footnote1.copy(fontWeight = FontWeight.Bold),
-                                    maxLines = 1,
-                                    isInteractive = false
-                                )
-                                Icon(
-                                    SFIcons.Chevron_Compact_Forward,
-                                    null,
+                                Box(
                                     Modifier
-                                        .width(16.dp)
-                                        .graphicsLayer {
-                                            blendMode =
-                                                if (isDark) BlendMode.Plus else BlendMode.Multiply
-                                            alpha = 0.6f
-                                        })
+                                        .width(2.dp)
+                                        .clip(RoundedCornerShape(8.dp))
+                                        .background(primaryColor)
+                                )
+                                Spacer(Modifier.width(8.dp))
+                                Column(Modifier.weight(1f)) {
+                                    Text(
+                                        text = tdString("PinnedMessage"),
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        color = primaryColor
+                                    )
+                                    Text(
+                                        text = pinnedText,
+                                        style = MiuixTheme.textStyles.footnote1,
+                                        modifier = Modifier.alpha(0.6f),
+                                        maxLines = 1
+                                    )
+                                }
                             }
                         }
                     }

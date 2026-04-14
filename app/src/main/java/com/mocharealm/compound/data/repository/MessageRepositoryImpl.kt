@@ -35,6 +35,15 @@ class MessageRepositoryImpl(
         messageMapper.aggregateAlbums(rawMessages)
     }
 
+    override suspend fun getChatPinnedMessages(chatId: Long): Result<List<Message>> = runCatching {
+        val result = tdLibDataSource.sendSafe(TdApi.SearchChatMessages(chatId, null, "", null, 0, 0, 100, TdApi.SearchMessagesFilterPinned())).getOrNull()
+        if (result is TdApi.FoundChatMessages && result.messages.isNotEmpty()) {
+            result.messages.map { messageMapper.mapSingleTdMessage(it) }
+        } else {
+            emptyList()
+        }
+    }
+
     override suspend fun sendMessage(
         chatId: Long,
         text: String,

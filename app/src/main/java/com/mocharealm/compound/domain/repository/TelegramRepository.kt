@@ -54,6 +54,8 @@ interface TelegramRepository {
         offset: Int = 0
     ): Result<List<Message>>
 
+    suspend fun getChatPinnedMessages(chatId: Long): Result<List<Message>>
+
     /** 下载文件并返回本地路径 */
     suspend fun downloadFile(fileId: Int): Result<String>
 

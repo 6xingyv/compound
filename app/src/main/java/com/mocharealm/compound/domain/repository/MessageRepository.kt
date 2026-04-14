@@ -16,6 +16,8 @@ interface MessageRepository {
         offset: Int = 0
     ): Result<List<Message>>
 
+    suspend fun getChatPinnedMessages(chatId: Long): Result<List<Message>>
+
     suspend fun sendMessage(
         chatId: Long,
         text: String,

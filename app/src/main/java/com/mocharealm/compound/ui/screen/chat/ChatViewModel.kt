@@ -17,6 +17,7 @@ import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
+import com.mocharealm.compound.domain.usecase.GetChatPinnedMessageUseCase
 import com.mocharealm.compound.domain.usecase.GetChatReadPositionUseCase
 import com.mocharealm.compound.domain.usecase.GetChatUseCase
 import com.mocharealm.compound.domain.usecase.GetCustomEmojiStickersUseCase
@@ -32,8 +33,8 @@ import com.mocharealm.compound.domain.usecase.SendMessageUseCase
 import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
-import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.debounce
@@ -111,6 +112,7 @@ data class ChatUiState(
     val locationPanelVisible: Boolean = false,
     val selectedFiles: List<ShareFileInfo> = emptyList(),
     val replyingToMessage: Message? = null,
+    val pinnedMessages: List<Message> = emptyList(),
 ) {
     fun withMessages(newMessages: List<Message>): ChatUiState {
         return copy(
@@ -147,6 +149,7 @@ class ChatViewModel(
     private val saveChatReadPosition: SaveChatReadPositionUseCase,
     private val getChatReadPosition: GetChatReadPositionUseCase,
     private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase,
+    private val getChatPinnedMessage: GetChatPinnedMessageUseCase,
     private val saveFileToDownloads: SaveFileToDownloadsUseCase,
     private val openFile: OpenFileUseCase
 ) : ViewModel() {
@@ -313,6 +316,11 @@ class ChatViewModel(
 
             val readPos = getChatReadPosition(chatId)
             val offset = if (readPos > 0) -PAGE_SIZE / 2 else 0
+
+            val pinnedMsgResult = getChatPinnedMessage(chatId)
+            if (pinnedMsgResult.isSuccess) {
+                _uiState.update { it.copy(pinnedMessages = pinnedMsgResult.getOrDefault(emptyList())) }
+            }
 
             val localResult = getChatMessages(
                 chatId,

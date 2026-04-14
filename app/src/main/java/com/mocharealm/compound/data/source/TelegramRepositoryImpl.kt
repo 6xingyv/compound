@@ -41,6 +41,8 @@ class TelegramRepositoryImpl(
     override suspend fun getChatMessages(chatId: Long, limit: Int, fromMessageId: Long, onlyLocal: Boolean, offset: Int) =
         messageRepository.getChatMessages(chatId, limit, fromMessageId, onlyLocal, offset)
 
+    override suspend fun getChatPinnedMessages(chatId: Long) = messageRepository.getChatPinnedMessages(chatId)
+
     override suspend fun sendMessage(chatId: Long, text: String, entities: List<Text.TextEntity>, replyToMessageId: Long) =
         messageRepository.sendMessage(chatId, text, entities, replyToMessageId)
 
