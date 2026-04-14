@@ -918,7 +918,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                 textStyle = MiuixTheme.textStyles.body1,
                                                 decorator = { innerTextField ->
                                                     if (viewModel.inputState.text.isEmpty()) {
-                                                        Box {
+                                                        Box(contentAlignment = Alignment.CenterStart) {
                                                             innerTextField()
                                                             Text(
                                                                 tdString(
