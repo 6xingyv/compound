@@ -628,8 +628,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 ) {
                                     androidx.compose.animation.AnimatedVisibility(
                                         visible = inAudioMode,
-                                        enter = fadeIn() + slideInHorizontally { it },
-                                        exit = fadeOut() + slideOutHorizontally { it }) {
+                                        enter = slideInHorizontally { it },
+                                        exit = slideOutHorizontally { it }) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 SFIcons.Microphone,
@@ -654,8 +654,8 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
 
                                     androidx.compose.animation.AnimatedVisibility(
                                         visible = !inAudioMode,
-                                        enter = fadeIn() + slideInHorizontally { -it },
-                                        exit = fadeOut() + slideOutHorizontally { -it }) {
+                                        enter = slideInHorizontally { -it },
+                                        exit = slideOutHorizontally { -it }) {
                                         Column(
                                             Modifier
                                                 .animateContentSize()
@@ -856,7 +856,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                                             innerTextField()
                                                             Text(
                                                                 tdString(
-                                                                    "TypeMessage", "default"
+                                                                    "TypeMessage"
                                                                 ),
                                                                 modifier = Modifier.graphicsLayer {
                                                                     blendMode =
@@ -911,11 +911,11 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     AnimatedVisibility(
                         !state.loading && (viewModel.inputState.text.isNotBlank() || state.selectedFiles.isNotEmpty()),
                         Modifier,
-                        enter = fadeIn() + slideInHorizontally {
+                        enter = slideInHorizontally {
                             if (layoutDirection == LayoutDirection.Ltr) it
                             else -it
                         } + expandHorizontally(),
-                        exit = fadeOut() + slideOutHorizontally {
+                        exit = slideOutHorizontally {
                             if (layoutDirection == LayoutDirection.Ltr) it
                             else -it
                         } + shrinkHorizontally()) {

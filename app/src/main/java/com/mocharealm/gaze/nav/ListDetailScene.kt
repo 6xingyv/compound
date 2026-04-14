@@ -272,18 +272,12 @@ class ListDetailSceneStrategy<T : Any>(val windowSizeClass: WindowSizeClass) : S
     override fun SceneStrategyScope<T>.calculateScene(entries: List<NavEntry<T>>): Scene<T>? {
         val topEntry = entries.last()
 
-        // If the top entry is explicitly fullscreen, we don't use ListDetailScene.
         if (topEntry.metadata.containsKey(FULLSCREEN_KEY)) {
             return null
         }
 
-        // If the window is compact, we always use a single pane.
         if (!windowSizeClass.isWidthAtLeastBreakpoint(WIDTH_DP_MEDIUM_LOWER_BOUND)) {
-            return SinglePaneScene(
-                key = topEntry.contentKey,
-                entry = topEntry,
-                previousEntries = entries.dropLast(1),
-            )
+            return null
         }
 
         // To use ListDetailScene, we need at least one entry marked as a list pane.
