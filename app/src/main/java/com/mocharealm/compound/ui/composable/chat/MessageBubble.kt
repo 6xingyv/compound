@@ -63,17 +63,25 @@ fun MessageReactions(
     ) {
         val lastIndex = reactions.lastIndex
         reactions.forEachIndexed { index, reaction ->
-            val isTopMost = index == lastIndex
+            val isTopMost = if (isOutgoing) index == 0 else index == lastIndex
             val shape = if (isTopMost) {
                 IndicatorContinuousShape(if (isOutgoing) BubbleAlignment.Start else BubbleAlignment.End)
             } else {
                 ContinuousRoundedRectangle(20.dp)
             }
-            val reactionColor = if (isOutgoing) MiuixTheme.colorScheme.surfaceContainer else MiuixTheme.colorScheme.primary
-            val reactionContentColor = if (isOutgoing) MiuixTheme.colorScheme.onSurfaceContainer else MiuixTheme.colorScheme.onPrimary
+            val reactionColor =
+                if (isOutgoing) MiuixTheme.colorScheme.surfaceContainer else MiuixTheme.colorScheme.primary
+            val reactionContentColor =
+                if (isOutgoing) MiuixTheme.colorScheme.onSurfaceContainer else MiuixTheme.colorScheme.onPrimary
             Box(
                 modifier = Modifier
-                    .zIndex(index.toFloat())
+                    .zIndex(
+                        if (isOutgoing) {
+                            (lastIndex - index).toFloat()
+                        } else {
+                            index.toFloat()
+                        }
+                    )
                     .size(40.dp)
                     .surface(shape = shape, color = reactionColor),
                 contentAlignment = Alignment.Center
@@ -185,8 +193,8 @@ fun MessageBubble(
                     val reactionsPadding = if (message.reactions.isNotEmpty()) {
                         Modifier.padding(
                             top = 20.dp,
-                            start = if (message.isOutgoing) 16.dp else 0.dp,
-                            end = if (message.isOutgoing) 0.dp else 16.dp
+                            start = if (message.isOutgoing) 20.dp else 0.dp,
+                            end = if (message.isOutgoing) 0.dp else 20.dp
                         )
                     } else Modifier
 
@@ -247,7 +255,6 @@ fun MessageContent(
     hasTail: Boolean,
     onReplyClick: (Long) -> Unit = {},
 ) {
-    androidx.compose.ui.platform.LocalUriHandler.current
     val contentColor = LocalContentColor.current
     val linkColor =
         if (message.isOutgoing) MiuixTheme.colorScheme.onPrimary
@@ -258,7 +265,6 @@ fun MessageContent(
     val hasReply = message.replyTo != null
     val hasShare = message.shareInfo != null
 
-    // Determine if we should use intrinsic width (e.g. for media blocks)
     val useIntrinsicWidth =
         message.blocks.any {
             (it is MessageBlock.MediaBlock && !it.file.fileUrl.isNullOrEmpty()) || it is MessageBlock.PollBlock
@@ -306,12 +312,6 @@ fun MessageContent(
             val isMedia =
                 block is MessageBlock.MediaBlock || block is MessageBlock.StickerBlock || block is MessageBlock.PositionBlock
 
-            // Gap logic: 
-            // 1. If hasReply and this is first block -> 0dp (gap is handled by replyBottom=8dp).
-            // 2. If NO reply and this is first block:
-            //    - Media (Image/Video/Sticker/Location) -> 0dp (edge-to-edge).
-            //    - Others (Text/Document) -> 10dp (standard bubble top).
-            // 3. If this is NOT first block -> 8dp gap to previous block.
             val blockTop = if (isFirstBlock) {
                 if (hasReply) 0.dp
                 else if (isMedia) 0.dp
@@ -320,7 +320,6 @@ fun MessageContent(
                 8.dp
             }
 
-            // If it's a media item and no share follows, it should have no bottom padding to stay edge-to-edge.
             val blockBottom = if (isLastBlock && !hasShare) {
                 if (isMedia) 0.dp else bottomPadding
             } else 0.dp
