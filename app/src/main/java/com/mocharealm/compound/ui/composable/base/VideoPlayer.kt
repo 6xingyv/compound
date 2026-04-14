@@ -4,14 +4,24 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
+import androidx.compose.foundation.layout.BoxWithConstraints
+import androidx.compose.foundation.layout.aspectRatio
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerInputEventHandler
 import androidx.compose.ui.input.pointer.pointerInput
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
+import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
 import androidx.media3.common.Player
 import androidx.media3.common.util.UnstableApi
@@ -20,7 +30,6 @@ import androidx.media3.ui.compose.PlayerSurface
 import androidx.media3.ui.compose.SURFACE_TYPE_SURFACE_VIEW
 import androidx.media3.ui.compose.SURFACE_TYPE_TEXTURE_VIEW
 import java.io.File
-import androidx.core.net.toUri
 
 @OptIn(UnstableApi::class)
 @Composable
@@ -31,11 +40,14 @@ fun VideoPlayer(
     loop: Boolean = true,
     mute: Boolean = true,
     playWhenReady: Boolean = true,
+    contentScale: ContentScale = ContentScale.Fit,
     gestureHandler: PointerInputEventHandler = {},
     useTextureView: Boolean = true,
     playerControls: @Composable BoxScope.(player: ExoPlayer) -> Unit = { _ -> }
 ) {
     val context = LocalContext.current
+    var videoAspectRatio by remember(filePath) { mutableFloatStateOf(16f / 9f) }
+
     val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
             val uri = if (filePath.startsWith("http")) {
@@ -51,19 +63,60 @@ fun VideoPlayer(
         }
     }
 
+    DisposableEffect(exoPlayer) {
+        val listener = object : Player.Listener {
+            override fun onVideoSizeChanged(videoSize: androidx.media3.common.VideoSize) {
+                if (videoSize.width > 0 && videoSize.height > 0) {
+                    val pixelRatio = if (videoSize.pixelWidthHeightRatio > 0f) {
+                        videoSize.pixelWidthHeightRatio
+                    } else {
+                        1f
+                    }
+                    videoAspectRatio = (videoSize.width * pixelRatio) / videoSize.height
+                }
+            }
+        }
+        exoPlayer.addListener(listener)
+        onDispose {
+            exoPlayer.removeListener(listener)
+        }
+    }
+
     DisposableEffect(filePath) {
         onDispose { exoPlayer.release() }
     }
 
     Box(modifier = modifier) {
-        PlayerSurface(
-            player = exoPlayer,
-            modifier = Modifier
-                .fillMaxSize()
-                .pointerInput(Unit, gestureHandler)
-                .then(playerSurfaceModifier),
-            surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW
-        )
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val containerAspectRatio = if (maxHeight.value > 0f) {
+                maxWidth.value / maxHeight.value
+            } else {
+                1f
+            }
+
+            val surfaceModifier = if (contentScale == ContentScale.Fit) {
+                if (containerAspectRatio > videoAspectRatio) {
+                    Modifier
+                        .fillMaxHeight()
+                        .aspectRatio(videoAspectRatio)
+                } else {
+                    Modifier
+                        .fillMaxWidth()
+                        .aspectRatio(videoAspectRatio)
+                }
+            } else {
+                Modifier.fillMaxSize()
+            }
+
+            PlayerSurface(
+                player = exoPlayer,
+                modifier = surfaceModifier
+                    .align(Alignment.Center)
+                    .pointerInput(Unit, gestureHandler)
+                    .then(playerSurfaceModifier),
+                surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW
+            )
+        }
 
         playerControls(exoPlayer)
     }

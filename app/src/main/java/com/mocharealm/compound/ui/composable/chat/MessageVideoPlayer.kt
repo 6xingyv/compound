@@ -1,4 +1,4 @@
-package com.mocharealm.compound.ui.composable.chat
+ package com.mocharealm.compound.ui.composable.chat
 
 import androidx.compose.animation.AnimatedContent
 import androidx.compose.animation.AnimatedVisibility
@@ -19,6 +19,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.unit.DpOffset
 import androidx.compose.ui.unit.dp
 import androidx.media3.common.Player
@@ -38,26 +39,42 @@ import kotlinx.coroutines.delay
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
-
 @Composable
-fun MessageVideoPlayer(filePath: String, modifier: Modifier = Modifier) {
+fun MessageVideoPlayer(
+    filePath: String,
+    modifier: Modifier = Modifier,
+    isMuted: Boolean = false,
+    showControls: Boolean = true
+) {
     var isControlsVisible by remember { mutableStateOf(false) }
     val layerBackdrop = rememberLayerBackdrop { drawRect(Color.Black); drawContent() }
+
     VideoPlayer(
         filePath = filePath,
         modifier = modifier,
         playerSurfaceModifier = Modifier.layerBackdrop(layerBackdrop),
-        loop = false,
-        mute = false,
-        playWhenReady = false,
-        gestureHandler = { detectTapGestures { isControlsVisible = !isControlsVisible } },
+        loop = isMuted,
+        mute = isMuted,
+        playWhenReady = isMuted,
+        contentScale = ContentScale.Crop,
+        gestureHandler = if (showControls) {
+            {
+                detectTapGestures { isControlsVisible = !isControlsVisible }
+            }
+        } else {
+            {}
+        },
         playerControls = { player ->
-            ControlLayer(
-                layerBackdrop = layerBackdrop,
-                player = player,
-                isVisible = isControlsVisible,
-                onVisibilityChange = { isControlsVisible = it })
-        })
+            if (showControls) {
+                ControlLayer(
+                    layerBackdrop = layerBackdrop,
+                    player = player,
+                    isVisible = isControlsVisible,
+                    onVisibilityChange = { isControlsVisible = it }
+                )
+            }
+        }
+    )
 }
 
 @Composable

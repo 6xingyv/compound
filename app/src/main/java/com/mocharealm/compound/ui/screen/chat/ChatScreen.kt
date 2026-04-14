@@ -1219,27 +1219,14 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
             },
             LocalCustomEmojiStickers provides state.customEmojiStickers,
             LocalOnMediaClick provides { blockId ->
-                val mediaMessages = state.messages.filter { msg ->
-                    msg.blocks.any { it is MessageBlock.MediaBlock }
+                val msg = state.messages.find { msg ->
+                    msg.blocks.any { it.id == blockId }
                 }
-                val allMediaItems = mediaMessages.flatMap { msg ->
-                    msg.blocks.filterIsInstance<MessageBlock.MediaBlock>().map { block ->
-                        com.mocharealm.compound.ui.nav.MediaItem(
-                            url = block.file.fileUrl ?: "",
-                            thumbnailUrl = block.thumbnail?.fileUrl,
-                            type = if (block.mediaType == MessageBlock.MediaBlock.MediaType.VIDEO)
-                                com.mocharealm.compound.ui.nav.MediaItem.MediaType.VIDEO
-                            else com.mocharealm.compound.ui.nav.MediaItem.MediaType.PHOTO,
-                            id = block.id
-                        )
-                    }
-                }
-                val initialIndex = allMediaItems.indexOfFirst { it.id == blockId }.coerceAtLeast(0)
-                if (allMediaItems.isNotEmpty()) {
+                if (msg != null) {
                     navigator.push(
                         com.mocharealm.compound.ui.nav.Screen.MediaPreview(
-                            allMediaItems,
-                            initialIndex
+                            chatId = msg.chatId,
+                            messageId = msg.id
                         )
                     )
                 }

@@ -35,8 +35,8 @@ sealed interface Screen : NavKey {
 
     @Serializable
     data class MediaPreview(
-        val items: List<MediaItem>,
-        val initialIndex: Int
+        val chatId: Long,
+        val messageId: Long
     ) : Screen
 }
 

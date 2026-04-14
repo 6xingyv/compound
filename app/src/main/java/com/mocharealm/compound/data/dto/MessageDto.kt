@@ -43,13 +43,26 @@ object MessageDto {
 
             is TdApi.MessagePhoto -> {
                 val largestSize = content.photo.sizes.maxByOrNull { it.width * it.height }
+                val previewSize =
+                    content.photo.sizes
+                        .filter { it.photo?.id != largestSize?.photo?.id }
+                        .maxByOrNull { it.width * it.height }
                 val photoFileId = largestSize?.photo?.id
                 val media =
                     MessageBlock.MediaBlock(
                         id = messageId,
                         timestamp = timestamp,
                         mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
-                        file = File(fileId = photoFileId),
+                        file = File(
+                            fileId = photoFileId,
+                            fileUrl = largestSize?.photo?.local?.takeIf { it.isDownloadingCompleted }?.path
+                        ),
+                        thumbnail = previewSize?.photo?.let {
+                            File(
+                                fileId = it.id,
+                                fileUrl = it.local?.takeIf { local -> local.isDownloadingCompleted }?.path
+                            )
+                        },
                         width = largestSize?.width ?: 0,
                         height = largestSize?.height ?: 0,
                         hasSpoiler = content.hasSpoiler,
@@ -66,8 +79,16 @@ object MessageDto {
                         id = messageId,
                         timestamp = timestamp,
                         mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
-                        file = File(fileId = videoFileId),
-                        thumbnail = thumbFileId?.let { File(fileId = it) },
+                        file = File(
+                            fileId = videoFileId,
+                            fileUrl = content.video.video.local?.takeIf { it.isDownloadingCompleted }?.path
+                        ),
+                        thumbnail = thumbFileId?.let {
+                            File(
+                                fileId = it,
+                                fileUrl = content.video.thumbnail?.file?.local?.takeIf { local -> local.isDownloadingCompleted }?.path
+                            )
+                        },
                         hasSpoiler = content.hasSpoiler,
                         width = content.video.width,
                         height = content.video.height,
@@ -84,8 +105,16 @@ object MessageDto {
                         id = messageId,
                         timestamp = timestamp,
                         stickerFormat = format,
-                        file = File(fileId = sticker?.sticker?.id),
-                        thumbnail = sticker?.thumbnail?.file?.id?.let { File(fileId = it) },
+                        file = File(
+                            fileId = sticker?.sticker?.id,
+                            fileUrl = sticker?.sticker?.local?.takeIf { it.isDownloadingCompleted }?.path
+                        ),
+                        thumbnail = sticker?.thumbnail?.file?.id?.let {
+                            File(
+                                fileId = it,
+                                fileUrl = sticker.thumbnail?.file?.local?.takeIf { local -> local.isDownloadingCompleted }?.path
+                            )
+                        },
                         caption = Text(content.emoji),
                     )
                 )
@@ -112,9 +141,15 @@ object MessageDto {
                                 fileId =
                                     content.animation
                                         .animation
-                                        .id
+                                        .id,
+                                fileUrl = content.animation.animation.local?.takeIf { it.isDownloadingCompleted }?.path
                             ),
-                        thumbnail = content.animation.thumbnail?.file?.id?.let { File(fileId = it) },
+                        thumbnail = content.animation.thumbnail?.file?.id?.let {
+                            File(
+                                fileId = it,
+                                fileUrl = content.animation.thumbnail?.file?.local?.takeIf { local -> local.isDownloadingCompleted }?.path
+                            )
+                        },
                         caption = Text("Sticker"),
                     )
                 )
@@ -127,8 +162,16 @@ object MessageDto {
                         id = messageId,
                         timestamp = timestamp,
                         stickerFormat = format,
-                        file = File(fileId = content.sticker.sticker.id),
-                        thumbnail = content.sticker.thumbnail?.file?.id?.let { File(fileId = it) },
+                        file = File(
+                            fileId = content.sticker.sticker.id,
+                            fileUrl = content.sticker.sticker.local?.takeIf { it.isDownloadingCompleted }?.path
+                        ),
+                        thumbnail = content.sticker.thumbnail?.file?.id?.let {
+                            File(
+                                fileId = it,
+                                fileUrl = content.sticker.thumbnail?.file?.local?.takeIf { local -> local.isDownloadingCompleted }?.path
+                            )
+                        },
                         caption = Text("Sticker"),
                     )
                 )
@@ -149,7 +192,8 @@ object MessageDto {
                                         fileId =
                                             content.document
                                                 .document
-                                                .id
+                                                .id,
+                                        fileUrl = content.document.document.local?.takeIf { it.isDownloadingCompleted }?.path
                                     ),
                                 mediaAlbumId = mediaAlbumId,
                             )
@@ -169,7 +213,8 @@ object MessageDto {
                                         fileId =
                                             content.document
                                                 .document
-                                                .id
+                                                .id,
+                                        fileUrl = content.document.document.local?.takeIf { it.isDownloadingCompleted }?.path
                                     ),
                                 mediaAlbumId = mediaAlbumId,
                             )
@@ -190,7 +235,8 @@ object MessageDto {
                                                 fileId =
                                                     content.document
                                                         .document
-                                                        .id
+                                                        .id,
+                                                fileUrl = content.document.document.local?.takeIf { it.isDownloadingCompleted }?.path
                                             ),
                                         fileName =
                                             content.document
@@ -202,8 +248,8 @@ object MessageDto {
                                             thumbFileId
                                                 ?.let {
                                                     File(
-                                                        fileId =
-                                                            it
+                                                        fileId = it,
+                                                        fileUrl = content.document.thumbnail?.file?.local?.takeIf { local -> local.isDownloadingCompleted }?.path
                                                     )
                                                 },
                                     ),

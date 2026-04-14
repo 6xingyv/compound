@@ -264,7 +264,7 @@ internal class WindowInsetsHolder private constructor(insets: WindowInsetsCompat
      * `true` unless the `AbstractComposeView` [AbstractComposeView.consumeWindowInsets] is set to
      * `false`.
      */
-    @OptIn(_root_ide_package_.androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
+    @OptIn(androidx.compose.foundation.layout.ExperimentalLayoutApi::class)
     val consumes =
         (view.parent as? View)?.getTag(R.id.consume_window_insets_tag) as? Boolean ?: false
 

@@ -616,7 +616,6 @@ class ChatViewModel(
                         if (
                             block.thumbnail?.fileId != null
                             && block.thumbnail.fileUrl == null
-                            && block.mediaType == MessageBlock.MediaBlock.MediaType.VIDEO
                         ) {
                             enqueueFileDownload(block.thumbnail.fileId) { path ->
                                 updateBlockThumbnail(msg.primaryId, block.id, path)
@@ -629,6 +628,11 @@ class ChatViewModel(
                         if (fileId != null && block.file.fileUrl == null) {
                             enqueueFileDownload(fileId) { path ->
                                 updateBlockFile(msg.primaryId, block.id, path)
+                            }
+                        }
+                        if (block.thumbnail?.fileId != null && block.thumbnail.fileUrl == null) {
+                            enqueueFileDownload(block.thumbnail.fileId) { path ->
+                                updateBlockThumbnail(msg.primaryId, block.id, path)
                             }
                         }
                     }
@@ -738,6 +742,12 @@ class ChatViewModel(
                 blocks = msg.blocks.map { block ->
                     when {
                         block is MessageBlock.MediaBlock && block.id == blockId -> block.copy(
+                            thumbnail = block.thumbnail?.copy(
+                                fileUrl = path
+                            )
+                        )
+
+                        block is MessageBlock.StickerBlock && block.id == blockId -> block.copy(
                             thumbnail = block.thumbnail?.copy(
                                 fileUrl = path
                             )

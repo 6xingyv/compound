@@ -7,6 +7,7 @@ import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.chat.ChatScreen
 import com.mocharealm.compound.ui.screen.chat.ChatViewModel
 import com.mocharealm.compound.ui.screen.chat.MediaPreviewScreen
+import com.mocharealm.compound.ui.screen.chat.MediaPreviewViewModel
 import com.mocharealm.compound.ui.screen.home.HomeScreen
 import com.mocharealm.compound.ui.screen.home.HomeViewModel
 import com.mocharealm.compound.ui.screen.intro.IntroScreen
@@ -94,6 +95,15 @@ val uiModule = module {
         HomeViewModel(get())
     }
 
+    viewModel<MediaPreviewViewModel> { (chatId: Long, messageId: Long) ->
+        MediaPreviewViewModel(
+            chatId = chatId,
+            messageId = messageId,
+            getChatMessages = get(),
+            downloadFile = get()
+        )
+    }
+
     single {
         DeepLinkHandler(get())
     }
@@ -128,6 +138,6 @@ val uiModule = module {
         IntroScreen()
     }
     navigation<Screen.MediaPreview>(mapOf(DETAIL_KEY to true)) { route ->
-        MediaPreviewScreen(items = route.items, initialIndex = route.initialIndex)
+        MediaPreviewScreen(viewModel = koinViewModel { parametersOf(route.chatId, route.messageId) })
     }
 }

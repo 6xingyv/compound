@@ -39,6 +39,7 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableFloatStateOf
 import androidx.compose.runtime.mutableIntStateOf
@@ -105,7 +106,12 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 import java.io.File
 
 @Composable
-fun MediaPreviewScreen(items: List<MediaItem>, initialIndex: Int) {
+fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
+    val state by viewModel.uiState.collectAsState()
+    val items = state.items
+    val initialIndex = state.initialIndex
+    if (items.isEmpty()) return
+
     val view = LocalView.current
     val navigator = LocalNavigator.current
     val expandedState = LocalListDetailExpanded.current
@@ -459,7 +465,10 @@ fun AdvancedVideoPlayer(
         filePath = filePath,
         modifier = modifier,
         playerSurfaceModifier = Modifier.layerBackdrop(layerBackdrop),
+        mute = false,
         playWhenReady = true,
+        contentScale = ContentScale.Fit,
+        useTextureView = true,
         gestureHandler = {
             detectTapGestures(
                 onTap = { isControlsVisible = !isControlsVisible },

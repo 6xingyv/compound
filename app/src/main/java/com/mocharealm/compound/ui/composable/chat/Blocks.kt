@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
@@ -187,8 +188,15 @@ fun VideoBlock(
     videoModifier: Modifier? = null
 ) {
     val onMediaClick = LocalOnMediaClick.current
+    val onDownloadVideo = LocalOnDownloadVideo.current
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
+
+    LaunchedEffect(block.file.fileUrl) {
+        if (block.file.fileUrl.isNullOrEmpty()) {
+            onDownloadVideo(block.id)
+        }
+    }
 
     val maxWidth = 280.dp
     val aspectRatio =
@@ -213,7 +221,9 @@ fun VideoBlock(
         if (!block.file.fileUrl.isNullOrEmpty()) {
             MessageVideoPlayer(
                 filePath = block.file.fileUrl,
-                modifier = finalVideoModifier.then(sharedModifier)
+                modifier = finalVideoModifier.then(sharedModifier),
+                isMuted = true,
+                showControls = false
             )
         } else {
             VideoThumbnailOverlay(block = block, modifier = finalVideoModifier.then(sharedModifier))
@@ -408,9 +418,7 @@ fun VideoThumbnailOverlay(block: MessageBlock.MediaBlock, modifier: Modifier = M
     }
 
     Box(
-        modifier =
-            modifier
-                .clickable { if (downloadPercent == null) onDownloadVideo(block.id) },
+        modifier = modifier,
         contentAlignment = Alignment.Center
     ) {
         if (!block.thumbnail?.fileUrl.isNullOrEmpty()) {
