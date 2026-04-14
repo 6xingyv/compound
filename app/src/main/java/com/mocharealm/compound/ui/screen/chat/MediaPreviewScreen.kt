@@ -4,11 +4,10 @@ import android.app.Activity
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.animateContentSize
 import androidx.compose.animation.core.Animatable
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
-import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.gestures.awaitEachGesture
 import androidx.compose.foundation.gestures.awaitFirstDown
@@ -29,7 +28,7 @@ import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.foundation.layout.widthIn
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.lazy.rememberLazyListState
@@ -71,6 +70,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.compose.ui.zIndex
 import androidx.core.view.WindowCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.media3.common.Player
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.navigation3.ui.LocalNavAnimatedContentScope
@@ -97,6 +97,7 @@ import com.mocharealm.gaze.icons.Play_Fill
 import com.mocharealm.gaze.icons.SFIcons
 import com.mocharealm.gaze.nav.LocalListDetailExpanded
 import com.mocharealm.gaze.ui.composable.LiquidSurface
+import com.mocharealm.gaze.ui.modifier.surface
 import com.mocharealm.tci18n.core.tdString
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
@@ -113,6 +114,8 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
     if (items.isEmpty()) return
 
     val view = LocalView.current
+    val window = (view.context as Activity).window
+    val insetsController = WindowCompat.getInsetsController(window, view)
     val navigator = LocalNavigator.current
     val expandedState = LocalListDetailExpanded.current
     val pagerState = rememberPagerState(initialPage = initialIndex) { items.size }
@@ -120,40 +123,81 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
     val scope = rememberCoroutineScope()
     val density = LocalDensity.current
 
-    var screenWidthPx by remember { mutableStateOf(0) }
-    val thumbnailWidth = 56.dp
+    var screenWidthPx by remember { mutableIntStateOf(0) }
+    val thumbnailMaxWidth = 96.dp
     val thumbnailSpacing = 8.dp
+    var isOverlayVisible by remember { mutableStateOf(true) }
+
+    val itemWidths = remember { mutableMapOf<Int, Int>() }
 
     DisposableEffect(Unit) {
         val originalValue = expandedState?.value ?: false
-
-        val window = (view.context as Activity).window
-        val controller = WindowCompat.getInsetsController(window, view)
-        val originalStatusBarSetting = controller.isAppearanceLightStatusBars
-        val originalNavigationBarSetting = controller.isAppearanceLightNavigationBars
-
+        val originalStatusBarSetting = insetsController.isAppearanceLightStatusBars
+        val originalNavigationBarSetting = insetsController.isAppearanceLightNavigationBars
         expandedState?.value = true
-
-        controller.isAppearanceLightStatusBars = false
-        controller.isAppearanceLightNavigationBars = false
+        insetsController.isAppearanceLightStatusBars = false
+        insetsController.isAppearanceLightNavigationBars = false
 
         onDispose {
             expandedState?.value = originalValue
-
-            controller.isAppearanceLightStatusBars = originalStatusBarSetting
-            controller.isAppearanceLightNavigationBars = originalNavigationBarSetting
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+            insetsController.isAppearanceLightStatusBars = originalStatusBarSetting
+            insetsController.isAppearanceLightNavigationBars = originalNavigationBarSetting
         }
     }
 
-    LaunchedEffect(pagerState.currentPage, screenWidthPx) {
-        if (screenWidthPx > 0) {
-            listState.animateScrollToItem(pagerState.currentPage, 0)
+    LaunchedEffect(isOverlayVisible) {
+        if (isOverlayVisible) {
+            insetsController.show(WindowInsetsCompat.Type.systemBars())
+        } else {
+            insetsController.hide(WindowInsetsCompat.Type.systemBars())
         }
+    }
+
+    val totalContentWidthPx = remember(itemWidths) {
+        if (itemWidths.isEmpty()) 0
+        else itemWidths.values.sum() + (items.size - 1) * with(density) { thumbnailSpacing.roundToPx() }
+    }
+
+    val startPaddingDp = remember(screenWidthPx, totalContentWidthPx, itemWidths) {
+        with(density) {
+            if (screenWidthPx <= 0 || itemWidths.isEmpty()) 0.dp
+            else if (totalContentWidthPx < screenWidthPx) {
+                ((screenWidthPx - totalContentWidthPx) / 2).toDp()
+            } else {
+                val firstItemWidth = itemWidths[0] ?: thumbnailMaxWidth.roundToPx()
+                ((screenWidthPx - firstItemWidth) / 2).toDp()
+            }
+        }
+    }
+
+    val endPaddingDp = remember(screenWidthPx, totalContentWidthPx, itemWidths) {
+        with(density) {
+            if (screenWidthPx <= 0 || itemWidths.isEmpty()) 0.dp
+            else if (totalContentWidthPx < screenWidthPx) {
+                ((screenWidthPx - totalContentWidthPx) / 2).toDp()
+            } else {
+                // 保证最后一项能居中
+                val lastItemWidth = itemWidths[items.size - 1] ?: thumbnailMaxWidth.roundToPx()
+                ((screenWidthPx - lastItemWidth) / 2).toDp()
+            }
+        }
+    }
+
+    LaunchedEffect(pagerState.currentPage, screenWidthPx, startPaddingDp) {
+        if (screenWidthPx <= 0) return@LaunchedEffect
+
+        val targetWidth = itemWidths[pagerState.currentPage] ?: with(density) { thumbnailMaxWidth.roundToPx() }
+
+        val startPaddingPx = with(density) { startPaddingDp.roundToPx() }
+        val targetX = (screenWidthPx - targetWidth) / 2
+        val finalOffset = startPaddingPx - targetX
+
+        listState.animateScrollToItem(pagerState.currentPage, finalOffset)
     }
 
     val sharedTransitionScope = LocalSharedTransitionScope.current
     val animatedVisibilityScope = LocalNavAnimatedContentScope.current
-
     val layerBackdrop = rememberLayerBackdrop {
         drawRect(Color.Black)
         drawContent()
@@ -163,7 +207,8 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
         modifier = Modifier
             .fillMaxSize()
             .background(Color.Black)
-            .onGloballyPositioned { screenWidthPx = it.size.width }) {
+            .onGloballyPositioned { screenWidthPx = it.size.width }
+    ) {
         var isPagerEnabled by remember { mutableStateOf(true) }
 
         HorizontalPager(
@@ -188,27 +233,36 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                     AdvancedVideoPlayer(
                         filePath = item.url,
                         modifier = finalModifier,
+                        isOverlayVisible = isOverlayVisible,
+                        onToggleOverlay = { isOverlayVisible = !isOverlayVisible }
                     )
                 } else {
                     ZoomableImage(
                         url = item.url,
                         thumbnailUrl = item.thumbnailUrl,
                         modifier = finalModifier,
-                        onZoomStateChanged = { zoomed -> isPagerEnabled = !zoomed })
+                        onTap = { isOverlayVisible = !isOverlayVisible },
+                        onZoomStateChanged = { zoomed -> isPagerEnabled = !zoomed }
+                    )
                 }
             }
         }
 
         with(sharedTransitionScope) {
-            with(animatedVisibilityScope) {
-                // Top Bar
+            // Top Bar
+            AnimatedVisibility(
+                visible = isOverlayVisible,
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 Row(
                     modifier = Modifier
                         .drawWithCache {
                             onDrawBehind {
                                 drawRect(
                                     Brush.verticalGradient(
-                                        0f to Color.Black, 1f to Color.Transparent
+                                        0f to Color.Black,
+                                        1f to Color.Transparent
                                     )
                                 )
                             }
@@ -220,7 +274,8 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                         .padding(16.dp)
                         .zIndex(10f),
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.SpaceBetween) {
+                    horizontalArrangement = Arrangement.SpaceBetween
+                ) {
                     LiquidSurface(
                         layerBackdrop,
                         Modifier.size(48.dp),
@@ -229,7 +284,8 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                             vibrancy()
                             blur(1.dp.toPx())
                             lens(16.dp.toPx(), 32.dp.toPx())
-                        }) {
+                        }
+                    ) {
                         Icon(
                             SFIcons.Chevron_Backward,
                             null,
@@ -242,10 +298,13 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                         layerBackdrop,
                         Modifier.animateContentSize(),
                         isInteractive = false,
-                        shape = { ContinuousRoundedRectangle(24.dp) }) {
+                        shape = { ContinuousRoundedRectangle(24.dp) }
+                    ) {
                         Text(
                             text = tdString(
-                                "Of", "%1\$d" to pagerState.currentPage + 1, "%2\$d" to items.size
+                                "Of",
+                                "%1\$d" to pagerState.currentPage + 1,
+                                "%2\$d" to items.size
                             ),
                             color = Color.White,
                             style = MiuixTheme.textStyles.body2,
@@ -254,19 +313,25 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                             textAlign = TextAlign.Center
                         )
                     }
-
                     Spacer(Modifier.size(48.dp))
                 }
+            }
 
-                // Bottom Bar
+            // Bottom Bar
+            AnimatedVisibility(
+                visible = isOverlayVisible,
+                modifier = Modifier.align(Alignment.BottomCenter),
+                enter = fadeIn(),
+                exit = fadeOut()
+            ) {
                 Box(
                     modifier = Modifier
-                        .align(Alignment.BottomCenter)
                         .drawWithCache {
                             onDrawBehind {
                                 drawRect(
                                     Brush.verticalGradient(
-                                        0f to Color.Transparent, 1f to Color.Black
+                                        0f to Color.Transparent,
+                                        1f to Color.Black
                                     )
                                 )
                             }
@@ -277,52 +342,59 @@ fun MediaPreviewScreen(viewModel: MediaPreviewViewModel) {
                         .padding(bottom = 24.dp)
                         .fillMaxWidth()
                         .height(72.dp)
-                        .zIndex(10f)) {
-                    val itemWidthPx = with(density) { thumbnailWidth.toPx() }
-                    val contentPadding =
-                        with(density) { (screenWidthPx / 2f - itemWidthPx / 2f).toDp() }.coerceAtLeast(
-                            0.dp
-                        )
-
+                        .zIndex(10f)
+                ) {
                     LazyRow(
                         state = listState,
-                        contentPadding = PaddingValues(horizontal = contentPadding),
+                        contentPadding = PaddingValues(start = startPaddingDp, end = endPaddingDp),
                         horizontalArrangement = Arrangement.spacedBy(thumbnailSpacing),
                         modifier = Modifier.fillMaxSize(),
                         verticalAlignment = Alignment.CenterVertically
                     ) {
-                        itemsIndexed(items) { index, item ->
+                        itemsIndexed(items, key = { _, item -> item.id }) { index, item ->
                             val isSelected = pagerState.currentPage == index
-                            val size by animateDpAsState(if (isSelected) 56.dp else 44.dp)
+                            val size = 56.dp
+                            var thumbAspectRatio by remember(item.id) { mutableFloatStateOf(1f) }
+                            val thumbWidth = (size * thumbAspectRatio).coerceIn(30.dp, 96.dp)
 
                             Box(
                                 modifier = Modifier
                                     .height(size)
-                                    .widthIn(30.dp, 56.dp)
-                                    .clip(ContinuousRoundedRectangle(12.dp))
-                                    .border(
-                                        width = if (isSelected) 2.dp else 0.dp,
-                                        color = if (isSelected) Color.White else Color.Transparent,
-                                        shape = ContinuousRoundedRectangle(12.dp)
+                                    .width(thumbWidth)
+                                    .onGloballyPositioned { itemWidths[index] = it.size.width }
+                                    .surface(
+                                        ContinuousRoundedRectangle(8.dp),
+                                        Color.Transparent,
+                                        if (isSelected) BorderStroke(2.dp, Color.White) else null,
                                     )
                                     .clickable {
                                         scope.launch {
-                                            pagerState.animateScrollToPage(
-                                                index
-                                            )
+                                            pagerState.animateScrollToPage(index)
+
+                                            val targetWidth = itemWidths[index] ?: with(density) { thumbnailMaxWidth.roundToPx() }
+
+                                            val startPaddingPx = with(density) { startPaddingDp.roundToPx() }
+                                            val targetX = (screenWidthPx - targetWidth) / 2
+                                            val finalOffset = startPaddingPx - targetX
+
+                                            listState.animateScrollToItem(index, finalOffset)
                                         }
                                     }
                             ) {
                                 AsyncImage(
-                                    model = ImageRequest.Builder(LocalContext.current).data(
-                                        if ((item.thumbnailUrl
-                                                ?: item.url).startsWith("http")
-                                        ) (item.thumbnailUrl ?: item.url) else File(
-                                            item.thumbnailUrl ?: item.url
-                                        )
-                                    ).build(),
+                                    model = ImageRequest.Builder(LocalContext.current)
+                                        .data(item.thumbnailUrl ?: item.url)
+                                        .build(),
                                     contentDescription = null,
-                                    contentScale = ContentScale.Crop
+                                    contentScale = ContentScale.Crop,
+                                    modifier = Modifier.fillMaxSize(),
+                                    onSuccess = { result ->
+                                        val w = result.result.image.width.toFloat()
+                                        val h = result.result.image.height.toFloat()
+                                        if (w > 0f && h > 0f) {
+                                            thumbAspectRatio = (w / h).coerceIn(0.5f, 2.5f)
+                                        }
+                                    }
                                 )
                             }
                         }
@@ -338,6 +410,7 @@ fun ZoomableImage(
     url: String,
     thumbnailUrl: String?,
     modifier: Modifier = Modifier,
+    onTap: () -> Unit = {},
     onZoomStateChanged: (Boolean) -> Unit
 ) {
     val scope = rememberCoroutineScope()
@@ -352,6 +425,7 @@ fun ZoomableImage(
             .onGloballyPositioned { containerSize = it.size }
             .pointerInput(Unit) {
                 detectTapGestures(
+                    onTap = { onTap() },
                     onDoubleTap = { tapOffset ->
                         scope.launch {
                             if (scale.value > 1f) {
@@ -452,9 +526,11 @@ fun ZoomableImage(
 
 @Composable
 fun AdvancedVideoPlayer(
-    filePath: String, modifier: Modifier = Modifier
+    filePath: String,
+    modifier: Modifier = Modifier,
+    isOverlayVisible: Boolean = true,
+    onToggleOverlay: () -> Unit = {}
 ) {
-    var isControlsVisible by remember { mutableStateOf(true) }
     var playbackSpeed by remember { mutableFloatStateOf(1f) }
     var isLongPressing by remember { mutableStateOf(false) }
     var longPressDirection by remember { mutableIntStateOf(0) }
@@ -471,7 +547,7 @@ fun AdvancedVideoPlayer(
         useTextureView = true,
         gestureHandler = {
             detectTapGestures(
-                onTap = { isControlsVisible = !isControlsVisible },
+                onTap = { onToggleOverlay() },
                 onLongPress = { offset ->
                     // 增加安全检查：只有在播放器准备好后才允许长按操作
                     isLongPressing = true
@@ -506,7 +582,7 @@ fun AdvancedVideoPlayer(
 
             VideoControlOverlay(
                 player = player,
-                isVisible = isControlsVisible,
+                isVisible = isOverlayVisible,
                 layerBackdrop = layerBackdrop,
                 playbackSpeed = playbackSpeed,
                 onSpeedChange = {

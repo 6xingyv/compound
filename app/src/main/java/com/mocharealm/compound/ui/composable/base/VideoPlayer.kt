@@ -72,7 +72,13 @@ fun VideoPlayer(
                     } else {
                         1f
                     }
-                    videoAspectRatio = (videoSize.width * pixelRatio) / videoSize.height
+                    val isRotated = (videoSize.unappliedRotationDegrees % 180) != 0
+                    val rawAspectRatio = (videoSize.width * pixelRatio) / videoSize.height
+                    videoAspectRatio = if (isRotated && rawAspectRatio > 0f) {
+                        1f / rawAspectRatio
+                    } else {
+                        rawAspectRatio
+                    }
                 }
             }
         }
@@ -86,22 +92,22 @@ fun VideoPlayer(
         onDispose { exoPlayer.release() }
     }
 
-    Box(modifier = modifier) {
-        BoxWithConstraints(Modifier.fillMaxSize()) {
-            val containerAspectRatio = if (maxHeight.value > 0f) {
-                maxWidth.value / maxHeight.value
-            } else {
-                1f
-            }
+    BoxWithConstraints(modifier = modifier) {
+        val containerAspectRatio = if (maxHeight.value > 0f) {
+            maxWidth.value / maxHeight.value
+        } else {
+            1f
+        }
 
+        Box(Modifier.fillMaxSize()) {
             val surfaceModifier = if (contentScale == ContentScale.Fit) {
-                if (containerAspectRatio > videoAspectRatio) {
+                if (videoAspectRatio >= containerAspectRatio) {
                     Modifier
-                        .fillMaxHeight()
+                        .fillMaxWidth()
                         .aspectRatio(videoAspectRatio)
                 } else {
                     Modifier
-                        .fillMaxWidth()
+                        .fillMaxHeight()
                         .aspectRatio(videoAspectRatio)
                 }
             } else {
@@ -116,8 +122,8 @@ fun VideoPlayer(
                     .then(playerSurfaceModifier),
                 surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW
             )
-        }
 
-        playerControls(exoPlayer)
+            playerControls(exoPlayer)
+        }
     }
 }
