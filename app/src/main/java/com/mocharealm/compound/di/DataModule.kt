@@ -1,8 +1,21 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.data.mapper.ChatMapper
+import com.mocharealm.compound.data.mapper.MessageMapper
+import com.mocharealm.compound.data.mapper.UserMapper
+import com.mocharealm.compound.data.notification.AppNotificationManager
+import com.mocharealm.compound.data.repository.AuthRepositoryImpl
+import com.mocharealm.compound.data.repository.ChatRepositoryImpl
+import com.mocharealm.compound.data.repository.MediaRepositoryImpl
+import com.mocharealm.compound.data.repository.MessageRepositoryImpl
 import com.mocharealm.compound.data.source.IcuPersonNameFormatterRepositoryImpl
 import com.mocharealm.compound.data.source.PhoneFormatRepositoryImpl
 import com.mocharealm.compound.data.source.TelegramRepositoryImpl
+import com.mocharealm.compound.data.source.remote.TdLibDataSource
+import com.mocharealm.compound.domain.repository.AuthRepository
+import com.mocharealm.compound.domain.repository.ChatRepository
+import com.mocharealm.compound.domain.repository.MediaRepository
+import com.mocharealm.compound.domain.repository.MessageRepository
 import com.mocharealm.compound.domain.repository.PersonNameFormatterRepository
 import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import com.mocharealm.compound.domain.repository.TelegramRepository
@@ -18,20 +31,6 @@ import org.koin.dsl.module
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-import com.mocharealm.compound.data.mapper.ChatMapper
-import com.mocharealm.compound.data.mapper.MessageMapper
-import com.mocharealm.compound.data.mapper.UserMapper
-import com.mocharealm.compound.data.notification.AppNotificationManager
-import com.mocharealm.compound.data.repository.AuthRepositoryImpl
-import com.mocharealm.compound.data.repository.ChatRepositoryImpl
-import com.mocharealm.compound.data.repository.MediaRepositoryImpl
-import com.mocharealm.compound.data.repository.MessageRepositoryImpl
-import com.mocharealm.compound.data.source.local.ChatLocalDataSource
-import com.mocharealm.compound.data.source.remote.TdLibDataSource
-import com.mocharealm.compound.domain.repository.AuthRepository
-import com.mocharealm.compound.domain.repository.ChatRepository
-import com.mocharealm.compound.domain.repository.MediaRepository
-import com.mocharealm.compound.domain.repository.MessageRepository
 
 val dataModule = module {
     single { MutableSharedFlow<TdApi.Update>(replay = 500, extraBufferCapacity = 500) }
@@ -55,7 +54,6 @@ val dataModule = module {
 
     // Data Sources
     single { TdLibDataSource(get(), get(), get()) }
-    single { ChatLocalDataSource(get()) }
 
     // Mappers
     single { UserMapper(get()) }
@@ -64,7 +62,7 @@ val dataModule = module {
 
     // Sub-Repositories
     single<AuthRepository> { AuthRepositoryImpl(get(), get()) }
-    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get(), get()) }
+    single<ChatRepository> { ChatRepositoryImpl(get(), get(), get()) }
     single<MessageRepository> { MessageRepositoryImpl(get(), get()) }
     single<MediaRepository> { MediaRepositoryImpl(get(), get()) }
 

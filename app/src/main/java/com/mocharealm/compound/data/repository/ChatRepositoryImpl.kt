@@ -2,7 +2,6 @@ package com.mocharealm.compound.data.repository
 
 import com.mocharealm.compound.data.mapper.ChatMapper
 import com.mocharealm.compound.data.mapper.MessageMapper
-import com.mocharealm.compound.data.source.local.ChatLocalDataSource
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.model.Chat
 import com.mocharealm.compound.domain.model.ChatType
@@ -13,7 +12,6 @@ import org.drinkless.tdlib.TdApi
 
 class ChatRepositoryImpl(
     private val tdLibDataSource: TdLibDataSource,
-    private val localDataSource: ChatLocalDataSource,
     private val chatMapper: ChatMapper,
     private val messageMapper: MessageMapper
 ) : ChatRepository {
@@ -67,11 +65,11 @@ class ChatRepositoryImpl(
     }
 
     override suspend fun saveChatReadPosition(chatId: Long, messageId: Long) {
-        localDataSource.saveReadPosition(chatId, messageId)
     }
 
     override suspend fun getChatReadPosition(chatId: Long): Long {
-        return localDataSource.getReadPosition(chatId)
+        val chat = runCatching { tdLibDataSource.send(TdApi.GetChat(chatId)) }.getOrNull()
+        return chat?.lastReadInboxMessageId ?: 0L
     }
 
     private suspend fun toDomainInternalLink(type: TdApi.InternalLinkType): InternalLink =
