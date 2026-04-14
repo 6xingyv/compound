@@ -6,6 +6,8 @@ data class Chat(
     val lastMessage: Message? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
+    val unreadMentionCount: Int = 0,
+    val unreadReactionCount: Int = 0,
     val type: ChatType = ChatType.DIRECT,
     val photoUrl: String? = null,
     val photoFileId: Int? = null,

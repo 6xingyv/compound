@@ -13,6 +13,8 @@ data class ChatDto(
     val lastMessage: Message? = null,
     val lastMessageDate: Long = 0L,
     val unreadCount: Int = 0,
+    val unreadMentionCount: Int = 0,
+    val unreadReactionCount: Int = 0,
     val isChannel: Boolean = false,
     val isGroup: Boolean = false,
     val photoUrl: String? = null,
@@ -29,6 +31,8 @@ data class ChatDto(
             lastMessage = lastMessage,
             lastMessageDate = lastMessageDate,
             unreadCount = unreadCount,
+            unreadMentionCount = unreadMentionCount,
+            unreadReactionCount = unreadReactionCount,
             type =
                 if (isGroup) ChatType.GROUP
                 else if (isChannel) ChatType.CHANNEL else ChatType.DIRECT,
@@ -106,6 +110,8 @@ data class ChatDto(
                 lastMessage = lastMessage,
                 lastMessageDate = chat.lastMessage?.date?.toLong() ?: 0L,
                 unreadCount = chat.unreadCount,
+                unreadMentionCount = chat.unreadMentionCount,
+                unreadReactionCount = chat.unreadReactionCount,
                 isChannel = isChannel,
                 isGroup = isGroup,
                 photoUrl = localPath,

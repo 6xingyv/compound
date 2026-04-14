@@ -5,7 +5,6 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxHeight
@@ -30,25 +29,16 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
-import androidx.compose.ui.draw.drawWithCache
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.nestedscroll.NestedScrollConnection
 import androidx.compose.ui.input.nestedscroll.NestedScrollSource
 import androidx.compose.ui.input.nestedscroll.nestedScroll
 import androidx.compose.ui.platform.LocalDensity
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
-import com.mocharealm.compound.ui.composable.base.Avatar
-import com.mocharealm.compound.ui.composable.chat.RichText
 import com.mocharealm.compound.ui.screen.chat.LocalCustomEmojiStickers
-import com.mocharealm.compound.ui.util.formatMessageTimestamp
-import com.mocharealm.compound.ui.util.toAnnotatedString
-import com.mocharealm.compound.ui.util.toPreviewAnnotatedString
+import com.mocharealm.compound.ui.screen.msglist.composable.ChatListItem
 import com.mocharealm.gaze.icons.Archivebox
 import com.mocharealm.gaze.icons.Pin
 import com.mocharealm.gaze.icons.Pin_Slash
@@ -259,73 +249,10 @@ fun MsgListScreen(
                             }
                         }
                     ) { _, _ ->
-                        Row(
-                            Modifier
-                                .fillMaxWidth()
-                                .background(MiuixTheme.colorScheme.surface)
-                                .drawWithCache {
-                                    onDrawBehind {
-                                        drawLine(
-                                            separatorColor,
-                                            start =
-                                                Offset(
-                                                    paddingPx + avatarPx + spacePx,
-                                                    size.height
-                                                ),
-                                            end = Offset(size.width - paddingPx, size.height),
-                                            strokeWidth = 1f
-                                        )
-                                    }
-                                }
-                                .clickable {
-                                    onChatClick(chat.id)
-                                }
-                                .padding(28.dp, 16.dp),
-                            horizontalArrangement = Arrangement.spacedBy(12.dp),
-                            verticalAlignment = Alignment.CenterVertically
-                        ) {
-                            Avatar(
-                                modifier = Modifier.size(45.dp),
-                                photoPath = chat.photoUrl,
-                                initials = chat.title.content.take(2)
-                            )
-                            Column(Modifier.weight(1f)) {
-                                Row {
-                                    RichText(
-                                        text = remember(chat.title, chat.isPinned) {
-                                            if (chat.isPinned) {
-                                                buildAnnotatedString {
-                                                    append("📌 ")
-                                                    append(chat.title.toAnnotatedString())
-                                                }
-                                            } else {
-                                                chat.title.toAnnotatedString()
-                                            }
-                                        },
-                                        style = MiuixTheme.textStyles.body1.copy(fontWeight = FontWeight.Bold),
-                                        maxLines = 1,
-                                        modifier = Modifier.weight(1f),
-                                        isInteractive = false
-                                    )
-                                    Text(
-                                        text = chat.lastMessageDate.formatMessageTimestamp(),
-                                        style = MiuixTheme.textStyles.body1,
-                                        maxLines = 1,
-                                        overflow = TextOverflow.Ellipsis,
-                                        modifier = Modifier.alpha(0.6f)
-                                    )
-                                }
-                                RichText(
-                                    text = chat.lastMessage?.toPreviewAnnotatedString(chat)
-                                        ?: AnnotatedString(""),
-                                    style = MiuixTheme.textStyles.body1,
-                                    modifier = Modifier.alpha(0.6f),
-                                    maxLines = 2,
-                                    minLines = 2,
-                                    isInteractive = false
-                                )
-                            }
-                        }
+                        ChatListItem(
+                            chat = chat,
+                            onChatClick = onChatClick
+                        )
                     }
                 }
                 if (state.loadingMore) {
