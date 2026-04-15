@@ -4,7 +4,6 @@ import android.net.Uri
 import androidx.annotation.OptIn
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.BoxScope
-import androidx.compose.foundation.layout.BoxWithConstraints
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,6 +19,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.input.pointer.PointerInputEventHandler
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.ContentScale
+import androidx.compose.ui.layout.onSizeChanged
 import androidx.compose.ui.platform.LocalContext
 import androidx.core.net.toUri
 import androidx.media3.common.MediaItem
@@ -47,6 +47,7 @@ fun VideoPlayer(
 ) {
     val context = LocalContext.current
     var videoAspectRatio by remember(filePath) { mutableFloatStateOf(16f / 9f) }
+    var containerAspectRatio by remember { mutableFloatStateOf(1f) }
 
     val exoPlayer = remember(filePath) {
         ExoPlayer.Builder(context).build().apply {
@@ -92,38 +93,37 @@ fun VideoPlayer(
         onDispose { exoPlayer.release() }
     }
 
-    BoxWithConstraints(modifier = modifier) {
-        val containerAspectRatio = if (maxHeight.value > 0f) {
-            maxWidth.value / maxHeight.value
-        } else {
-            1f
-        }
-
-        Box(Modifier.fillMaxSize()) {
-            val surfaceModifier = if (contentScale == ContentScale.Fit) {
-                if (videoAspectRatio >= containerAspectRatio) {
-                    Modifier
-                        .fillMaxWidth()
-                        .aspectRatio(videoAspectRatio)
-                } else {
-                    Modifier
-                        .fillMaxHeight()
-                        .aspectRatio(videoAspectRatio)
+    Box(
+        modifier = modifier
+            .onSizeChanged { size ->
+                if (size.width > 0 && size.height > 0) {
+                    containerAspectRatio = size.width.toFloat() / size.height.toFloat()
                 }
-            } else {
-                Modifier.fillMaxSize()
             }
-
-            PlayerSurface(
-                player = exoPlayer,
-                modifier = surfaceModifier
-                    .align(Alignment.Center)
-                    .pointerInput(Unit, gestureHandler)
-                    .then(playerSurfaceModifier),
-                surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW
-            )
-
-            playerControls(exoPlayer)
+    ) {
+        val surfaceModifier = if (contentScale == ContentScale.Fit) {
+            if (videoAspectRatio >= containerAspectRatio) {
+                Modifier
+                    .fillMaxWidth()
+                    .aspectRatio(videoAspectRatio)
+            } else {
+                Modifier
+                    .fillMaxHeight()
+                    .aspectRatio(videoAspectRatio)
+            }
+        } else {
+            Modifier.fillMaxSize()
         }
+
+        PlayerSurface(
+            player = exoPlayer,
+            modifier = surfaceModifier
+                .align(Alignment.Center)
+                .pointerInput(Unit, gestureHandler)
+                .then(playerSurfaceModifier),
+            surfaceType = if (useTextureView) SURFACE_TYPE_TEXTURE_VIEW else SURFACE_TYPE_SURFACE_VIEW
+        )
+
+        playerControls(exoPlayer)
     }
 }
