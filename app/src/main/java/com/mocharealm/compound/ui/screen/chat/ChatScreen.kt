@@ -46,6 +46,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
+import androidx.compose.foundation.layout.imeNestedScroll
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
@@ -161,8 +163,6 @@ import com.mocharealm.gaze.ui.composable.PopupMenu
 import com.mocharealm.gaze.ui.composable.RevealDirection
 import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.composable.rememberElasticRevealState
-import com.mocharealm.gaze.ui.layout.imeNestedScroll
-import com.mocharealm.gaze.ui.layout.imePadding
 import com.mocharealm.tci18n.core.tdString
 import kotlinx.coroutines.FlowPreview
 import kotlinx.coroutines.flow.debounce
@@ -1258,7 +1258,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                     .fillMaxSize()
                     .then(
                         if (state.stickerPanelVisible || state.locationPanelVisible) Modifier
-                        else Modifier.imeNestedScroll(focusRequester)
+                        else Modifier.imeNestedScroll()
                     )
                     .scrollEndHaptic(),
                 contentPadding = innerPadding,

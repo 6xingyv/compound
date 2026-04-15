@@ -151,7 +151,7 @@ fun HomeScreen(
                     }
                     .navigationBarsPadding()
                     .captionBarPadding()
-                    .imePadding()
+                        .imePadding()
                     .padding(16.dp)
                     .fillMaxWidth(),
             ) {
