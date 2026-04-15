@@ -151,7 +151,7 @@ fun HomeScreen(
                     }
                     .navigationBarsPadding()
                     .captionBarPadding()
-                        .imePadding()
+                    .imePadding()
                     .padding(16.dp)
                     .fillMaxWidth(),
             ) {
@@ -193,14 +193,15 @@ fun HomeScreen(
                             Modifier
                                 .height(64.dp)
                                 .fillMaxWidth(),
-                            Modifier.clickable(
-                                interactionSource = null,
-                                indication = null,
-                                role = Role.Button,
-                                onClick = {
-                                    page.value = HomePageTarget.SEARCH
-                                }
-                            ),
+                            Modifier
+                                .clickable(
+                                    interactionSource = null,
+                                    indication = null,
+                                    role = Role.Button,
+                                    onClick = {
+                                        page.value = HomePageTarget.SEARCH
+                                    }
+                                ),
                             shape = { ContinuousCapsule },
                             effects = {
                                 vibrancy()
@@ -325,7 +326,6 @@ fun SearchBarLayout(
     tabBar: @Composable () -> Unit,
     searchBar: @Composable () -> Unit
 ) {
-    // 只有一个动画变量驱动
     val progress by animateFloatAsState(
         targetValue = if (inSearchMode) 1f else 0f,
         animationSpec = spring(stiffness = Spring.StiffnessMediumLow)

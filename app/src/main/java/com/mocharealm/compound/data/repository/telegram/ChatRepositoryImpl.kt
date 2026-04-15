@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.repository
+package com.mocharealm.compound.data.repository.telegram
 
 import com.mocharealm.compound.data.mapper.ChatMapper
 import com.mocharealm.compound.data.mapper.MessageMapper

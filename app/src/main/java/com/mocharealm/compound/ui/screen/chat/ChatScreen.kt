@@ -48,7 +48,6 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.imeNestedScroll
 import androidx.compose.foundation.layout.imePadding
-import androidx.compose.foundation.layout.isImeVisible
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -514,10 +513,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
         bottomBar = {
             Column(
                 Modifier
-                    .then(
-                        if (state.stickerPanelVisible || state.locationPanelVisible) Modifier
-                        else Modifier.imePadding()
-                    )
+                    .imePadding()
                     .drawWithCache {
                         onDrawBehind {
                             drawRect(
@@ -527,11 +523,12 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                             )
                         }
                     }
-                    .fillMaxWidth()) {
+                    .fillMaxWidth()
+            ) {
                 Row(
                     Modifier
                         .then(
-                            if (state.stickerPanelVisible || state.locationPanelVisible || WindowInsets.isImeVisible) Modifier
+                            if (state.stickerPanelVisible || state.locationPanelVisible) Modifier
                             else Modifier
                                 .navigationBarsPadding()
                                 .padding(captionBar.takeOnly(PaddingValuesSide.Bottom))
@@ -694,8 +691,9 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 ) {
                                     androidx.compose.animation.AnimatedVisibility(
                                         visible = inAudioMode,
-                                        enter = slideInHorizontally { it },
-                                        exit = slideOutHorizontally { it }) {
+                                        enter = slideInHorizontally { it } + fadeIn(),
+                                        exit = slideOutHorizontally { it } + fadeOut()
+                                    ) {
                                         Row(verticalAlignment = Alignment.CenterVertically) {
                                             Icon(
                                                 SFIcons.Microphone,

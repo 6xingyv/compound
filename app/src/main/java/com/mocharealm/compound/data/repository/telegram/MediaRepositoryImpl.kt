@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.repository
+package com.mocharealm.compound.data.repository.telegram
 
 import android.content.ContentValues
 import android.content.Context

@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.repository
+package com.mocharealm.compound.data.repository.telegram
 
 import com.google.firebase.messaging.FirebaseMessaging
 import com.mocharealm.compound.data.mapper.UserMapper

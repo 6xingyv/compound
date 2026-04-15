@@ -136,6 +136,14 @@ ksp {
     arg("tci18n.moduleName", "AppMain")
 }
 
+// Workaround: app KSP occasionally gets marked UP-TO-DATE while generated
+// sources are missing, which breaks compilation of settings generated tokens.
+tasks.configureEach {
+    if (name.startsWith("ksp") && name.endsWith("Kotlin")) {
+        outputs.upToDateWhen { false }
+    }
+}
+
 base {
     archivesName.set(
         "${rootProject.name.usLocaleDecapitalize()}-${libs.versions.appVersionName.get().replace(" ", "-")}"
@@ -173,6 +181,7 @@ dependencies {
     implementation(libs.maplibre.compose)
 
     implementation(libs.kotlinx.serialization.core)
+    implementation(libs.androidx.datastore.preferences)
 
     implementation(libs.hiddenapi.bypass)
 
@@ -182,6 +191,9 @@ dependencies {
 
     implementation(project(":tci18n:core"))
     ksp(project(":tci18n:processor"))
+
+    implementation(project(":tcsettings:core"))
+    ksp(project(":tcsettings:processor"))
 
     testImplementation(libs.junit)
     androidTestImplementation(libs.screengrab)

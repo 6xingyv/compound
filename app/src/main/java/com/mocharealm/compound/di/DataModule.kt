@@ -4,13 +4,14 @@ import com.mocharealm.compound.data.mapper.ChatMapper
 import com.mocharealm.compound.data.mapper.MessageMapper
 import com.mocharealm.compound.data.mapper.UserMapper
 import com.mocharealm.compound.data.notification.AppNotificationManager
-import com.mocharealm.compound.data.repository.AuthRepositoryImpl
-import com.mocharealm.compound.data.repository.ChatRepositoryImpl
-import com.mocharealm.compound.data.repository.MediaRepositoryImpl
-import com.mocharealm.compound.data.repository.MessageRepositoryImpl
-import com.mocharealm.compound.data.source.IcuPersonNameFormatterRepositoryImpl
-import com.mocharealm.compound.data.source.PhoneFormatRepositoryImpl
-import com.mocharealm.compound.data.source.TelegramRepositoryImpl
+import com.mocharealm.compound.data.repository.IcuPersonNameFormatterRepositoryImpl
+import com.mocharealm.compound.data.repository.PhoneFormatRepositoryImpl
+import com.mocharealm.compound.data.repository.telegram.AuthRepositoryImpl
+import com.mocharealm.compound.data.repository.telegram.ChatRepositoryImpl
+import com.mocharealm.compound.data.repository.telegram.MediaRepositoryImpl
+import com.mocharealm.compound.data.repository.telegram.MessageRepositoryImpl
+import com.mocharealm.compound.data.repository.telegram.TelegramRepositoryImpl
+import com.mocharealm.compound.data.source.local.AppDataStoreSettingsStore
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
 import com.mocharealm.compound.domain.repository.AuthRepository
 import com.mocharealm.compound.domain.repository.ChatRepository
@@ -21,6 +22,7 @@ import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import com.mocharealm.compound.domain.repository.TelegramRepository
 import com.mocharealm.tci18n.core.TdStringProvider
 import com.mocharealm.tci18n.core.tdLangPackId
+import com.mocharealm.tcsettings.core.SettingsStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
 import kotlinx.coroutines.suspendCancellableCoroutine
@@ -51,6 +53,7 @@ val dataModule = module {
 
     // Notification Manager
     single { AppNotificationManager(get(), get()) }
+    single<SettingsStore> { AppDataStoreSettingsStore(get()) }
 
     // Data Sources
     single { TdLibDataSource(get(), get(), get()) }
@@ -125,3 +128,4 @@ val dataModule = module {
         }
     }
 }
+

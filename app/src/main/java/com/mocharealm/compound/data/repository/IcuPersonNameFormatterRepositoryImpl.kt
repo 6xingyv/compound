@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.source
+package com.mocharealm.compound.data.repository
 
 import android.annotation.SuppressLint
 import com.mocharealm.compound.domain.model.User
@@ -16,7 +16,6 @@ class IcuPersonNameFormatterRepositoryImpl : PersonNameFormatterRepository {
 
     private fun createFormatter(): Any? {
         val cls = Class.forName("android.icu.text.PersonNameFormatter")
-        // 使用 HiddenApiBypass 获取 builder 方法
         val builderMethod = HiddenApiBypass.getDeclaredMethod(cls, "builder")
         val builder = builderMethod.invoke(null)
 
@@ -55,9 +54,8 @@ class IcuPersonNameFormatterRepositoryImpl : PersonNameFormatterRepository {
         return try {
             val personNameProxy = createPersonNameProxy(user)
             formatMethod.invoke(formatterObj, personNameProxy) as String
-        } catch (e: Exception) {
-            android.util.Log.e("ICU_Formatter", "Format failed", e)
-            "${user.lastName}${user.firstName}".trim() // 降级方案
+        } catch (_: Exception) {
+            "${user.lastName}${user.firstName}".trim()
         }
     }
 
@@ -83,7 +81,6 @@ class IcuPersonNameFormatterRepositoryImpl : PersonNameFormatterRepository {
                 }
                 "getNameLocale" -> detectedLocale
                 "getPreferredOrder" -> {
-                    // 返回 PreferredOrder.DEFAULT (由系统根据 Locale 自动推断)
                     java.lang.Enum.valueOf(preferredOrderClass as Class<out Enum<*>>, "DEFAULT")
                 }
                 "equals" -> proxy === args[0]

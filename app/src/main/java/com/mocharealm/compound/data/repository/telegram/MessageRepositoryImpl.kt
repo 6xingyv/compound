@@ -1,12 +1,14 @@
-package com.mocharealm.compound.data.repository
+package com.mocharealm.compound.data.repository.telegram
 
 import com.mocharealm.compound.data.dto.MessageDto
 import com.mocharealm.compound.data.mapper.MessageMapper
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
+import com.mocharealm.compound.domain.model.File
 import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
 import com.mocharealm.compound.domain.model.ShareFileInfo
+import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.repository.MessageRepository
 import com.mocharealm.compound.domain.util.MarkdownParser
 import kotlinx.coroutines.flow.Flow
@@ -47,7 +49,7 @@ class MessageRepositoryImpl(
     override suspend fun sendMessage(
         chatId: Long,
         text: String,
-        entities: List<com.mocharealm.compound.domain.model.Text.TextEntity>,
+        entities: List<Text.TextEntity>,
         replyToMessageId: Long
     ): Result<Message> {
         return try {
@@ -78,7 +80,7 @@ class MessageRepositoryImpl(
         chatId: Long,
         files: List<ShareFileInfo>,
         caption: String,
-        captionEntities: List<com.mocharealm.compound.domain.model.Text.TextEntity>,
+        captionEntities: List<Text.TextEntity>,
         replyToMessageId: Long
     ): Result<List<Message>> = runCatching {
         val formattedCaption = TdApi.FormattedText(caption, MessageDto.mapToTdApiEntities(captionEntities))
@@ -146,9 +148,9 @@ class MessageRepositoryImpl(
                 id = 0,
                 timestamp = 0,
                 stickerFormat = MessageDto.mapStickerFormat(sticker.format),
-                file = com.mocharealm.compound.domain.model.File(fileId = sticker.sticker.id),
-                thumbnail = sticker.thumbnail?.file?.id?.let { com.mocharealm.compound.domain.model.File(fileId = it) },
-                caption = com.mocharealm.compound.domain.model.Text("")
+                file = File(fileId = sticker.sticker.id),
+                thumbnail = sticker.thumbnail?.file?.id?.let { File(fileId = it) },
+                caption = Text("")
             )
         }
     }

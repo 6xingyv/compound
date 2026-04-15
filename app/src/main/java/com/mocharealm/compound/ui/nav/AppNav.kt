@@ -34,6 +34,23 @@ sealed interface Screen : NavKey {
     data class SharePicker(val payload: SharePayload) : Screen
 
     @Serializable
+    data class Settings(
+        val destination: SettingsDestination = SettingsDestination.Root
+    ) : Screen
+
+    @Serializable
+    enum class SettingsDestination {
+        Root,
+        Chat,
+        Privacy,
+        Notifications,
+        Data,
+        Devices,
+        Language
+    }
+
+
+    @Serializable
     data class MediaPreview(
         val chatId: Long,
         val messageId: Long

@@ -367,7 +367,9 @@ class TdI18nSymbolProcessor(
             .addType(manifestClass)
             .build()
 
-        fileSpec.writeTo(codeGenerator, Dependencies.ALL_FILES)
+        // Avoid passing ALL_FILES which may force KotlinPoet to query KSFile PSI paths
+        // and cause lifetime issues across KSP rounds. Use empty Dependencies instead.
+        fileSpec.writeTo(codeGenerator, Dependencies(false))
     }
 
     /**
@@ -378,10 +380,13 @@ class TdI18nSymbolProcessor(
      * discover the generated manifest class at runtime without any DI framework.
      */
     private fun generateSpiServiceFile() {
+        // Create the service descriptor without relying on ALL_FILES dependencies
+        // which may force KSP to query KSFile PSI paths and trigger lifetime issues.
+        val servicePath = "META-INF/services/${MODULE_MANIFEST_FQN}"
         val serviceFile = codeGenerator.createNewFile(
-            dependencies = Dependencies.ALL_FILES,
-            packageName = "META-INF.services",
-            fileName = MODULE_MANIFEST_FQN,
+            dependencies = Dependencies(false),
+            packageName = "",
+            fileName = servicePath,
             extensionName = ""
         )
         serviceFile.write("$GENERATED_PACKAGE.$generatedClassName\n".toByteArray())

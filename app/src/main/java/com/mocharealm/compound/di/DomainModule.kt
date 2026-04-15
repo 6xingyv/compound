@@ -1,5 +1,10 @@
 package com.mocharealm.compound.di
 
+import com.mocharealm.compound.domain.interceptor.settings.AutoPlayVideosInterceptor
+import com.mocharealm.compound.domain.interceptor.settings.ContactJoinedTelegramInterceptor
+import com.mocharealm.compound.domain.interceptor.settings.LanguageCodeInterceptor
+import com.mocharealm.compound.domain.interceptor.settings.SuggestFrequentContactsInterceptor
+import com.mocharealm.compound.domain.interceptor.settings.SyncContactsInterceptor
 import com.mocharealm.compound.domain.usecase.CloseChatUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
@@ -37,6 +42,13 @@ import com.mocharealm.compound.domain.usecase.phonenumber.ValidatePhoneNumberUse
 import org.koin.dsl.module
 
 val domainModule = module {
+    // --- Settings Interceptors ---
+    single { AutoPlayVideosInterceptor(get()) }
+    single { ContactJoinedTelegramInterceptor(get()) }
+    single { LanguageCodeInterceptor(get()) }
+    single { SuggestFrequentContactsInterceptor(get()) }
+    single { SyncContactsInterceptor(get()) }
+
     factory {
         SetAuthenticationPhoneNumberUseCase(get())
     }

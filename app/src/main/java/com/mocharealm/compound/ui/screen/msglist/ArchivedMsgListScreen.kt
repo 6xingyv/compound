@@ -134,7 +134,10 @@ fun ArchivedMsgListScreen(
                 }
             } else {
                 items(state.chats, key = { chat -> chat.id }) { chat ->
-                    val revealState = rememberRevealState(key = chat.id)
+                    val revealState = rememberRevealState(
+                        key = chat.id,
+                        directions = setOf(RevealDirection.EndToStart)
+                    )
                     RevealSwipe(
                         state = revealState,
                         shape = RoundedCornerShape(0.dp),

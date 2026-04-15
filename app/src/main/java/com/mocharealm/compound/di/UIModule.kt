@@ -15,6 +15,7 @@ import com.mocharealm.compound.ui.screen.me.MeViewModel
 import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListScreen
 import com.mocharealm.compound.ui.screen.msglist.ArchivedMsgListViewModel
 import com.mocharealm.compound.ui.screen.msglist.MsgListViewModel
+import com.mocharealm.compound.ui.screen.settings.SettingsScreen
 import com.mocharealm.compound.ui.screen.share.SharePickerScreen
 import com.mocharealm.compound.ui.screen.signin.SignInScreen
 import com.mocharealm.compound.ui.screen.signin.SignInViewModel
@@ -139,5 +140,8 @@ val uiModule = module {
     }
     navigation<Screen.MediaPreview>(mapOf(DETAIL_KEY to true)) { route ->
         MediaPreviewScreen(viewModel = koinViewModel { parametersOf(route.chatId, route.messageId) })
+    }
+    navigation<Screen.Settings>(mapOf(LIST_KEY to true)) { route ->
+        SettingsScreen(route.destination)
     }
 }

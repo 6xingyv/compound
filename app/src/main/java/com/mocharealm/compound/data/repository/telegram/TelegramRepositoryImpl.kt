@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.source
+package com.mocharealm.compound.data.repository.telegram
 
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageUpdateEvent
@@ -18,7 +18,7 @@ class TelegramRepositoryImpl(
     private val mediaRepository: MediaRepository
 ) : TelegramRepository {
 
-    // --- Auth Repository Delegation ---
+    // Auth Repository
     override suspend fun setAuthenticationPhoneNumber(phoneNumber: String) = authRepository.setAuthenticationPhoneNumber(phoneNumber)
     override suspend fun checkAuthenticationCode(code: String) = authRepository.checkAuthenticationCode(code)
     override suspend fun checkAuthenticationPassword(password: String) = authRepository.checkAuthenticationPassword(password)
@@ -27,7 +27,7 @@ class TelegramRepositoryImpl(
     override suspend fun getAuthenticationState() = authRepository.getAuthenticationState()
     override suspend fun awaitAuthState() = authRepository.awaitAuthState()
 
-    // --- Chat Repository Delegation ---
+    // Chat Repository
     override suspend fun getChats(limit: Int, offset: Int, archived: Boolean) =
         chatRepository.getChats(limit, offset, archived)
     override suspend fun getChat(chatId: Long) = chatRepository.getChat(chatId)
@@ -37,7 +37,7 @@ class TelegramRepositoryImpl(
     override suspend fun saveChatReadPosition(chatId: Long, messageId: Long) = chatRepository.saveChatReadPosition(chatId, messageId)
     override suspend fun getChatReadPosition(chatId: Long) = chatRepository.getChatReadPosition(chatId)
 
-    // Message Repository Delegation
+    // Message Repository
     override suspend fun getChatMessages(chatId: Long, limit: Int, fromMessageId: Long, onlyLocal: Boolean, offset: Int) =
         messageRepository.getChatMessages(chatId, limit, fromMessageId, onlyLocal, offset)
 
@@ -56,7 +56,7 @@ class TelegramRepositoryImpl(
     override suspend fun setChatDraftMessage(chatId: Long, replyToMessageId: Long, draftText: String) =
         messageRepository.setChatDraftMessage(chatId, replyToMessageId, draftText)
 
-    // Media Repository Delegation
+    // Media Repository
     override suspend fun downloadFile(fileId: Int) = mediaRepository.downloadFile(fileId)
     override fun downloadFileWithProgress(fileId: Int) = mediaRepository.downloadFileWithProgress(fileId)
     override suspend fun saveFileToDownloads(filePath: String, fileName: String) = mediaRepository.saveFileToDownloads(filePath, fileName)
@@ -64,7 +64,7 @@ class TelegramRepositoryImpl(
     override suspend fun getInstalledStickerSets() = mediaRepository.getInstalledStickerSets()
     override suspend fun getStickerSetStickers(setId: Long) = mediaRepository.getStickerSetStickers(setId)
 
-    // Push Notification registration
+    // Push Notification
     override suspend fun registerDevice(token: String) = authRepository.registerDevice(token)
     override suspend fun processPushNotification(json: String) = authRepository.processPushNotification(json)
 }

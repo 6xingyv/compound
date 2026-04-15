@@ -1,4 +1,4 @@
-package com.mocharealm.compound.data.source
+package com.mocharealm.compound.data.repository
 
 import android.content.Context
 import com.mocharealm.compound.domain.model.CallingCodeInfo
@@ -8,6 +8,7 @@ import com.mocharealm.compound.domain.repository.PhoneFormatRepository
 import java.io.ByteArrayOutputStream
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
+import java.util.Locale
 
 class PhoneFormatRepositoryImpl(
     private val context: Context,
@@ -184,7 +185,7 @@ class PhoneFormatRepositoryImpl(
     }
 
     private fun getDefaultLocaleCountry(): String {
-        return java.util.Locale.getDefault().country.lowercase()
+        return Locale.getDefault().country.lowercase()
     }
 
     private fun value32(offset: Int): Int? {
