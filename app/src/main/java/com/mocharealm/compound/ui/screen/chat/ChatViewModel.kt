@@ -130,6 +130,9 @@ private val Message.primaryId: Long
 private val Message.primaryTimestamp: Long
     get() = blocks.first().timestamp
 
+/** Helper: whether message contains given block/message id */
+private fun Message.containsBlockId(id: Long): Boolean = blocks.any { it.id == id }
+
 class ChatViewModel(
     private val chatId: Long,
     private val getChatMessages: GetChatMessagesUseCase,
@@ -187,10 +190,10 @@ class ChatViewModel(
                     is MessageUpdateEvent.NewMessage -> {
                         if (event.message.chatId == chatId) {
                             updateMessagesState { currentMessages ->
-                                if (currentMessages.any { it.primaryId == event.message.primaryId }) {
+                                if (currentMessages.any { it.containsBlockId(event.message.primaryId) }) {
                                     currentMessages
                                 } else {
-                                    currentMessages + event.message
+                                    aggregateAlbumsForDisplay(currentMessages + event.message)
                                 }
                             }
                             downloadMissingFiles(listOf(event.message))
@@ -201,12 +204,13 @@ class ChatViewModel(
                         if (event.message.chatId == chatId) {
                             updateMessagesState { currentMessages ->
                                 val index = currentMessages.indexOfFirst {
-                                    it.primaryId == event.message.primaryId
+                                    it.containsBlockId(event.message.primaryId)
                                 }
                                 if (index != -1) {
                                     val updated = currentMessages.toMutableList()
-                                    updated[index] = event.message
-                                    updated
+                                    val target = updated[index]
+                                    updated[index] = replaceMessagePart(target, event.message.primaryId, event.message)
+                                    aggregateAlbumsForDisplay(updated)
                                 } else {
                                     currentMessages
                                 }
@@ -219,19 +223,20 @@ class ChatViewModel(
                         if (event.message.chatId == chatId) {
                             updateMessagesState { currentMessages ->
                                 val oldIndex = currentMessages.indexOfFirst {
-                                    it.primaryId == event.oldMessageId
+                                    it.containsBlockId(event.oldMessageId)
                                 }
                                 if (oldIndex != -1) {
                                     val updated = currentMessages.toMutableList()
-                                    updated[oldIndex] = event.message
-                                    updated
+                                    val target = updated[oldIndex]
+                                    updated[oldIndex] = replaceMessagePart(target, event.oldMessageId, event.message)
+                                    aggregateAlbumsForDisplay(updated)
                                 } else {
                                     if (currentMessages.any {
-                                            it.primaryId == event.message.primaryId
+                                            it.containsBlockId(event.message.primaryId)
                                         }) {
                                         currentMessages
                                     } else {
-                                        currentMessages + event.message
+                                        aggregateAlbumsForDisplay(currentMessages + event.message)
                                     }
                                 }
                             }
@@ -332,7 +337,7 @@ class ChatViewModel(
             val localMessages = localResult.getOrNull().orEmpty()
             if (localMessages.isNotEmpty()) {
                 val sortedLocal = localMessages.sortedBy { it.primaryTimestamp }
-                setMessages(sortedLocal) {
+                setMessages(aggregateAlbumsForDisplay(sortedLocal)) {
                     it.copy(
                         loading = false,
                         initialLoaded = true,
@@ -364,7 +369,7 @@ class ChatViewModel(
                 }
 
                 val sortedMerged = merged.sortedBy { it.primaryTimestamp }
-                setMessages(sortedMerged) { state ->
+                setMessages(aggregateAlbumsForDisplay(sortedMerged)) { state ->
                     state.copy(
                         loading = false,
                         hasMore = networkMessages.size >= PAGE_SIZE,
@@ -416,7 +421,7 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    setMessages(combinedMessages) {
+                    setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
                         it.copy(
                             loadingMore = false,
                             hasMore = newMessages.isNotEmpty(),
@@ -464,7 +469,7 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    setMessages(combinedMessages) {
+                    setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
                         it.copy(
                             loadingNewer = false,
                             hasMoreNewer = newMessages.isNotEmpty(),
@@ -494,7 +499,7 @@ class ChatViewModel(
                 val combinedMessages = (newMessages + _uiState.value.messages).sortedBy {
                     it.primaryTimestamp
                 }
-                setMessages(combinedMessages) {
+                setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
                     it.copy(
                         loadingMore = false,
                         scrollToMessageId = messageId
@@ -540,7 +545,9 @@ class ChatViewModel(
         }
         messageIdMutex.withLock {
             messageIdIndex.clear()
-            newMessages.forEach { messageIdIndex.add(it.primaryId) }
+            newMessages.forEach { message ->
+                message.blocks.forEach { block -> messageIdIndex.add(block.id) }
+            }
         }
         _uiState.update { state ->
             stateTransform(state).copy(messages = newMessages, messageItems = newItems)
@@ -695,16 +702,10 @@ class ChatViewModel(
             if (newMessage == oldMessage) return@update state
 
             val newMessages = state.messages.toMutableList().also { it[msgIndex] = newMessage }
-            val itemIndex = state.messageItems.indexOfFirst { it.message.primaryId == messageId }
-            val newItems = if (itemIndex == -1) {
-                state.messageItems
-            } else {
-                state.messageItems.toMutableList().also { list ->
-                    list[itemIndex] = list[itemIndex].copy(message = newMessage)
-                }
-            }
+            val aggregatedMessages = aggregateAlbumsForDisplay(newMessages)
+            val newItems = aggregatedMessages.toMessageItems()
 
-            state.copy(messages = newMessages, messageItems = newItems)
+            state.copy(messages = aggregatedMessages, messageItems = newItems)
         }
     }
 
@@ -932,5 +933,89 @@ class ChatViewModel(
 
     fun removeSelectedFile(file: ShareFileInfo) {
         _uiState.update { it.copy(selectedFiles = it.selectedFiles - file) }
+    }
+
+    private fun aggregateAlbumsForDisplay(messages: List<Message>): List<Message> {
+        if (messages.isEmpty()) return emptyList()
+
+        val result = mutableListOf<Message>()
+        var currentGroup = mutableListOf<Message>()
+        var currentAlbumId = 0L
+
+        for (msg in messages) {
+            val albumId = getAlbumId(msg)
+
+            if (albumId != 0L) {
+                if (currentAlbumId == albumId) {
+                    currentGroup.add(msg)
+                } else {
+                    if (currentGroup.isNotEmpty()) {
+                        result.add(mergeAlbumGroup(currentGroup))
+                    }
+                    currentGroup = mutableListOf(msg)
+                    currentAlbumId = albumId
+                }
+            } else {
+                if (currentGroup.isNotEmpty()) {
+                    result.add(mergeAlbumGroup(currentGroup))
+                    currentGroup = mutableListOf()
+                    currentAlbumId = 0L
+                }
+                result.add(msg)
+            }
+        }
+
+        if (currentGroup.isNotEmpty()) {
+            result.add(mergeAlbumGroup(currentGroup))
+        }
+
+        return result
+    }
+
+    private fun getAlbumId(msg: Message): Long {
+        return when (val first = msg.blocks.firstOrNull()) {
+            is MessageBlock.MediaBlock -> first.mediaAlbumId
+            is MessageBlock.DocumentBlock -> first.mediaAlbumId
+            else -> 0L
+        }
+    }
+
+    private fun mergeAlbumGroup(group: List<Message>): Message {
+        if (group.size == 1) return group[0]
+
+        val first = group[0]
+        val allBlocks = group.flatMap { it.blocks }.toMutableList().apply {
+            sortBy { it is MessageBlock.TextBlock }
+        }
+        val allReactions = group.flatMap { it.reactions }
+            .distinctBy { it.reactionText.content }
+        val shareInfo = group.mapNotNull { it.shareInfo }.firstOrNull()
+
+        return first.copy(
+            blocks = allBlocks,
+            reactions = allReactions,
+            shareInfo = shareInfo
+        )
+    }
+
+    private fun replaceMessagePart(current: Message, oldMessageId: Long, incoming: Message): Message {
+        val currentAlbumId = getAlbumId(current)
+        val incomingAlbumId = getAlbumId(incoming)
+        if (currentAlbumId == 0L || incomingAlbumId == 0L || currentAlbumId != incomingAlbumId) {
+            return incoming
+        }
+
+        val mergedBlocks = (current.blocks.filterNot { it.id == oldMessageId } + incoming.blocks)
+            .distinctBy { it.id to it::class }
+            .sortedBy { it is MessageBlock.TextBlock }
+
+        val mergedReactions = (current.reactions + incoming.reactions)
+            .distinctBy { it.reactionText.content }
+
+        return current.copy(
+            blocks = mergedBlocks,
+            reactions = mergedReactions,
+            shareInfo = current.shareInfo ?: incoming.shareInfo
+        )
     }
 }
