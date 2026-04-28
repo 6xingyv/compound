@@ -1,19 +1,12 @@
 package com.mocharealm.tcsettings.core
 
 import kotlinx.coroutines.flow.Flow
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.map
-import kotlin.reflect.KClass
 
 interface SettingToken<T>
 
-data class SelectableValue<T>(
-    val current: T,
-    val options: List<T>
-)
-
-interface SettingsOptionsProvider<T> {
-    val options: Flow<List<T>>
+interface SettingsStore {
+    fun <T> flow(token: SettingToken<T>, defaultValue: T): Flow<T>
+    suspend fun <T> write(token: SettingToken<T>, value: T)
 }
 
 fun interface SettingsInterceptor<T> {
@@ -29,31 +22,22 @@ sealed interface InterceptorResult {
 }
 
 class SettingsInterceptorDispatcher(
-    private val interceptors: Map<KClass<*>, SettingsInterceptor<Any?>> = emptyMap()
+    private val interceptors: Map<SettingToken<*>, SettingsInterceptor<*>> = emptyMap()
 ) {
     @Suppress("UNCHECKED_CAST")
-    suspend fun <T> dispatch(tokenClass: KClass<*>, newValue: T): InterceptorResult {
-        val interceptor = interceptors[tokenClass] ?: return InterceptorResult.Success
+    suspend fun <T> dispatch(token: SettingToken<T>, newValue: T): InterceptorResult {
+        val interceptor = interceptors[token] ?: return InterceptorResult.Success
         return (interceptor as SettingsInterceptor<T>).intercept(newValue)
     }
 }
 
-interface SettingsStore {
-    fun <T> flow(tokenClass: KClass<*>, defaultValue: T): Flow<T>
-    suspend fun <T> write(tokenClass: KClass<*>, value: T)
-}
+data class SettingsError(
+    val token: SettingToken<*>,
+    val message: String?,
+    val throwable: Throwable?
+)
 
-class InMemorySettingsStore : SettingsStore {
-    private val values = MutableStateFlow<Map<KClass<*>, Any?>>(emptyMap())
-
-    @Suppress("UNCHECKED_CAST")
-    override fun <T> flow(tokenClass: KClass<*>, defaultValue: T): Flow<T> {
-        return values.map { map ->
-            (map[tokenClass] as T?) ?: defaultValue
-        }
-    }
-
-    override suspend fun <T> write(tokenClass: KClass<*>, value: T) {
-        values.value = values.value + (tokenClass to value)
-    }
-}
+data class SelectableValue<T>(
+    val current: T,
+    val options: List<T>
+)

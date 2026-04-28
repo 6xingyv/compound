@@ -12,64 +12,49 @@ import androidx.datastore.preferences.core.longPreferencesKey
 import androidx.datastore.preferences.core.stringPreferencesKey
 import androidx.datastore.preferences.core.stringSetPreferencesKey
 import androidx.datastore.preferences.preferencesDataStore
+import com.mocharealm.tcsettings.core.SettingToken
 import com.mocharealm.tcsettings.core.SettingsStore
 import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.map
-import kotlin.reflect.KClass
+import java.util.concurrent.ConcurrentHashMap
 
 private val Context.dataStore: DataStore<Preferences> by preferencesDataStore(name = "app_settings")
 
 class AppDataStoreSettingsStore(private val context: Context) : SettingsStore {
 
-    private val keyCache = java.util.concurrent.ConcurrentHashMap<KClass<*>, Preferences.Key<*>>()
+    private val keyCache = ConcurrentHashMap<SettingToken<*>, Preferences.Key<*>>()
 
-    private fun <T> getOrCacheKey(tokenClass: KClass<*>, value: T?): Preferences.Key<T>? {
-        @Suppress("UNCHECKED_CAST")
-        val cached = keyCache[tokenClass] as? Preferences.Key<T>
-        if (cached != null) return cached
+    @Suppress("UNCHECKED_CAST")
+    private fun <T> getOrCreateKey(token: SettingToken<T>, defaultValue: T): Preferences.Key<T> {
+        keyCache[token]?.let { return it as Preferences.Key<T> }
 
-        if (value == null) return null
+        val keyName = token.toString()
+        val key = when (defaultValue) {
+            is Boolean -> booleanPreferencesKey(keyName)
+            is Int -> intPreferencesKey(keyName)
+            is String -> stringPreferencesKey(keyName)
+            is Float -> floatPreferencesKey(keyName)
+            is Long -> longPreferencesKey(keyName)
+            is Double -> doublePreferencesKey(keyName)
+            is Set<*> -> stringSetPreferencesKey(keyName)
+            else -> throw IllegalArgumentException("Unsupported type for DataStore: ${defaultValue!!::class.java}")
+        } as Preferences.Key<T>
 
-        val keyName = tokenClass.qualifiedName ?: tokenClass.toString()
-        @Suppress("UNCHECKED_CAST")
-        val key = when (value) {
-            is Int -> intPreferencesKey(keyName) as Preferences.Key<T>
-            is String -> stringPreferencesKey(keyName) as Preferences.Key<T>
-            is Boolean -> booleanPreferencesKey(keyName) as Preferences.Key<T>
-            is Float -> floatPreferencesKey(keyName) as Preferences.Key<T>
-            is Long -> longPreferencesKey(keyName) as Preferences.Key<T>
-            is Double -> doublePreferencesKey(keyName) as Preferences.Key<T>
-            is Set<*> -> stringSetPreferencesKey(keyName) as Preferences.Key<T>
-            else -> throw IllegalArgumentException("Unsupported type for DataStore: ${value!!::class.java}")
-        }
-        
-        keyCache[tokenClass] = key
+        keyCache[token] = key
         return key
     }
 
-    override fun <T> flow(tokenClass: KClass<*>, defaultValue: T): Flow<T> {
-        val key = getOrCacheKey(tokenClass, defaultValue) 
-            ?: throw IllegalArgumentException("Cannot determine DataStore key type because defaultValue is null and no previous writes occurred.")
-        
+    override fun <T> flow(token: SettingToken<T>, defaultValue: T): Flow<T> {
+        val key = getOrCreateKey(token, defaultValue)
         return context.dataStore.data.map { preferences ->
             preferences[key] ?: defaultValue
         }
     }
 
-    override suspend fun <T> write(tokenClass: KClass<*>, value: T) {
-        val key = getOrCacheKey(tokenClass, value)
-        
-        if (key == null && value == null) {
-            // Cannot determine key and value is null, nothing to remove
-            return
-        }
-        
+    override suspend fun <T> write(token: SettingToken<T>, value: T) {
+        val key = getOrCreateKey(token, value)
         context.dataStore.edit { preferences ->
-            if (value == null) {
-                key?.let { preferences.remove(it) }
-            } else {
-                key?.let { preferences[it] = value }
-            }
+            preferences[key] = value
         }
     }
 }

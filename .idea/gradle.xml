@@ -14,6 +14,7 @@
             <option value="$PROJECT_DIR$/tci18n/core" />
             <option value="$PROJECT_DIR$/tci18n/processor" />
             <option value="$PROJECT_DIR$/tcsettings" />
+            <option value="$PROJECT_DIR$/tcsettings/compose" />
             <option value="$PROJECT_DIR$/tcsettings/core" />
             <option value="$PROJECT_DIR$/tcsettings/processor" />
           </set>

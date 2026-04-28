@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="compose">
+    <output-path>$PROJECT_DIR$/tcsettings/compose/build/libs</output-path>
+    <root id="archive" name="compose.jar">
+      <element id="module-output" name="Compound.tcsettings.compose.androidMain" />
+    </root>
+  </artifact>
+</component>

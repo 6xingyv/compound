@@ -13,7 +13,6 @@ import com.google.devtools.ksp.symbol.KSClassDeclaration
 import com.google.devtools.ksp.symbol.KSFunctionDeclaration
 import com.google.devtools.ksp.symbol.KSPropertyDeclaration
 import com.google.devtools.ksp.symbol.KSType
-import com.squareup.kotlinpoet.AnnotationSpec
 import com.squareup.kotlinpoet.ClassName
 import com.squareup.kotlinpoet.CodeBlock
 import com.squareup.kotlinpoet.FileSpec
@@ -22,7 +21,6 @@ import com.squareup.kotlinpoet.KModifier
 import com.squareup.kotlinpoet.ParameterSpec
 import com.squareup.kotlinpoet.ParameterizedTypeName.Companion.parameterizedBy
 import com.squareup.kotlinpoet.PropertySpec
-import com.squareup.kotlinpoet.STAR
 import com.squareup.kotlinpoet.TypeSpec
 import com.squareup.kotlinpoet.TypeVariableName
 import com.squareup.kotlinpoet.asClassName
@@ -32,32 +30,33 @@ import com.squareup.kotlinpoet.ksp.writeTo
 
 private const val SETTINGS_MODULE_FQN = "com.mocharealm.tcsettings.core.SettingsModule"
 private const val SETTING_ITEM_FQN = "com.mocharealm.tcsettings.core.SettingItem"
+private const val DEFAULT_VALUE_FQN = "com.mocharealm.tcsettings.core.DefaultValue"
 private const val SETTINGS_TOKEN_ANNOTATION_FQN = "com.mocharealm.tcsettings.core.SettingsToken"
-private const val SETTINGS_FALLBACK_ANNOTATION_FQN =
-    "com.mocharealm.tcsettings.core.SettingsFallback"
+private const val SETTINGS_FALLBACK_ANNOTATION_FQN = "com.mocharealm.tcsettings.core.SettingsFallback"
 private const val SETTINGS_INTERCEPTOR_FQN = "com.mocharealm.tcsettings.core.SettingsInterceptor"
 private const val COMPOSABLE_FQN = "androidx.compose.runtime.Composable"
 
 private val SETTING_TOKEN_CLASS = ClassName("com.mocharealm.tcsettings.core", "SettingToken")
-private val SETTINGS_INTERCEPTOR_CLASS =
-    ClassName("com.mocharealm.tcsettings.core", "SettingsInterceptor")
-private val SETTINGS_INTERCEPTOR_DISPATCHER_CLASS =
-    ClassName("com.mocharealm.tcsettings.core", "SettingsInterceptorDispatcher")
+private val SETTINGS_INTERCEPTOR_CLASS = ClassName("com.mocharealm.tcsettings.core", "SettingsInterceptor")
+private val SETTINGS_INTERCEPTOR_DISPATCHER_CLASS = ClassName("com.mocharealm.tcsettings.core", "SettingsInterceptorDispatcher")
 private val SETTINGS_STORE_CLASS = ClassName("com.mocharealm.tcsettings.core", "SettingsStore")
-private val INTERCEPTOR_RESULT_CLASS =
-    ClassName("com.mocharealm.tcsettings.core", "InterceptorResult")
+private val SETTINGS_ERROR_CLASS = ClassName("com.mocharealm.tcsettings.core", "SettingsError")
+private val INTERCEPTOR_RESULT_CLASS = ClassName("com.mocharealm.tcsettings.core", "InterceptorResult")
 private val FLOW_CLASS = ClassName("kotlinx.coroutines.flow", "Flow")
+private val SHARED_FLOW_CLASS = ClassName("kotlinx.coroutines.flow", "SharedFlow")
+private val MUTABLE_SHARED_FLOW_CLASS = ClassName("kotlinx.coroutines.flow", "MutableSharedFlow")
 private val KOIN_MODULE_CLASS = ClassName("org.koin.core.module", "Module")
-private val KOIN_JAVA_COMPONENT_CLASS = ClassName("org.koin.java", "KoinJavaComponent")
-
+private val KOIN_INJECT_FUNCTION = ClassName("org.koin.compose", "koinInject")
+private val SETTINGS_CONTROLLER_CLASS = ClassName("com.mocharealm.tcsettings.compose", "SettingsController")
+private val REMEMBER_SETTINGS_CONTROLLER = ClassName("com.mocharealm.tcsettings.compose", "rememberSettingsController")
 
 private data class InterceptorBinding(
-    val tokenQualifiedName: String,
+    val tokenObjectName: String,
     val interceptorClassName: ClassName
 )
 
 private data class TokenUiBinding(
-    val tokenQualifiedName: String,
+    val tokenObjectName: String,
     val funcPackageName: String,
     val funcSimpleName: String,
     val paramCount: Int
@@ -75,13 +74,9 @@ class TcSettingsSymbolProcessor(
 
     private val logger: KSPLogger = environment.logger
     private val codeGenerator: CodeGenerator = environment.codeGenerator
-    private var generated = false
 
     override fun process(resolver: Resolver): List<KSAnnotated> {
         validateTokenUiContracts(resolver)
-
-        if (generated) return emptyList()
-        generated = true
 
         val interceptorBindings = collectInterceptorBindings(resolver)
         val tokenUiBindings = collectTokenUiBindings(resolver)
@@ -111,13 +106,11 @@ class TcSettingsSymbolProcessor(
             .filterIsInstance<KSClassDeclaration>()
             .mapNotNull { declaration ->
                 if (!declaration.implementsSettingsInterceptor()) return@mapNotNull null
-                val tokenQualifiedName =
-                    declaration.findSettingsTokenQualifiedName() ?: return@mapNotNull null
+                val tokenQualifiedName = declaration.findSettingsTokenQualifiedName() ?: return@mapNotNull null
                 InterceptorBinding(
-                    tokenQualifiedName = tokenQualifiedName,
-                    interceptorClassName = declaration.toClassName(),
-
-                    )
+                    tokenObjectName = tokenQualifiedName.substringAfterLast('.'),
+                    interceptorClassName = declaration.toClassName()
+                )
             }
             .toList()
     }
@@ -127,10 +120,9 @@ class TcSettingsSymbolProcessor(
             .getSymbolsWithAnnotation(SETTINGS_TOKEN_ANNOTATION_FQN)
             .filterIsInstance<KSFunctionDeclaration>()
             .mapNotNull { function ->
-                val tokenQualifiedName =
-                    function.findSettingsTokenQualifiedName() ?: return@mapNotNull null
+                val tokenQualifiedName = function.findSettingsTokenQualifiedName() ?: return@mapNotNull null
                 TokenUiBinding(
-                    tokenQualifiedName = tokenQualifiedName,
+                    tokenObjectName = tokenQualifiedName.substringAfterLast('.'),
                     funcPackageName = function.packageName.asString(),
                     funcSimpleName = function.simpleName.asString(),
                     paramCount = function.parameters.size
@@ -144,14 +136,12 @@ class TcSettingsSymbolProcessor(
             .getSymbolsWithAnnotation(SETTINGS_FALLBACK_ANNOTATION_FQN)
             .filterIsInstance<KSFunctionDeclaration>()
             .mapNotNull { function ->
-                val propertyTypeQualifiedName =
-                    function.findSettingsFallbackQualifiedName() ?: return@mapNotNull null
+                val propertyTypeQualifiedName = function.findSettingsFallbackQualifiedName() ?: return@mapNotNull null
                 FallbackUiBinding(
                     propertyTypeQualifiedName = propertyTypeQualifiedName,
                     funcPackageName = function.packageName.asString(),
-                    funcSimpleName = function.simpleName.asString(),
-
-                    )
+                    funcSimpleName = function.simpleName.asString()
+                )
             }
             .toList()
     }
@@ -161,9 +151,8 @@ class TcSettingsSymbolProcessor(
             it.annotationType.resolve().declaration.qualifiedName?.asString() == SETTINGS_TOKEN_ANNOTATION_FQN
         } ?: return null
 
-        val valueArgument =
-            tokenAnnotation.arguments.firstOrNull { it.name?.asString() == "value" }?.value
-                ?: tokenAnnotation.arguments.firstOrNull()?.value
+        val valueArgument = tokenAnnotation.arguments.firstOrNull { it.name?.asString() == "value" }?.value
+            ?: tokenAnnotation.arguments.firstOrNull()?.value
 
         return when (valueArgument) {
             is String -> valueArgument
@@ -176,9 +165,8 @@ class TcSettingsSymbolProcessor(
         val annotation = annotations.firstOrNull {
             it.annotationType.resolve().declaration.qualifiedName?.asString() == SETTINGS_FALLBACK_ANNOTATION_FQN
         } ?: return null
-        val valueArgument =
-            annotation.arguments.firstOrNull { it.name?.asString() == "type" }?.value
-                ?: annotation.arguments.firstOrNull()?.value
+        val valueArgument = annotation.arguments.firstOrNull { it.name?.asString() == "type" }?.value
+            ?: annotation.arguments.firstOrNull()?.value
         return when (valueArgument) {
             is String -> valueArgument
             is KSType -> valueArgument.declaration.qualifiedName?.asString()
@@ -190,29 +178,6 @@ class TcSettingsSymbolProcessor(
         return superTypes.any {
             it.resolve().declaration.qualifiedName?.asString() == SETTINGS_INTERCEPTOR_FQN
         }
-    }
-
-    private fun KSAnnotated.findSettingsTokenType(): KSType? {
-        val tokenAnnotation = annotations.firstOrNull {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == SETTINGS_TOKEN_ANNOTATION_FQN
-        } ?: return null
-
-        val valueArgument =
-            tokenAnnotation.arguments.firstOrNull { it.name?.asString() == "value" }?.value
-                ?: tokenAnnotation.arguments.firstOrNull()?.value
-
-        return valueArgument as? KSType
-    }
-
-
-    private fun KSAnnotated.findSettingsFallbackType(): KSType? {
-        val annotation = annotations.firstOrNull {
-            it.annotationType.resolve().declaration.qualifiedName?.asString() == SETTINGS_FALLBACK_ANNOTATION_FQN
-        } ?: return null
-        val valueArgument =
-            annotation.arguments.firstOrNull { it.name?.asString() == "type" }?.value
-                ?: annotation.arguments.firstOrNull()?.value
-        return valueArgument as? KSType
     }
 
     private fun validateTokenUiContracts(resolver: Resolver) {
@@ -302,237 +267,225 @@ class TcSettingsSymbolProcessor(
             .toList()
 
         if (properties.isEmpty()) {
-            logger.warn(
-                "@SettingsModule($moduleInterfaceName) 中没有找到 @SettingItem 属性",
-                moduleDeclaration
-            )
+            logger.warn("@SettingsModule($moduleInterfaceName) 中没有找到 @SettingItem 属性", moduleDeclaration)
         }
 
-        val tokenType = buildTokenType(tokenTypeName, properties)
-        val stateType = buildStateType(stateTypeName)
-
-        val moduleTokenPrefix = "$packageName.$tokenTypeName."
-        val moduleBindings = interceptorBindings
-            .filter { it.tokenQualifiedName.startsWith(moduleTokenPrefix) }
-
-        val tokenTypeCanonical = "$packageName.$tokenTypeName"
-        val moduleTokenUiBindings = tokenUiBindings
-            .filter { it.tokenQualifiedName.startsWith(moduleTokenPrefix) || it.tokenQualifiedName == tokenTypeCanonical }
-
-        val renderFunction = buildRenderFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            stateType = ClassName(packageName, stateTypeName),
-            properties = properties,
-            tokenUiBindings = moduleTokenUiBindings,
-            fallbackUiBindings = fallbackUiBindings
-        )
-
-        val readSettingFlowFunction = buildReadSettingFlowFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            properties = properties
-        )
-
-        val persistSettingFunction = buildPersistSettingFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            properties = properties
-        )
-
-        val observeStateFunction = buildObserveStateFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            stateType = ClassName(packageName, stateTypeName),
-            properties = properties
-        )
-
-        val applyPatchFunction = buildApplyPatchFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            stateType = ClassName(packageName, stateTypeName),
-            properties = properties
-        )
-
-        val controllerType = buildControllerType(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            stateType = ClassName(packageName, stateTypeName)
-        )
-
-        val rememberStateFunction = buildRememberStateFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            stateType = ClassName(packageName, stateTypeName)
-        )
-
-        val rememberControllerFunction = buildRememberControllerFunction(
-            moduleInterfaceName = moduleInterfaceName,
-            tokenType = ClassName(packageName, tokenTypeName),
-            stateType = ClassName(packageName, stateTypeName),
-            controllerType = ClassName(packageName, "${moduleInterfaceName}Controller")
-        )
-
+        val tokenType = buildTokenType(tokenTypeName, properties, tokenUiBindings, fallbackUiBindings)
+        val stateType = buildStateType(stateTypeName, properties)
+        val rememberStateFunction = buildRememberStateFunction(moduleInterfaceName, stateType, properties)
         val koinModuleProperty = buildKoinModuleProperty(
             propertyName = koinModulePropertyName,
             tokenType = ClassName(packageName, tokenTypeName),
-            bindings = moduleBindings
+            interceptorBindings = interceptorBindings
         )
 
-        // Avoid passing KSFile instances to Dependencies to prevent PSI lifetime issues.
         val dependencies = Dependencies(false)
 
         FileSpec.builder(packageName, "${moduleInterfaceName}Generated")
             .addFileComment("Generated by TcSettingsSymbolProcessor. Do not edit.")
             .addImport("org.koin.dsl", "module")
-            .addImport("kotlinx.coroutines", "launch")
+            .addImport("org.koin.compose", "koinInject")
             .addImport("androidx.compose.runtime", "collectAsState")
+            .addImport("androidx.compose.runtime", "remember")
+            .addImport("androidx.compose.runtime", "rememberCoroutineScope")
+            .addImport("androidx.compose.runtime", "getValue")
+            .addImport("com.mocharealm.tcsettings.compose", "rememberSettingsController")
+            .addImport("com.mocharealm.tcsettings.core", "SettingsStore")
             .addType(tokenType)
             .addType(stateType)
-            .addType(controllerType)
             .addProperty(koinModuleProperty)
-            .addFunction(renderFunction)
-            .addFunction(readSettingFlowFunction)
-            .addFunction(persistSettingFunction)
-            .addFunction(observeStateFunction)
-            .addFunction(applyPatchFunction)
             .addFunction(rememberStateFunction)
-            .addFunction(rememberControllerFunction)
             .build()
             .writeTo(codeGenerator, dependencies)
     }
 
-    private fun buildControllerType(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        stateType: ClassName
-    ): TypeSpec {
-        val onPatchType = ClassName("kotlin", "Function2").parameterizedBy(
-            tokenType,
-            Any::class.asClassName().copy(nullable = true),
-            Unit::class.asClassName()
-        )
-
-        val constructor = FunSpec.constructorBuilder()
-            .addParameter("state", stateType)
-            .addParameter("onPatch", onPatchType)
-            .build()
-
-        val renderFun = FunSpec.builder("Render")
-            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
-            .addParameter("token", tokenType)
-            .addStatement("Render%LSetting(token, state, onPatch)", moduleInterfaceName)
-            .build()
-
-        return TypeSpec.classBuilder("${moduleInterfaceName}Controller")
-            .primaryConstructor(constructor)
-            .addProperty(PropertySpec.builder("state", stateType).initializer("state").build())
-            .addProperty(
-                PropertySpec.builder("onPatch", onPatchType)
-                    .initializer("onPatch")
-                    .build()
-            )
-            .addFunction(renderFun)
-            .build()
-    }
-
-
-    private fun buildRenderFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        stateType: ClassName,
+    private fun buildTokenType(
+        tokenTypeName: String,
         properties: List<KSPropertyDeclaration>,
         tokenUiBindings: List<TokenUiBinding>,
         fallbackUiBindings: List<FallbackUiBinding>
-    ): FunSpec {
-        val funSpec = FunSpec.builder("Render${moduleInterfaceName}Setting")
-            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
-            .addParameter("token", tokenType)
-            .addParameter("state", stateType)
-            .addParameter(
-                ParameterSpec.builder(
-                    "onPatch",
-                    ClassName("kotlin", "Function2").parameterizedBy(
-                        tokenType,
-                        Any::class.asClassName().copy(nullable = true),
-                        Unit::class.asClassName()
-                    )
-                ).build()
-            )
-
-        funSpec.beginControlFlow("when (token)")
+    ): TypeSpec {
+        val tokenTypeClassName = ClassName("", tokenTypeName)
+        val tokenInterface = TypeSpec.interfaceBuilder(tokenTypeName)
+            .addModifiers(KModifier.SEALED)
+            .addSuperinterface(SETTING_TOKEN_CLASS.parameterizedBy(TypeVariableName("T")))
+            .addTypeVariable(TypeVariableName("T"))
 
         properties.forEach { property ->
-            val propertyTypeName = property.type.resolve().declaration.qualifiedName?.asString()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-            val tokenQualifiedName = "${tokenType.canonicalName}.$tokenObjectName"
+            val propertyType = property.type.toTypeName()
+            val tokenObjectName = property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
+            val defaultValue = property.getDefaultValue()
 
-            val tokenBinding = tokenUiBindings.find {
-                val bindingName = it.tokenQualifiedName
-                bindingName == tokenQualifiedName ||
-                    bindingName == tokenType.canonicalName ||
-                    bindingName.endsWith("." + tokenObjectName) ||
-                    bindingName.endsWith("$" + tokenObjectName) ||
-                    bindingName.endsWith(tokenObjectName)
-            }
-            if (tokenBinding != null) {
-                val funcPackageName = tokenBinding.funcPackageName
-                val funcSimpleName = tokenBinding.funcSimpleName
-                if (tokenBinding.paramCount == 3) {
-                    funSpec.addStatement(
-                        "is %T.%L -> %T(token, state.get(token) ?: return, { onPatch(token, it) })",
-                        tokenType,
-                        tokenObjectName,
-                        ClassName(funcPackageName, funcSimpleName)
-                    )
-                } else {
-                    // function likely has signature (value, onValueChange)
-                    funSpec.addStatement(
-                        "is %T.%L -> %T(state.get(token) ?: return, { onPatch(token, it) })",
-                        tokenType,
-                        tokenObjectName,
-                        ClassName(funcPackageName, funcSimpleName)
-                    )
-                }
-            } else {
-                val fallbackBinding =
-                    fallbackUiBindings.find { it.propertyTypeQualifiedName == propertyTypeName }
-                if (fallbackBinding != null) {
-                    val funcPackageName = fallbackBinding.funcPackageName
-                    val funcSimpleName = fallbackBinding.funcSimpleName
-                    funSpec.addStatement(
-                        "is %T.%L -> %T(token, state.get(token) ?: return, { onPatch(token, it) })",
-                        tokenType,
-                        tokenObjectName,
-                        ClassName(funcPackageName, funcSimpleName)
-                    )
-                } else {
-                    funSpec.addStatement(
-                        "is %T.%L -> { /* No UI found for %L */ }",
-                        tokenType, tokenObjectName, tokenObjectName
-                    )
-                }
-            }
+            val tokenObject = TypeSpec.objectBuilder(tokenObjectName)
+                .addSuperinterface(tokenTypeClassName.parameterizedBy(propertyType))
+
+            val renderFun = buildTokenRenderFunction(
+                tokenObjectName = tokenObjectName,
+                propertyType = propertyType,
+                defaultValue = defaultValue,
+                tokenUiBindings = tokenUiBindings,
+                fallbackUiBindings = fallbackUiBindings
+            )
+            tokenObject.addFunction(renderFun)
+
+            tokenInterface.addType(tokenObject.build())
         }
 
-        funSpec.endControlFlow()
-        return funSpec.build()
+        return tokenInterface.build()
+    }
+
+    private fun KSPropertyDeclaration.getDefaultValue(): String {
+        val defaultValueAnnotation = annotations.firstOrNull {
+            it.annotationType.resolve().declaration.qualifiedName?.asString() == DEFAULT_VALUE_FQN
+        }
+        val valueArgument = defaultValueAnnotation?.arguments?.firstOrNull()?.value
+        return when (valueArgument) {
+            is String -> if (valueArgument.isEmpty()) "\"\"" else valueArgument
+            else -> "null"
+        }
+    }
+
+    private fun buildTokenRenderFunction(
+        tokenObjectName: String,
+        propertyType: com.squareup.kotlinpoet.TypeName,
+        defaultValue: String,
+        tokenUiBindings: List<TokenUiBinding>,
+        fallbackUiBindings: List<FallbackUiBinding>
+    ): FunSpec {
+        val onValueChangeType = ClassName("kotlin", "Function1").parameterizedBy(
+            propertyType,
+            ClassName("kotlin", "Boolean")
+        ).copy(nullable = true)
+
+        val renderFun = FunSpec.builder("Render")
+            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
+            .addParameter(
+                ParameterSpec.builder("onValueChange", onValueChangeType)
+                    .defaultValue("null")
+                    .build()
+            )
+
+        val tokenBinding = tokenUiBindings.find { it.tokenObjectName == tokenObjectName }
+        val fallbackBinding = fallbackUiBindings.find {
+            it.propertyTypeQualifiedName == propertyType.toString()
+        }
+
+        renderFun.addCode("""
+            val store: SettingsStore = koinInject()
+            val controller = rememberSettingsController(store)
+            
+            val value = remember(this) { store.flow(this, %L) }
+                .collectAsState(initial = %L).value
+            
+            val handleChange: (%L) -> Unit = { newValue ->
+                val allowed = onValueChange?.invoke(newValue) ?: true
+                if (allowed) {
+                    controller.update(this, newValue)
+                }
+            }
+        """.trimIndent(), defaultValue, defaultValue, propertyType)
+
+        if (tokenBinding != null) {
+            renderFun.addStatement(
+                "%T(value, handleChange)",
+                ClassName(tokenBinding.funcPackageName, tokenBinding.funcSimpleName)
+            )
+        } else if (fallbackBinding != null) {
+            renderFun.addStatement(
+                "%T(this, value, handleChange)",
+                ClassName(fallbackBinding.funcPackageName, fallbackBinding.funcSimpleName)
+            )
+        } else {
+            renderFun.addStatement("// No UI found for %L", tokenObjectName)
+        }
+
+        return renderFun.build()
+    }
+
+    private fun buildStateType(
+        stateTypeName: String,
+        properties: List<KSPropertyDeclaration>
+    ): TypeSpec {
+        val constructor = FunSpec.constructorBuilder()
+        properties.forEach { property ->
+            val propertyType = property.type.toTypeName()
+            val propertyName = property.simpleName.asString()
+            val defaultValue = property.getDefaultValue()
+            constructor.addParameter(
+                ParameterSpec.builder(propertyName, propertyType)
+                    .defaultValue(defaultValue)
+                    .build()
+            )
+        }
+
+        val stateClass = TypeSpec.classBuilder(stateTypeName)
+            .addModifiers(KModifier.DATA)
+            .primaryConstructor(constructor.build())
+
+        properties.forEach { property ->
+            val propertyType = property.type.toTypeName()
+            val propertyName = property.simpleName.asString()
+            stateClass.addProperty(
+                PropertySpec.builder(propertyName, propertyType)
+                    .initializer(propertyName)
+                    .build()
+            )
+        }
+
+        return stateClass.build()
+    }
+
+    private fun buildRememberStateFunction(
+        moduleInterfaceName: String,
+        stateType: TypeSpec,
+        properties: List<KSPropertyDeclaration>
+    ): FunSpec {
+        val function = FunSpec.builder("remember${moduleInterfaceName}State")
+            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
+
+        val codeBuilder = CodeBlock.builder()
+        codeBuilder.add("val store: SettingsStore = koinInject()\n\n")
+
+        properties.forEach { property ->
+            val propertyName = property.simpleName.asString()
+            val tokenObjectName = propertyName.replaceFirstChar { it.uppercaseChar() }
+            val defaultValue = property.getDefaultValue()
+            codeBuilder.add(
+                "val %L by remember { store.flow(%L.%L, %L) }\n    .collectAsState(initial = %L)\n",
+                propertyName,
+                "${moduleInterfaceName}Token",
+                tokenObjectName,
+                defaultValue,
+                defaultValue
+            )
+        }
+
+        codeBuilder.add("\nreturn remember(%L) {\n    %L(%L)\n}",
+            properties.joinToString(", ") { it.simpleName.asString() },
+            "${moduleInterfaceName}State",
+            properties.joinToString(", ") { it.simpleName.asString() }
+        )
+
+        function.addCode(codeBuilder.build())
+        return function.build()
     }
 
     private fun buildKoinModuleProperty(
         propertyName: String,
         tokenType: ClassName,
-        bindings: List<InterceptorBinding>
+        interceptorBindings: List<InterceptorBinding>
     ): PropertySpec {
-        val interceptorAnyType = SETTINGS_INTERCEPTOR_CLASS.parameterizedBy(
-            Any::class.asClassName().copy(nullable = true)
-        )
+        val interceptorAnyType = SETTINGS_INTERCEPTOR_CLASS.parameterizedBy(Any::class.asClassName().copy(nullable = true))
 
         val initializerBuilder = CodeBlock.builder()
             .add("module {\n")
             .indent()
 
-        if (bindings.isEmpty()) {
+        interceptorBindings.forEach { binding ->
+            initializerBuilder.add("single { %T(get()) }\n", binding.interceptorClassName)
+        }
+
+        if (interceptorBindings.isEmpty()) {
             initializerBuilder.add("single { %T() }\n", SETTINGS_INTERCEPTOR_DISPATCHER_CLASS)
         } else {
             initializerBuilder
@@ -543,13 +496,12 @@ class TcSettingsSymbolProcessor(
                 .add("mapOf(\n")
                 .indent()
 
-            bindings.forEachIndexed { index, binding ->
-                val tokenObjectName = binding.tokenQualifiedName.substringAfterLast('.')
-                val suffix = if (index < bindings.lastIndex) "," else ""
+            interceptorBindings.forEachIndexed { index, binding ->
+                val suffix = if (index < interceptorBindings.lastIndex) "," else ""
                 initializerBuilder.add(
-                    "%T.%L::class to (get<%T>() as %T)%L\n",
+                    "%T.%L to get<%T>() as %T%L\n",
                     tokenType,
-                    tokenObjectName,
+                    binding.tokenObjectName,
                     binding.interceptorClassName,
                     interceptorAnyType,
                     suffix
@@ -573,319 +525,6 @@ class TcSettingsSymbolProcessor(
 
         return PropertySpec.builder(propertyName, KOIN_MODULE_CLASS)
             .initializer(initializer)
-            .build()
-    }
-
-    private fun buildReadSettingFlowFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        properties: List<KSPropertyDeclaration>
-    ): FunSpec {
-        val tType = TypeVariableName("T")
-        val flowOfT = FLOW_CLASS.parameterizedBy(tType)
-
-        val function = FunSpec.builder("Read${moduleInterfaceName}SettingFlow")
-            .addTypeVariable(tType)
-            .addParameter("settingsStore", SETTINGS_STORE_CLASS)
-            .addParameter("token", tokenType)
-            .addParameter("defaultValue", tType)
-            .returns(flowOfT)
-            .addAnnotation(
-                AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S", "UNCHECKED_CAST")
-                    .build()
-            )
-
-        function.beginControlFlow("return when (token)")
-
-        properties.forEach { property ->
-            val propertyType = property.type.toTypeName()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-            function.addStatement(
-                "is %T.%L -> settingsStore.flow(%T.%L::class, defaultValue as %T) as %T",
-                tokenType,
-                tokenObjectName,
-                tokenType,
-                tokenObjectName,
-                propertyType,
-                flowOfT
-            )
-        }
-
-        function.endControlFlow()
-        return function.build()
-    }
-
-    private fun buildPersistSettingFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        properties: List<KSPropertyDeclaration>
-    ): FunSpec {
-        val function = FunSpec.builder("Persist${moduleInterfaceName}Setting")
-            .addModifiers(KModifier.SUSPEND)
-            .addParameter("settingsStore", SETTINGS_STORE_CLASS)
-            .addParameter("token", tokenType)
-            .addParameter("newValue", Any::class.asClassName().copy(nullable = true))
-            .addAnnotation(
-                AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S", "UNCHECKED_CAST")
-                    .build()
-            )
-
-        function.beginControlFlow("when (token)")
-
-        properties.forEach { property ->
-            val propertyType = property.type.toTypeName()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-            function.addStatement(
-                "is %T.%L -> settingsStore.write(%T.%L::class, newValue as %T)",
-                tokenType,
-                tokenObjectName,
-                tokenType,
-                tokenObjectName,
-                propertyType
-            )
-        }
-
-        function.endControlFlow()
-        return function.build()
-    }
-
-    private fun buildObserveStateFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        stateType: ClassName,
-        properties: List<KSPropertyDeclaration>
-    ): FunSpec {
-        val flowOfState = FLOW_CLASS.parameterizedBy(stateType)
-
-        val function = FunSpec.builder("Observe${moduleInterfaceName}State")
-            .addParameter("settingsStore", SETTINGS_STORE_CLASS)
-            .addParameter("defaults", stateType)
-            .returns(flowOfState)
-
-        function.addStatement(
-            "var merged: %T = kotlinx.coroutines.flow.flowOf(defaults)",
-            flowOfState
-        )
-
-        properties.forEach { property ->
-            val propertyType = property.type.toTypeName()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-            function.addStatement(
-                "val %LFlow = Read%LSettingFlow(settingsStore, %T.%L, defaults.get(%T.%L) as %T)",
-                property.simpleName.asString(),
-                moduleInterfaceName,
-                tokenType,
-                tokenObjectName,
-                tokenType,
-                tokenObjectName,
-                propertyType
-            )
-            function.addStatement(
-                "merged = kotlinx.coroutines.flow.combine(merged, %LFlow) { s, v -> s.patch(%T.%L, v) }",
-                property.simpleName.asString(),
-                tokenType,
-                tokenObjectName
-            )
-        }
-
-        function.addStatement("return merged")
-        return function.build()
-    }
-
-    private fun buildApplyPatchFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        stateType: ClassName,
-        properties: List<KSPropertyDeclaration>
-    ): FunSpec {
-        val function = FunSpec.builder("Apply${moduleInterfaceName}Patch")
-            .addModifiers(KModifier.SUSPEND)
-            .addParameter("settingsStore", SETTINGS_STORE_CLASS)
-            .addParameter("interceptorDispatcher", SETTINGS_INTERCEPTOR_DISPATCHER_CLASS)
-            .addParameter("state", stateType)
-            .addParameter("token", tokenType)
-            .addParameter("newValue", Any::class.asClassName().copy(nullable = true))
-            .addAnnotation(
-                AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S", "UNCHECKED_CAST")
-                    .build()
-            )
-            .returns(stateType)
-
-        function.beginControlFlow("return when (token)")
-
-        properties.forEach { property ->
-            val propertyType = property.type.toTypeName()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-            function.addStatement(
-                "is %T.%L -> when (interceptorDispatcher.dispatch(%T.%L::class, newValue as %T)) { " +
-                        "is %T.Success -> { Persist%LSetting(settingsStore, %T.%L, newValue as %T); state.patch(token, newValue) }; " +
-                        "is %T.Failure -> state }",
-                tokenType,
-                tokenObjectName,
-                tokenType,
-                tokenObjectName,
-                propertyType,
-                INTERCEPTOR_RESULT_CLASS,
-                moduleInterfaceName,
-                tokenType,
-                tokenObjectName,
-                propertyType,
-                INTERCEPTOR_RESULT_CLASS
-            )
-        }
-
-        function.endControlFlow()
-        return function.build()
-    }
-
-    private fun buildRememberStateFunction(
-        moduleInterfaceName: String,
-        stateType: ClassName
-    ): FunSpec {
-        val function = FunSpec.builder("remember${moduleInterfaceName}State")
-            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
-            .addParameter("defaults", stateType)
-            .returns(stateType)
-
-        function.addCode("""
-        val settingsStore = androidx.compose.runtime.remember {
-            %T.get<%T>(%T::class.java) 
-        }
-        val state = androidx.compose.runtime.remember(settingsStore, defaults) {
-            Observe%LState(settingsStore, defaults)
-        }.collectAsState(initial = defaults)
-        return state.value
-        """.trimIndent(),
-            KOIN_JAVA_COMPONENT_CLASS,
-            SETTINGS_STORE_CLASS,
-            SETTINGS_STORE_CLASS,
-            moduleInterfaceName
-        )
-
-        return function.build()
-    }
-
-    private fun buildRememberControllerFunction(
-        moduleInterfaceName: String,
-        tokenType: ClassName,
-        stateType: ClassName,
-        controllerType: ClassName
-    ): FunSpec {
-        val function = FunSpec.builder("remember${moduleInterfaceName}Controller")
-            .addAnnotation(ClassName("androidx.compose.runtime", "Composable"))
-            .addParameter("defaults", stateType)
-            .returns(controllerType)
-
-        function.addCode(
-            """
-            val settingsStore = androidx.compose.runtime.remember {
-                %T.get<%T>(%T::class.java)
-            }
-            val interceptorDispatcher = androidx.compose.runtime.remember {
-                %T.get<%T>(%T::class.java)
-            }
-            val scope = androidx.compose.runtime.rememberCoroutineScope()
-            val state = remember%LState(defaults)
-
-            return androidx.compose.runtime.remember(state, settingsStore, interceptorDispatcher, scope) {
-                %T(state) { token: %T, value: Any? ->
-                    scope.launch {
-                        Apply%LPatch(settingsStore, interceptorDispatcher, state, token, value)
-                    }
-                }
-            }
-            """.trimIndent(),
-            KOIN_JAVA_COMPONENT_CLASS,
-            SETTINGS_STORE_CLASS,
-            SETTINGS_STORE_CLASS,
-            KOIN_JAVA_COMPONENT_CLASS,
-            SETTINGS_INTERCEPTOR_DISPATCHER_CLASS,
-            SETTINGS_INTERCEPTOR_DISPATCHER_CLASS,
-            moduleInterfaceName,
-            controllerType,
-            tokenType,
-            moduleInterfaceName
-        )
-
-        return function.build()
-    }
-
-    private fun buildTokenType(
-        tokenTypeName: String,
-        properties: List<KSPropertyDeclaration>
-    ): TypeSpec {
-        val tokenTypeClassName = ClassName("", tokenTypeName)
-        val tokenInterface = TypeSpec.interfaceBuilder(tokenTypeName)
-            .addModifiers(KModifier.SEALED)
-
-        properties.forEach { property ->
-            val propertyType = property.type.toTypeName()
-            val tokenObjectName =
-                property.simpleName.asString().replaceFirstChar { it.uppercaseChar() }
-
-            val tokenObject = TypeSpec.objectBuilder(tokenObjectName)
-                .addSuperinterface(tokenTypeClassName)
-                .addSuperinterface(SETTING_TOKEN_CLASS.parameterizedBy(propertyType))
-                .build()
-
-            tokenInterface.addType(tokenObject)
-        }
-
-        return tokenInterface.build()
-    }
-
-    private fun buildStateType(stateTypeName: String): TypeSpec {
-        val tokenStar = SETTING_TOKEN_CLASS.parameterizedBy(STAR)
-        val valuesMapType = Map::class.asClassName()
-            .parameterizedBy(tokenStar, Any::class.asClassName().copy(nullable = true))
-        val tType = TypeVariableName("T")
-        val stateClass = ClassName("", stateTypeName)
-
-        val constructor = FunSpec.constructorBuilder()
-            .addParameter(
-                ParameterSpec.builder("values", valuesMapType)
-                    .defaultValue("emptyMap()")
-                    .build()
-            )
-            .build()
-
-        val valuesProperty = PropertySpec.builder("values", valuesMapType)
-            .initializer("values")
-            .addModifiers(KModifier.PRIVATE)
-            .build()
-
-        val getFun = FunSpec.builder("get")
-            .addModifiers(KModifier.OPERATOR)
-            .addTypeVariable(tType)
-            .addParameter("token", SETTING_TOKEN_CLASS.parameterizedBy(tType))
-            .returns(tType.copy(nullable = true))
-            .addAnnotation(
-                AnnotationSpec.builder(Suppress::class)
-                    .addMember("%S", "UNCHECKED_CAST")
-                    .build()
-            )
-            .addStatement("return values[token] as T?")
-            .build()
-
-        val patchFun = FunSpec.builder("patch")
-            .addParameter("token", tokenStar)
-            .addParameter("newValue", Any::class.asClassName().copy(nullable = true))
-            .returns(stateClass)
-            .addStatement("return %T(values = values + (token to newValue))", stateClass)
-            .build()
-
-        return TypeSpec.classBuilder(stateTypeName)
-            .primaryConstructor(constructor)
-            .addProperty(valuesProperty)
-            .addFunction(getFun)
-            .addFunction(patchFun)
             .build()
     }
 }

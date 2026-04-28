@@ -193,6 +193,7 @@ dependencies {
     ksp(project(":tci18n:processor"))
 
     implementation(project(":tcsettings:core"))
+    implementation(project(":tcsettings:compose"))
     ksp(project(":tcsettings:processor"))
 
     testImplementation(libs.junit)
