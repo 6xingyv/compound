@@ -196,7 +196,6 @@ dependencies {
     ksp(project(":tcsettings:processor"))
 
     testImplementation(libs.junit)
-    androidTestImplementation(libs.screengrab)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)
     androidTestImplementation(platform(libs.androidx.compose.bom))
