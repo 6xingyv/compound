@@ -19,12 +19,12 @@ fun tdLangPackId(locale: Locale): String {
         // Chinese
         "zh" -> {
             if (script.isNotEmpty()) {
-                "$lang-${script.lowercase()}-beta"
+                "$lang-${script.lowercase()}"
             }
 
             when (country) {
-                "TW", "HK", "MO" -> "zh-hant-beta"
-                else -> "zh-hans-beta"
+                "TW", "HK", "MO" -> "zh-hant"
+                else -> "zh-hans"
             }
         }
         // Portuguese: pt-BR vs pt
