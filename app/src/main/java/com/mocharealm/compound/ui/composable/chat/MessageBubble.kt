@@ -21,14 +21,18 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.zIndex
 import com.mocharealm.compound.domain.model.Message
@@ -53,44 +57,87 @@ import top.yukonga.miuix.kmp.theme.MiuixTheme
 fun MessageReactions(
     reactions: List<MessageReaction>,
     isOutgoing: Boolean,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    bubbleWidth: Dp = Dp.Unspecified
 ) {
     if (reactions.isEmpty()) return
+
+    val maxCount = if (bubbleWidth != Dp.Unspecified && bubbleWidth > 0.dp) {
+        val itemSize = 40.dp
+        val overlap = 12.dp
+        val itemStep = itemSize - overlap
+        val maxTotalWidth = bubbleWidth * 0.8f
+        (((maxTotalWidth - itemSize) / itemStep).toInt() + 1).coerceAtLeast(1)
+    } else Int.MAX_VALUE
+
+    val showEllipsis = reactions.size > maxCount
+    val displayReactions = if (showEllipsis) {
+        if (isOutgoing) {
+            reactions.take(maxCount - 1) + listOf<MessageReaction?>(null)
+        } else {
+            listOf<MessageReaction?>(null) + reactions.takeLast(maxCount - 1)
+        }
+    } else {
+        reactions.map { it as MessageReaction? }
+    }
+
     Row(
         modifier = modifier,
         horizontalArrangement = Arrangement.spacedBy((-12).dp),
         verticalAlignment = Alignment.Bottom
     ) {
-        val lastIndex = reactions.lastIndex
-        reactions.forEachIndexed { index, reaction ->
+        val lastIndex = displayReactions.lastIndex
+        displayReactions.forEachIndexed { index, reaction ->
             val isTopMost = if (isOutgoing) index == 0 else index == lastIndex
             val shape = if (isTopMost) {
                 IndicatorContinuousShape(if (isOutgoing) BubbleAlignment.Start else BubbleAlignment.End)
             } else {
                 ContinuousRoundedRectangle(20.dp)
             }
-            val reactionColor =
-                if (isOutgoing) MiuixTheme.colorScheme.surfaceContainer else MiuixTheme.colorScheme.primary
-            val reactionContentColor =
-                if (isOutgoing) MiuixTheme.colorScheme.onSurfaceContainer else MiuixTheme.colorScheme.onPrimary
-            Box(
-                modifier = Modifier
-                    .zIndex(
-                        if (isOutgoing) {
-                            (lastIndex - index).toFloat()
-                        } else {
-                            index.toFloat()
-                        }
+            if (reaction == null) {
+                Box(
+                    modifier = Modifier
+                        .zIndex(
+                            if (isOutgoing) {
+                                (lastIndex - index).toFloat()
+                            } else {
+                                index.toFloat()
+                            }
+                        )
+                        .size(40.dp)
+                        .surface(shape = shape, color = MiuixTheme.colorScheme.surfaceContainer),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text(
+                        text = "...",
+                        style = MiuixTheme.textStyles.body1,
+                        color = MiuixTheme.colorScheme.onSurfaceContainer
                     )
-                    .size(40.dp)
-                    .surface(shape = shape, color = reactionColor),
-                contentAlignment = Alignment.Center
-            ) {
-                RichText(
-                    text = reaction.reactionText.toAnnotatedString(),
-                    style = MiuixTheme.textStyles.body1,
-                    contentColor = reactionContentColor
-                )
+                }
+            } else {
+                val reactionColor =
+                    if (reaction.isChosen) MiuixTheme.colorScheme.primary else MiuixTheme.colorScheme.surfaceContainer
+                val reactionContentColor =
+                    if (reaction.isChosen) MiuixTheme.colorScheme.onPrimary else MiuixTheme.colorScheme.onSurfaceContainer
+                Box(
+                    modifier = Modifier
+                        .zIndex(
+                            if (isOutgoing) {
+                                (lastIndex - index).toFloat()
+                            } else {
+                                index.toFloat()
+                            }
+                        )
+                        .size(40.dp)
+                        .surface(shape = shape, color = reactionColor),
+                    contentAlignment = Alignment.Center
+                ) {
+                    RichText(
+                        text = reaction.reactionText.toAnnotatedString(),
+                        style = MiuixTheme.textStyles.body1,
+                        contentColor = reactionContentColor
+                    )
+                }
             }
         }
     }
@@ -109,6 +156,8 @@ fun MessageBubble(
     val isBorderless =
         (message.blocks.size == 1 && message.blocks.first() is MessageBlock.StickerBlock) ||
                 (message.blocks.all { it is MessageBlock.MediaBlock && it.mediaType == MessageBlock.MediaBlock.MediaType.PHOTO } && message.blocks.size > 1)
+
+    var bubbleWidth by remember { mutableStateOf(0) }
 
     val topPad = if (isFirst) 8.dp else 2.dp
     val bottomPad = if (isLast) 8.dp else 2.dp
@@ -153,24 +202,8 @@ fun MessageBubble(
             }
 
         Column(
-            Modifier.weight(1f, fill = false),
-            verticalArrangement = Arrangement.spacedBy(4.dp)
+            Modifier.weight(1f, fill = false)
         ) {
-            if (showAvatar) {
-                if (!message.isOutgoing && isFirst) {
-                    Text(
-                        text = message.sender.formatName(),
-                        fontWeight = FontWeight.SemiBold,
-                        style = MiuixTheme.textStyles.footnote1,
-                        modifier = Modifier
-                            .padding(horizontal = 12.dp)
-                            .alpha(0.6f),
-                        maxLines = 1,
-                        overflow = TextOverflow.Ellipsis
-                    )
-                }
-            }
-
             val colorScheme = MiuixTheme.colorScheme
 
             val contentColor = remember(message.isOutgoing) {
@@ -189,54 +222,78 @@ fun MessageBubble(
                     backgroundColor = contentColor.copy(0.2f)
                 )
             ) {
+                val density = LocalDensity.current
+                val bubbleWidthDp = with(density) { bubbleWidth.toDp() }
                 Box {
-                    val reactionsPadding = if (message.reactions.isNotEmpty()) {
-                        Modifier.padding(
-                            top = 20.dp,
-                            start = if (message.isOutgoing) 20.dp else 0.dp,
-                            end = if (message.isOutgoing) 0.dp else 20.dp
-                        )
-                    } else Modifier
-
-                    Box(modifier = reactionsPadding) {
-                        if (isBorderless) {
-                            MessageContent(
-                                message,
-                                isBorderless = true,
-                                hasTail = isLast,
-                                onReplyClick = onReplyClick
+                    val showNickname = showAvatar && !message.isOutgoing && isFirst
+                    Column {
+                        if (showNickname) {
+                            Text(
+                                text = message.sender.formatName(),
+                                fontWeight = FontWeight.SemiBold,
+                                style = MiuixTheme.textStyles.footnote1,
+                                modifier = Modifier
+                                    .padding(horizontal = 12.dp)
+                                    .alpha(0.6f),
+                                maxLines = 1,
+                                overflow = TextOverflow.Ellipsis
                             )
-                        } else {
-                            Box(
-                                modifier =
-                                    Modifier
-                                        .surface(
-                                            shape = shape,
-                                            color =
-                                                if (message.isOutgoing)
-                                                    MiuixTheme.colorScheme.primary
-                                                else
-                                                    MiuixTheme.colorScheme
-                                                        .surfaceContainer,
-                                        )
-                                        .semantics(mergeDescendants = false) {
-                                            isTraversalGroup = true
-                                        },
-                                propagateMinConstraints = true,
-                            ) {
-                                MessageContent(
-                                    message = message,
-                                    isBorderless = false,
-                                    hasTail = isLast,
-                                    onReplyClick = onReplyClick,
-                                )
+                            Spacer(Modifier.size(4.dp))
+                        }
+
+                        val reactionsPadding = if (message.reactions.isNotEmpty()) {
+                            Modifier.padding(
+                                top = if (showNickname) 0.dp else 20.dp,
+                                start = if (message.isOutgoing) 20.dp else 0.dp,
+                                end = if (message.isOutgoing) 0.dp else 20.dp
+                            )
+                        } else Modifier
+
+                        Box(modifier = reactionsPadding) {
+                            if (isBorderless) {
+                                Box(Modifier.onSizeChanged { bubbleWidth = it.width }) {
+                                    MessageContent(
+                                        message,
+                                        isBorderless = true,
+                                        hasTail = isLast,
+                                        onReplyClick = onReplyClick
+                                    )
+                                }
+                            } else {
+                                Box(
+                                    modifier =
+                                        Modifier
+                                            .surface(
+                                                shape = shape,
+                                                color =
+                                                    if (message.isOutgoing)
+                                                        MiuixTheme.colorScheme.primary
+                                                    else
+                                                        MiuixTheme.colorScheme
+                                                            .surfaceContainer,
+                                            )
+                                            .onSizeChanged { bubbleWidth = it.width }
+                                            .semantics(mergeDescendants = false) {
+                                                isTraversalGroup = true
+                                            },
+                                    propagateMinConstraints = true,
+                                ) {
+                                    MessageContent(
+                                        message = message,
+                                        isBorderless = false,
+                                        hasTail = isLast,
+                                        onReplyClick = onReplyClick,
+                                    )
+                                }
                             }
                         }
                     }
+
                     if (message.reactions.isNotEmpty()) {
                         MessageReactions(
                             reactions = message.reactions,
                             isOutgoing = message.isOutgoing,
+                            bubbleWidth = bubbleWidthDp,
                             modifier = Modifier.align(
                                 if (message.isOutgoing) Alignment.TopStart else Alignment.TopEnd
                             )
