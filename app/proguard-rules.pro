@@ -29,3 +29,4 @@
 -keepclasseswithmembernames class * {
     native <methods>;
 }
+-keep class com.mocharealm.compound.domain.model.settings.*

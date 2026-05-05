@@ -13,6 +13,7 @@ import com.mocharealm.compound.data.repository.telegram.MessageRepositoryImpl
 import com.mocharealm.compound.data.repository.telegram.TelegramRepositoryImpl
 import com.mocharealm.compound.data.source.local.AppDataStoreSettingsStore
 import com.mocharealm.compound.data.source.remote.TdLibDataSource
+import com.mocharealm.compound.domain.model.settings.LanguageSettingsModuleToken
 import com.mocharealm.compound.domain.repository.AuthRepository
 import com.mocharealm.compound.domain.repository.ChatRepository
 import com.mocharealm.compound.domain.repository.MediaRepository
@@ -25,6 +26,7 @@ import com.mocharealm.tci18n.core.tdLangPackId
 import com.mocharealm.tcsettings.core.SettingsStore
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.drinkless.tdlib.Client
 import org.drinkless.tdlib.TdApi
@@ -82,8 +84,16 @@ val dataModule = module {
     }
     single {
         val client: Client = get()
+        val settingsStore: SettingsStore = get()
+
         TdStringProvider { keys ->
-            val langPackId = tdLangPackId(Locale.getDefault())
+            // Dynamically get the current language pack ID from settings
+            // Falls back to device locale if no setting is saved
+            val savedLanguageCode = settingsStore.flow(LanguageSettingsModuleToken.LanguageCode, "").first()
+            val langPackId = savedLanguageCode.ifEmpty {
+                tdLangPackId(Locale.getDefault())
+            }
+
             // Fire and forget synchronization so it doesn't block offline loading
             client.send(TdApi.SynchronizeLanguagePack(langPackId)) { }
 
@@ -128,4 +138,3 @@ val dataModule = module {
         }
     }
 }
-

@@ -24,11 +24,20 @@ class AppDataStoreSettingsStore(private val context: Context) : SettingsStore {
 
     private val keyCache = ConcurrentHashMap<SettingToken<*>, Preferences.Key<*>>()
 
+    /**
+     * Generate a stable key name for the token.
+     * Uses the class name which is stable across app restarts.
+     */
+    private fun getTokenKeyName(token: SettingToken<*>): String {
+        // For Kotlin objects, use the class name which is stable
+        return token::class.java.name
+    }
+
     @Suppress("UNCHECKED_CAST")
     private fun <T> getOrCreateKey(token: SettingToken<T>, defaultValue: T): Preferences.Key<T> {
         keyCache[token]?.let { return it as Preferences.Key<T> }
 
-        val keyName = token.toString()
+        val keyName = getTokenKeyName(token)
         val key = when (defaultValue) {
             is Boolean -> booleanPreferencesKey(keyName)
             is Int -> intPreferencesKey(keyName)

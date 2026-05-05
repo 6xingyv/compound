@@ -7,6 +7,27 @@ import com.mocharealm.tcsettings.core.SettingsInterceptor
 import com.mocharealm.tcsettings.core.SettingsToken
 import org.drinkless.tdlib.TdApi
 
+@SettingsToken(PrivacySettingsModuleToken.PasscodeLock::class)
+class PasscodeLockInterceptor(
+    private val tdLibDataSource: TdLibDataSource
+) : SettingsInterceptor<Boolean> {
+    override suspend fun intercept(newValue: Boolean): InterceptorResult {
+        // TODO
+        // Passcode lock 是本地功能，不需要同步到 TDLib
+        return InterceptorResult.Success
+    }
+}
+
+@SettingsToken(PrivacySettingsModuleToken.TwoStepVerification::class)
+class TwoStepVerificationInterceptor(
+    private val tdLibDataSource: TdLibDataSource
+) : SettingsInterceptor<Boolean> {
+    override suspend fun intercept(newValue: Boolean): InterceptorResult {
+        // Two-step verification 需要单独的 API 处理
+        return InterceptorResult.Success
+    }
+}
+
 @SettingsToken(PrivacySettingsModuleToken.SyncContacts::class)
 class SyncContactsInterceptor(
     private val tdLibDataSource: TdLibDataSource

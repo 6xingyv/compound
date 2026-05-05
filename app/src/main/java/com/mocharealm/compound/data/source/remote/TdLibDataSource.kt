@@ -6,9 +6,11 @@ import com.mocharealm.compound.BuildConfig
 import com.mocharealm.tci18n.core.tdLangPackId
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.flow.Flow
 import kotlinx.coroutines.flow.SharedFlow
+import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.filterIsInstance
+import kotlinx.coroutines.flow.map
+import kotlinx.coroutines.flow.shareIn
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.suspendCancellableCoroutine
 import org.drinkless.tdlib.Client
@@ -16,10 +18,6 @@ import org.drinkless.tdlib.TdApi
 import java.util.Locale
 import kotlin.coroutines.resume
 import kotlin.coroutines.resumeWithException
-
-import kotlinx.coroutines.flow.SharingStarted
-import kotlinx.coroutines.flow.map
-import kotlinx.coroutines.flow.shareIn
 
 class TdLibDataSource(
     private val client: Client,
@@ -70,6 +68,10 @@ class TdLibDataSource(
         runCatching {
             send(query)
         }
+
+    suspend fun getLocalizationTargetInfo(): Result<TdApi.LocalizationTargetInfo> {
+        return sendSafe(TdApi.GetLocalizationTargetInfo(true))
+    }
 
     fun setBackgroundActive(active: Boolean) {
         client.send(TdApi.SetOption("is_background_active", TdApi.OptionValueBoolean(active))) { }

@@ -23,6 +23,8 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.text.input.TextFieldLineLimits
 import androidx.compose.foundation.text.input.TextFieldState
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -35,6 +37,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.unit.dp
+import com.mocharealm.compound.domain.model.settings.LanguageSettingsModuleToken
 import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.nav.Screen
 import com.mocharealm.compound.ui.screen.settings.fragments.ChatSettingsFragment
@@ -68,11 +71,14 @@ import com.mocharealm.gaze.ui.composable.TextField
 import com.mocharealm.gaze.ui.modifier.surface
 import com.mocharealm.tci18n.core.tdLangPackId
 import com.mocharealm.tci18n.core.tdString
+import com.mocharealm.tcsettings.core.SettingsStore
+import org.koin.compose.koinInject
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Scaffold
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 import top.yukonga.miuix.kmp.utils.scrollEndHaptic
+import java.util.Locale
 
 data class SettingsScreenItem(
     val title: String,
@@ -131,6 +137,15 @@ fun SettingsScreen(destination: Screen.SettingsDestination = Screen.SettingsDest
         drawContent()
     }
 
+
+    val store: SettingsStore = koinInject()
+    val currentLanguage by remember {
+        store.flow(
+            LanguageSettingsModuleToken.LanguageCode,
+            tdLangPackId(Locale.getDefault())
+        )
+    }.collectAsState(initial = "")
+
     val settingsItems = listOf(
         SettingsScreenItem(
             tdString("SettingsChat"),
@@ -169,7 +184,7 @@ fun SettingsScreen(destination: Screen.SettingsDestination = Screen.SettingsDest
         ),
         SettingsScreenItem(
             tdString("SettingsLanguage"),
-            tdLangPackId(java.util.Locale.getDefault()),
+            currentLanguage,
             SFIcons.Globe_Fill,
             Color(0xFFc26cf3) to Color(0xFFa056df),
             Screen.Settings(Screen.SettingsDestination.Language)

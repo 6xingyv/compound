@@ -30,19 +30,24 @@ import com.mocharealm.gaze.ui.composable.Button
 import com.mocharealm.gaze.ui.composable.Toggle
 import com.mocharealm.tcsettings.core.SelectableValue
 import com.mocharealm.tcsettings.core.SettingToken
+import com.mocharealm.tcsettings.core.SettingsFallback
 import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
+@SettingsFallback(type = Boolean::class)
 @Composable
 fun RenderBooleanSettingItem(
+    token: SettingToken<Boolean>,
     value: Boolean,
     onValueChange: (Boolean) -> Unit
 ) = Toggle({ value }, onValueChange)
 
+@SettingsFallback(type = String::class)
 @Composable
 fun RenderStringSettingItem(
+    token: SettingToken<String>,
     value: String,
     onValueChange: (String) -> Unit
 ) {
@@ -57,8 +62,10 @@ fun RenderStringSettingItem(
     )
 }
 
+@SettingsFallback(type = Int::class)
 @Composable
 fun RenderIntSettingItem(
+    token: SettingToken<Int>,
     value: Int,
     onValueChange: (Int) -> Unit
 ) {
@@ -116,6 +123,7 @@ fun RenderIntSettingItem(
     }
 }
 
+@SettingsFallback(type = SelectableValue::class)
 @Composable
 fun <T> RenderSelectableSettingItem(
     token: SettingToken<T>,

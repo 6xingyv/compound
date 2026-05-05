@@ -36,7 +36,7 @@ sealed class TdStringValue {
             0 -> zero.takeIf { it.isNotEmpty() } ?: other
             1 -> one.takeIf { it.isNotEmpty() } ?: other
             2 -> two.takeIf { it.isNotEmpty() } ?: other
-            else -> other // Simplified for now
+            else -> other // Simplified for now TODO
         }
     }
 

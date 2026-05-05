@@ -113,6 +113,7 @@ data class ChatUiState(
     val selectedFiles: List<ShareFileInfo> = emptyList(),
     val replyingToMessage: Message? = null,
     val pinnedMessages: List<Message> = emptyList(),
+    val currentPinnedIndex: Int = 0,
 ) {
     fun withMessages(newMessages: List<Message>): ChatUiState {
         return copy(
@@ -513,6 +514,18 @@ class ChatViewModel(
                 }
             }
         }
+    }
+
+    fun cyclePinnedMessages() {
+        val state = _uiState.value
+        val pins = state.pinnedMessages
+        if (pins.isEmpty()) return
+
+        val currentIndex = state.currentPinnedIndex % pins.size
+        scrollToMessage(pins[currentIndex].primaryId)
+
+        val nextIndex = (currentIndex + 1) % pins.size
+        _uiState.update { it.copy(currentPinnedIndex = nextIndex) }
     }
 
     fun clearScrollTarget() {

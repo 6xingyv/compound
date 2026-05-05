@@ -386,16 +386,20 @@ class TcSettingsSymbolProcessor(
         """.trimIndent(), defaultValue, defaultValue, propertyType)
 
         if (tokenBinding != null) {
+            renderFun.addStatement("")
             renderFun.addStatement(
                 "%T(value, handleChange)",
                 ClassName(tokenBinding.funcPackageName, tokenBinding.funcSimpleName)
             )
         } else if (fallbackBinding != null) {
+            renderFun.addStatement("")
             renderFun.addStatement(
-                "%T(this, value, handleChange)",
-                ClassName(fallbackBinding.funcPackageName, fallbackBinding.funcSimpleName)
+                "%T(this@%L, value, handleChange)",
+                ClassName(fallbackBinding.funcPackageName, fallbackBinding.funcSimpleName),
+                tokenObjectName
             )
         } else {
+            renderFun.addStatement("")
             renderFun.addStatement("// No UI found for %L", tokenObjectName)
         }
 

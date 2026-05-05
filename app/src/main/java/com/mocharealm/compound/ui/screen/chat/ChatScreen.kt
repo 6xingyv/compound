@@ -457,7 +457,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                 }
 
                 AnimatedVisibility(visible = state.pinnedMessages.isNotEmpty()) {
-                    state.pinnedMessages.firstOrNull()?.let { pinnedMessage ->
+                    state.pinnedMessages.getOrNull(state.currentPinnedIndex % state.pinnedMessages.size)?.let { pinnedMessage ->
                         val pinnedText =
                             pinnedMessage.blocks.find { it is MessageBlock.TextBlock }
                                 .let { if (it is MessageBlock.TextBlock) it.content.content else "Media" }
@@ -469,7 +469,7 @@ fun ChatScreen(viewModel: ChatViewModel = koinViewModel()) {
                                 indication = null,
                                 role = Role.Button,
                                 onClick = {
-                                    viewModel.scrollToMessage(pinnedMessage.id)
+                                    viewModel.cyclePinnedMessages()
                                 }
                             ),
                             shape = { ContinuousRoundedRectangle(16.dp) },

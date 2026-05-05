@@ -170,4 +170,54 @@ class TdStringProvider(
             }
         }
     }
+
+    /**
+     * Clear all cached strings and reload them.
+     * This is useful when the language is changed.
+     */
+    suspend fun clearCacheAndReload() {
+        mutex.withLock {
+            // Clear the global cache
+            globalCache.clear()
+            
+            // Collect all keys that need to be reloaded
+            val allKeys = mutableSetOf<String>()
+            for ((_, pageMap) in pageStrings) {
+                allKeys.addAll(pageMap.keys)
+            }
+            
+            // Reset all reactive states to empty
+            for ((_, pageMap) in pageStrings) {
+                for ((_, state) in pageMap) {
+                    state.value = TdStringValue.Empty
+                }
+            }
+        }
+        
+        // Reload all keys
+        val keysToReload = mutex.withLock {
+            val keys = mutableSetOf<String>()
+            for ((_, pageMap) in pageStrings) {
+                keys.addAll(pageMap.keys)
+            }
+            keys.toList()
+        }
+        
+        if (keysToReload.isNotEmpty()) {
+            try {
+                val fetched = fetchStrings(keysToReload)
+                mutex.withLock {
+                    for ((key, value) in fetched) {
+                        globalCache[key] = value
+                        // Update all pages that reference this key
+                        for ((_, pageMap) in pageStrings) {
+                            pageMap[key]?.value = value
+                        }
+                    }
+                }
+            } catch (_: Exception) {
+                // Silently handle fetch errors
+            }
+        }
+    }
 }

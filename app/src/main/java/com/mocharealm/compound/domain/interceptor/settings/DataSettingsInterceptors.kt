@@ -8,11 +8,23 @@ import com.mocharealm.tcsettings.core.SettingsToken
 import org.drinkless.tdlib.TdApi
 
 @SettingsToken(DataSettingsModuleToken.AutoPlayVideos::class)
-class AutoPlayVideosInterceptor(
+class DataAutoPlayVideosInterceptor(
     private val tdLibDataSource: TdLibDataSource
 ) : SettingsInterceptor<Boolean> {
     override suspend fun intercept(newValue: Boolean): InterceptorResult {
         return tdLibDataSource.sendSafe(TdApi.SetOption("autoplay_video", TdApi.OptionValueBoolean(newValue))).fold(
+            onSuccess = { InterceptorResult.Success },
+            onFailure = { InterceptorResult.Failure(throwable = it) }
+        )
+    }
+}
+
+@SettingsToken(DataSettingsModuleToken.AutoPlayGifs::class)
+class AutoPlayGifsInterceptor(
+    private val tdLibDataSource: TdLibDataSource
+) : SettingsInterceptor<Boolean> {
+    override suspend fun intercept(newValue: Boolean): InterceptorResult {
+        return tdLibDataSource.sendSafe(TdApi.SetOption("autoplay_gifs", TdApi.OptionValueBoolean(newValue))).fold(
             onSuccess = { InterceptorResult.Success },
             onFailure = { InterceptorResult.Failure(throwable = it) }
         )
