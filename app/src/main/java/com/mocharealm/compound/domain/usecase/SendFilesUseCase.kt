@@ -11,7 +11,8 @@ class SendFilesUseCase(private val repository: TelegramRepository) {
             files: List<ShareFileInfo>,
             caption: String = "",
             captionEntities: List<Text.TextEntity> = emptyList(),
-            replyToMessageId: Long = 0
+            replyToMessageId: Long = 0,
+            asFile: Boolean = false
     ): Result<List<Message>> =
-            repository.sendFiles(chatId, files, caption, captionEntities, replyToMessageId)
+            repository.sendFiles(chatId, files, caption, captionEntities, replyToMessageId, asFile)
 }

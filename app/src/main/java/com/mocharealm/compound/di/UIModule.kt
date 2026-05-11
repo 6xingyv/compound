@@ -88,7 +88,9 @@ val uiModule = module {
             getCustomEmojiStickers = get(),
             getChatPinnedMessage = get(),
             saveFileToDownloads = get(),
-            openFile = get()
+            openFile = get(),
+            deleteMessages = get(),
+            editMessageText = get()
         )
     }
 

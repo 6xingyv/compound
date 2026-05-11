@@ -81,7 +81,8 @@ class MessageRepositoryImpl(
         files: List<ShareFileInfo>,
         caption: String,
         captionEntities: List<Text.TextEntity>,
-        replyToMessageId: Long
+        replyToMessageId: Long,
+        asFile: Boolean
     ): Result<List<Message>> = runCatching {
         val formattedCaption = TdApi.FormattedText(caption, MessageDto.mapToTdApiEntities(captionEntities))
 
@@ -90,7 +91,21 @@ class MessageRepositoryImpl(
             val cap = if (isLast) formattedCaption else TdApi.FormattedText("", emptyArray())
             val thumbnail = file.thumbnailPath?.let { TdApi.InputThumbnail(TdApi.InputFileLocal(it), 320, 320) }
 
-            TdApi.InputMessageDocument(TdApi.InputFileLocal(file.filePath), thumbnail, false, cap)
+            if (asFile) {
+                TdApi.InputMessageDocument(TdApi.InputFileLocal(file.filePath), thumbnail, false, cap)
+            } else {
+                when {
+                    file.mimeType.startsWith("image/") -> {
+                        TdApi.InputMessagePhoto(TdApi.InputFileLocal(file.filePath), thumbnail, intArrayOf(), 0, 0, cap, false, null, false)
+                    }
+                    file.mimeType.startsWith("video/") -> {
+                        TdApi.InputMessageVideo(TdApi.InputFileLocal(file.filePath), thumbnail, null, 0, intArrayOf(), 0, 0, 0, false, cap, false, null, false)
+                    }
+                    else -> {
+                        TdApi.InputMessageDocument(TdApi.InputFileLocal(file.filePath), thumbnail, false, cap)
+                    }
+                }
+            }
         }
 
         val replyTo = if (replyToMessageId != 0L) {
@@ -130,6 +145,11 @@ class MessageRepositoryImpl(
         tdLibDataSource.updates.filterIsInstance<TdApi.UpdateMessageInteractionInfo>().transform { update ->
             val msg = tdLibDataSource.sendSafe(TdApi.GetMessage(update.chatId, update.messageId)).getOrNull()
             if (msg != null) emit(MessageUpdateEvent.MessageUpdated(messageMapper.mapSingleTdMessage(msg)))
+        },
+        tdLibDataSource.deleteMessagesFlow.transform { update ->
+            update.messageIds.forEach { id ->
+                emit(MessageUpdateEvent.MessageDeleted(id, update.chatId))
+            }
         }
     )
 
@@ -169,5 +189,19 @@ class MessageRepositoryImpl(
         }
         tdLibDataSource.send(TdApi.SetChatDraftMessage(chatId, null, draft))
         Result.success(Unit)
+    }
+
+    override suspend fun deleteMessages(chatId: Long, messageIds: List<Long>, revoke: Boolean): Result<Unit> = runCatching {
+        tdLibDataSource.send(TdApi.DeleteMessages(chatId, messageIds.toLongArray(), revoke))
+    }
+
+    override suspend fun editMessageText(chatId: Long, messageId: Long, text: String): Result<Message> = runCatching {
+        val (finalText, finalEntities) = MarkdownParser.parseForSending(text)
+        val content = TdApi.InputMessageText(
+            TdApi.FormattedText(finalText, MessageDto.mapToTdApiEntities(finalEntities)),
+            null, true
+        )
+        val msg = tdLibDataSource.send(TdApi.EditMessageText(chatId, messageId, null, content))
+        messageMapper.mapSingleTdMessage(msg)
     }
 }

@@ -26,6 +26,8 @@ import com.mocharealm.compound.domain.usecase.SendStickerUseCase
 import com.mocharealm.compound.domain.usecase.SetAuthenticationPhoneNumberUseCase
 import com.mocharealm.compound.domain.usecase.SetChatDraftMessageUseCase
 import com.mocharealm.compound.domain.usecase.SubscribeToMessageUpdatesUseCase
+import com.mocharealm.compound.domain.usecase.DeleteMessagesUseCase
+import com.mocharealm.compound.domain.usecase.EditMessageTextUseCase
 import com.mocharealm.compound.domain.usecase.ToggleChatArchiveUseCase
 import com.mocharealm.compound.domain.usecase.ToggleChatPinUseCase
 import com.mocharealm.compound.domain.usecase.auth.AwaitAuthenticationStateUseCase
@@ -141,5 +143,11 @@ val domainModule = module {
     }
     factory {
         ToggleChatArchiveUseCase(get())
+    }
+    factory {
+        DeleteMessagesUseCase(get())
+    }
+    factory {
+        EditMessageTextUseCase(get())
     }
 }

@@ -14,6 +14,8 @@ import com.mocharealm.compound.domain.model.ShareFileInfo
 import com.mocharealm.compound.domain.model.StickerSetInfo
 import com.mocharealm.compound.domain.model.Text
 import com.mocharealm.compound.domain.usecase.CloseChatUseCase
+import com.mocharealm.compound.domain.usecase.DeleteMessagesUseCase
+import com.mocharealm.compound.domain.usecase.EditMessageTextUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileUseCase
 import com.mocharealm.compound.domain.usecase.DownloadFileWithProgressUseCase
 import com.mocharealm.compound.domain.usecase.GetChatMessagesUseCase
@@ -89,6 +91,11 @@ fun List<Message>.toMessageItems(): List<ChatMessageItem> {
     }
 }
 
+data class SelectedFileItem(
+    val info: ShareFileInfo,
+    val block: MessageBlock
+)
+
 data class ChatUiState(
     val messages: List<Message> = emptyList(),
     val messageItems: List<ChatMessageItem> = emptyList(),
@@ -110,10 +117,12 @@ data class ChatUiState(
     val stickerPanelVisible: Boolean = false,
     val stickersLoading: Boolean = false,
     val locationPanelVisible: Boolean = false,
-    val selectedFiles: List<ShareFileInfo> = emptyList(),
+    val selectedFiles: List<SelectedFileItem> = emptyList(),
     val replyingToMessage: Message? = null,
+    val editingMessage: Message? = null,
     val pinnedMessages: List<Message> = emptyList(),
     val currentPinnedIndex: Int = 0,
+    val sendAsFile: Boolean = false,
 ) {
     fun withMessages(newMessages: List<Message>): ChatUiState {
         return copy(
@@ -155,7 +164,9 @@ class ChatViewModel(
     private val getCustomEmojiStickers: GetCustomEmojiStickersUseCase,
     private val getChatPinnedMessage: GetChatPinnedMessageUseCase,
     private val saveFileToDownloads: SaveFileToDownloadsUseCase,
-    private val openFile: OpenFileUseCase
+    private val openFile: OpenFileUseCase,
+    private val deleteMessages: DeleteMessagesUseCase,
+    private val editMessageText: EditMessageTextUseCase
 ) : ViewModel() {
 
     companion object {
@@ -281,15 +292,30 @@ class ChatViewModel(
     }
 
     fun sendMessage() {
+        val state = _uiState.value
         val text = inputState.text.toString()
-        val files = _uiState.value.selectedFiles
-        val replyToId = _uiState.value.replyingToMessage?.primaryId ?: 0L
+
+        // If editing, submit edit instead
+        val editing = state.editingMessage
+        if (editing != null) {
+            if (text.isBlank()) return
+            viewModelScope.launch {
+                editMessageText(chatId, editing.primaryId, text).onSuccess {
+                    inputState.clearText()
+                    _uiState.update { it.copy(editingMessage = null) }
+                }
+            }
+            return
+        }
+
+        val files = state.selectedFiles.map { it.info }
+        val replyToId = state.replyingToMessage?.primaryId ?: 0L
 
         if (text.isBlank() && files.isEmpty()) return
 
         if (files.isNotEmpty()) {
             viewModelScope.launch {
-                sendFiles(chatId, files, text, replyToMessageId = replyToId).onSuccess {
+                sendFiles(chatId, files, text, replyToMessageId = replyToId, asFile = state.sendAsFile).onSuccess {
                     inputState.clearText()
                     _uiState.update { it.copy(selectedFiles = emptyList(), replyingToMessage = null) }
                 }.onFailure { e -> }
@@ -305,7 +331,24 @@ class ChatViewModel(
     }
 
     fun setReplyingTo(message: Message?) {
-        _uiState.update { it.copy(replyingToMessage = message) }
+        _uiState.update { it.copy(replyingToMessage = message, editingMessage = null) }
+    }
+
+    fun startEditing(message: Message) {
+        val text = message.blocks.filterIsInstance<MessageBlock.TextBlock>().firstOrNull()?.content?.content ?: return
+        inputState.edit { replace(0, length, text) }
+        _uiState.update { it.copy(editingMessage = message, replyingToMessage = null) }
+    }
+
+    fun cancelEditing() {
+        inputState.clearText()
+        _uiState.update { it.copy(editingMessage = null) }
+    }
+
+    fun deleteMessage(messageId: Long, revoke: Boolean = false) {
+        viewModelScope.launch {
+            deleteMessages(chatId, listOf(messageId), revoke)
+        }
     }
 
     fun loadMessages() {
@@ -422,7 +465,7 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
+                    setMessages(combinedMessages) {
                         it.copy(
                             loadingMore = false,
                             hasMore = newMessages.isNotEmpty(),
@@ -470,7 +513,7 @@ class ChatViewModel(
                         state.messages
                     }
 
-                    setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
+                    setMessages(combinedMessages) {
                         it.copy(
                             loadingNewer = false,
                             hasMoreNewer = newMessages.isNotEmpty(),
@@ -500,7 +543,7 @@ class ChatViewModel(
                 val combinedMessages = (newMessages + _uiState.value.messages).sortedBy {
                     it.primaryTimestamp
                 }
-                setMessages(aggregateAlbumsForDisplay(combinedMessages)) {
+                setMessages(combinedMessages) {
                     it.copy(
                         loadingMore = false,
                         scrollToMessageId = messageId
@@ -550,20 +593,21 @@ class ChatViewModel(
     }
 
     private suspend fun setMessages(
-        newMessages: List<Message>,
+        rawMessages: List<Message>,
         stateTransform: (ChatUiState) -> ChatUiState = { it }
     ) {
-        val newItems = withContext(Dispatchers.Default) {
-            newMessages.toMessageItems()
+        val (aggregatedMessages, newItems) = withContext(Dispatchers.Default) {
+            val aggregated = aggregateAlbumsForDisplay(rawMessages)
+            aggregated to aggregated.toMessageItems()
         }
         messageIdMutex.withLock {
             messageIdIndex.clear()
-            newMessages.forEach { message ->
+            aggregatedMessages.forEach { message ->
                 message.blocks.forEach { block -> messageIdIndex.add(block.id) }
             }
         }
         _uiState.update { state ->
-            stateTransform(state).copy(messages = newMessages, messageItems = newItems)
+            stateTransform(state).copy(messages = aggregatedMessages, messageItems = newItems)
         }
     }
 
@@ -715,10 +759,18 @@ class ChatViewModel(
             if (newMessage == oldMessage) return@update state
 
             val newMessages = state.messages.toMutableList().also { it[msgIndex] = newMessage }
-            val aggregatedMessages = aggregateAlbumsForDisplay(newMessages)
-            val newItems = aggregatedMessages.toMessageItems()
+            
+            val itemIndex = state.messageItems.indexOfFirst { it.message.primaryId == messageId }
+            val newItems = if (itemIndex != -1) {
+                val oldItem = state.messageItems[itemIndex]
+                state.messageItems.toMutableList().also { 
+                    it[itemIndex] = oldItem.copy(message = newMessage) 
+                }
+            } else {
+                state.messageItems
+            }
 
-            state.copy(messages = aggregatedMessages, messageItems = newItems)
+            state.copy(messages = newMessages, messageItems = newItems)
         }
     }
 
@@ -941,11 +993,38 @@ class ChatViewModel(
 
     fun onFilesSelected(files: List<ShareFileInfo>) {
         if (files.isEmpty()) return
-        _uiState.update { it.copy(selectedFiles = it.selectedFiles + files) }
+        val items = files.map { file ->
+            val block = if (file.mimeType.startsWith("image/")) {
+                MessageBlock.MediaBlock(
+                    id = 0, timestamp = 0, mediaType = MessageBlock.MediaBlock.MediaType.PHOTO,
+                    file = com.mocharealm.compound.domain.model.File(fileUrl = file.filePath)
+                )
+            } else if (file.mimeType.startsWith("video/")) {
+                MessageBlock.MediaBlock(
+                    id = 0, timestamp = 0, mediaType = MessageBlock.MediaBlock.MediaType.VIDEO,
+                    file = com.mocharealm.compound.domain.model.File(fileUrl = file.filePath),
+                    thumbnail = com.mocharealm.compound.domain.model.File(fileUrl = file.thumbnailPath)
+                )
+            } else {
+                val fileName = file.filePath.substringAfterLast("/")
+                MessageBlock.DocumentBlock(
+                    id = 0, timestamp = 0, document = com.mocharealm.compound.domain.model.Document(
+                        file = com.mocharealm.compound.domain.model.File(fileUrl = file.filePath),
+                        fileName = fileName, mimeType = file.mimeType
+                    )
+                )
+            }
+            SelectedFileItem(file, block)
+        }
+        _uiState.update { it.copy(selectedFiles = it.selectedFiles + items) }
     }
 
-    fun removeSelectedFile(file: ShareFileInfo) {
-        _uiState.update { it.copy(selectedFiles = it.selectedFiles - file) }
+    fun removeSelectedFile(item: SelectedFileItem) {
+        _uiState.update { it.copy(selectedFiles = it.selectedFiles - item) }
+    }
+
+    fun toggleSendAsFile() {
+        _uiState.update { it.copy(sendAsFile = !it.sendAsFile) }
     }
 
     private fun aggregateAlbumsForDisplay(messages: List<Message>): List<Message> {

@@ -82,7 +82,8 @@ interface TelegramRepository {
         files: List<ShareFileInfo>,
         caption: String = "",
         captionEntities: List<Text.TextEntity> = emptyList(),
-        replyToMessageId: Long = 0
+        replyToMessageId: Long = 0,
+        asFile: Boolean = false
     ): Result<List<Message>>
 
     /** 实时消息流 */
@@ -116,6 +117,9 @@ interface TelegramRepository {
         replyToMessageId: Long,
         draftText: String
     ): Result<Unit>
+
+    suspend fun deleteMessages(chatId: Long, messageIds: List<Long>, revoke: Boolean = false): Result<Unit>
+    suspend fun editMessageText(chatId: Long, messageId: Long, text: String): Result<Message>
 
     /** 保存/获取聊天最后阅读位置 */
     suspend fun saveChatReadPosition(chatId: Long, messageId: Long)

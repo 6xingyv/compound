@@ -30,7 +30,8 @@ interface MessageRepository {
         files: List<ShareFileInfo>,
         caption: String = "",
         captionEntities: List<Text.TextEntity> = emptyList(),
-        replyToMessageId: Long = 0
+        replyToMessageId: Long = 0,
+        asFile: Boolean = false
     ): Result<List<Message>>
 
     val messageUpdates: Flow<MessageUpdateEvent>
@@ -43,4 +44,7 @@ interface MessageRepository {
         replyToMessageId: Long,
         draftText: String
     ): Result<Unit>
+
+    suspend fun deleteMessages(chatId: Long, messageIds: List<Long>, revoke: Boolean = false): Result<Unit>
+    suspend fun editMessageText(chatId: Long, messageId: Long, text: String): Result<Message>
 }

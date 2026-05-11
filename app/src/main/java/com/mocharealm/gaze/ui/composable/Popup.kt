@@ -65,13 +65,13 @@ object OverlayPositionProvider : PopupPositionProvider {
             PopupPositionProvider.Align.TopStart,
             PopupPositionProvider.Align.BottomStart -> {
                 if (layoutDirection == LayoutDirection.Ltr) anchorBounds.left + popupMargin.left
-                else anchorBounds.right - popupMargin.right
+                else anchorBounds.right - popupContentSize.width - popupMargin.right
             }
 
             PopupPositionProvider.Align.End,
             PopupPositionProvider.Align.TopEnd,
             PopupPositionProvider.Align.BottomEnd -> {
-                if (layoutDirection == LayoutDirection.Ltr) anchorBounds.right - popupMargin.right
+                if (layoutDirection == LayoutDirection.Ltr) anchorBounds.right - popupContentSize.width - popupMargin.right
                 else anchorBounds.left + popupMargin.left
             }
         }

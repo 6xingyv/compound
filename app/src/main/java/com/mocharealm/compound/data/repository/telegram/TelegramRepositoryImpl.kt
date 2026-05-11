@@ -46,8 +46,8 @@ class TelegramRepositoryImpl(
     override suspend fun sendMessage(chatId: Long, text: String, entities: List<Text.TextEntity>, replyToMessageId: Long) =
         messageRepository.sendMessage(chatId, text, entities, replyToMessageId)
 
-    override suspend fun sendFiles(chatId: Long, files: List<ShareFileInfo>, caption: String, captionEntities: List<Text.TextEntity>, replyToMessageId: Long) =
-        messageRepository.sendFiles(chatId, files, caption, captionEntities, replyToMessageId)
+    override suspend fun sendFiles(chatId: Long, files: List<ShareFileInfo>, caption: String, captionEntities: List<Text.TextEntity>, replyToMessageId: Long, asFile: Boolean) =
+        messageRepository.sendFiles(chatId, files, caption, captionEntities, replyToMessageId, asFile)
 
     override val messageUpdates: Flow<MessageUpdateEvent> get() = messageRepository.messageUpdates
 
@@ -55,6 +55,10 @@ class TelegramRepositoryImpl(
     override suspend fun sendLocation(chatId: Long, latitude: Double, longitude: Double) = messageRepository.sendLocation(chatId, latitude, longitude)
     override suspend fun setChatDraftMessage(chatId: Long, replyToMessageId: Long, draftText: String) =
         messageRepository.setChatDraftMessage(chatId, replyToMessageId, draftText)
+    override suspend fun deleteMessages(chatId: Long, messageIds: List<Long>, revoke: Boolean) =
+        messageRepository.deleteMessages(chatId, messageIds, revoke)
+    override suspend fun editMessageText(chatId: Long, messageId: Long, text: String) =
+        messageRepository.editMessageText(chatId, messageId, text)
 
     // Media Repository
     override suspend fun downloadFile(fileId: Int) = mediaRepository.downloadFile(fileId)

@@ -1,6 +1,8 @@
 package com.mocharealm.compound.ui.composable.chat
 
 import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectTapGestures
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
@@ -26,10 +28,13 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.layout.onSizeChanged
+import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.platform.LocalDensity
 import androidx.compose.ui.semantics.isTraversalGroup
 import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
@@ -39,6 +44,7 @@ import com.mocharealm.compound.domain.model.Message
 import com.mocharealm.compound.domain.model.MessageBlock
 import com.mocharealm.compound.domain.model.MessageReaction
 import com.mocharealm.compound.ui.composable.base.Avatar
+import com.mocharealm.compound.ui.nav.LocalNavigator
 import com.mocharealm.compound.ui.screen.chat.GroupPosition
 import com.mocharealm.compound.ui.screen.chat.composable.ShareSourceCard
 import com.mocharealm.compound.ui.shape.BubbleAlignment
@@ -48,19 +54,36 @@ import com.mocharealm.compound.ui.util.copyRelativeLightness
 import com.mocharealm.compound.ui.util.formatName
 import com.mocharealm.compound.ui.util.toAnnotatedString
 import com.mocharealm.gaze.capsule.ContinuousRoundedRectangle
+import com.mocharealm.gaze.glassy.liquid.effect.Backdrop
+import com.mocharealm.gaze.glassy.liquid.effect.backdrops.rememberCombinedBackdrop
+import com.mocharealm.gaze.glassy.liquid.effect.effects.blur
+import com.mocharealm.gaze.glassy.liquid.effect.effects.lens
+import com.mocharealm.gaze.glassy.liquid.effect.effects.vibrancy
+import com.mocharealm.gaze.icons.Arrowshape_Turn_Up_Left_Fill
+import com.mocharealm.gaze.icons.Document_On_Document
+import com.mocharealm.gaze.icons.Pencil
+import com.mocharealm.gaze.icons.SFIcons
+import com.mocharealm.gaze.icons.Trash
+import com.mocharealm.gaze.ui.composable.OverlayPositionProvider
+import com.mocharealm.gaze.ui.composable.PopupMenu
 import com.mocharealm.gaze.ui.modifier.surface
+import top.yukonga.miuix.kmp.basic.Icon
 import top.yukonga.miuix.kmp.basic.Text
 import top.yukonga.miuix.kmp.theme.LocalContentColor
 import top.yukonga.miuix.kmp.theme.MiuixTheme
 
 @Composable
 fun MessageReactions(
+    messageId: Long,
+    chatId: Long,
     reactions: List<MessageReaction>,
     isOutgoing: Boolean,
     modifier: Modifier = Modifier,
     bubbleWidth: Dp = Dp.Unspecified
 ) {
     if (reactions.isEmpty()) return
+
+    val navigator = LocalNavigator.current
 
     val maxCount = if (bubbleWidth != Dp.Unspecified && bubbleWidth > 0.dp) {
         val itemSize = 40.dp
@@ -82,7 +105,10 @@ fun MessageReactions(
     }
 
     Row(
-        modifier = modifier,
+        modifier = modifier.clickable {
+            // Placeholder: currently no ReactionDetails route exists.
+            // navigator.push(Screen.ReactionDetails(chatId = chatId, messageId = messageId))
+        },
         horizontalArrangement = Arrangement.spacedBy((-12).dp),
         verticalAlignment = Alignment.Bottom
     ) {
@@ -149,6 +175,10 @@ fun MessageBubble(
     groupPosition: GroupPosition,
     showAvatar: Boolean = true,
     onReplyClick: (Long) -> Unit = {},
+    onReply: (Message) -> Unit = {},
+    onDelete: (Long) -> Unit = {},
+    onEdit: (Message) -> Unit = {},
+    layerBackdrop: Backdrop? = null,
     modifier: Modifier = Modifier.fillMaxWidth()
 ) {
     val isFirst = groupPosition == GroupPosition.FIRST || groupPosition == GroupPosition.SINGLE
@@ -249,7 +279,20 @@ fun MessageBubble(
                             )
                         } else Modifier
 
-                        Box(modifier = reactionsPadding) {
+                        var showMenu by remember { mutableStateOf(false) }
+
+                        val tint =
+                            if (message.isOutgoing)
+                                MiuixTheme.colorScheme.primary
+                            else
+                                MiuixTheme.colorScheme.surfaceContainer
+
+                        Box(modifier = reactionsPadding.pointerInput(Unit) {
+                            detectTapGestures(
+                                onTap = { showMenu = true },
+                                onLongPress = { showMenu = true }
+                            )
+                        }) {
                             if (isBorderless) {
                                 Box(Modifier.onSizeChanged { bubbleWidth = it.width }) {
                                     MessageContent(
@@ -265,12 +308,7 @@ fun MessageBubble(
                                         Modifier
                                             .surface(
                                                 shape = shape,
-                                                color =
-                                                    if (message.isOutgoing)
-                                                        MiuixTheme.colorScheme.primary
-                                                    else
-                                                        MiuixTheme.colorScheme
-                                                            .surfaceContainer,
+                                                color = tint,
                                             )
                                             .onSizeChanged { bubbleWidth = it.width }
                                             .semantics(mergeDescendants = false) {
@@ -286,11 +324,124 @@ fun MessageBubble(
                                     )
                                 }
                             }
+
+                            if (showMenu && layerBackdrop != null) {
+                                val clipboard = LocalClipboardManager.current
+                                val textContent =
+                                    message.blocks.filterIsInstance<MessageBlock.TextBlock>()
+                                        .firstOrNull()?.content?.content
+                                val canEdit = message.isOutgoing && textContent != null
+                                PopupMenu(
+                                    show = true,
+                                    backdrop = layerBackdrop,
+                                    alignment = if (message.isOutgoing) top.yukonga.miuix.kmp.basic.PopupPositionProvider.Align.TopEnd else top.yukonga.miuix.kmp.basic.PopupPositionProvider.Align.TopStart,
+                                    popupPositionProvider = OverlayPositionProvider,
+                                    surfaceColor = MiuixTheme.colorScheme.surfaceContainer.copy(0.6f),
+                                    onDismissRequest = { showMenu = false },
+                                    effects = {
+                                        vibrancy()
+                                        blur(8.dp.toPx())
+                                        lens(
+                                            16.dp.toPx(),
+                                            32.dp.toPx(),
+                                            chromaticAberration = false
+                                        )
+                                    }
+                                ) {
+                                    Column(Modifier.padding(16.dp)) {
+                                        Row(
+                                            horizontalArrangement = Arrangement.spacedBy(16.dp),
+                                            modifier = Modifier.padding(bottom = 16.dp)
+                                        ) {
+                                            listOf("👍", "👎", "❤️", "🔥", "😂").forEach { emoji ->
+                                                Text(
+                                                    text = emoji,
+                                                    style = MiuixTheme.textStyles.title2,
+                                                    modifier = Modifier.clickable {
+                                                        showMenu = false
+                                                    }
+                                                )
+                                            }
+                                        }
+                                        Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                                            Row(
+                                                Modifier.clickable {
+                                                    showMenu = false; onReply(
+                                                    message
+                                                )
+                                                },
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    SFIcons.Arrowshape_Turn_Up_Left_Fill,
+                                                    null,
+                                                    Modifier.size(20.dp)
+                                                )
+                                                Text("Reply")
+                                            }
+                                            if (textContent != null) {
+                                                Row(
+                                                    Modifier.clickable {
+                                                        showMenu = false; clipboard.setText(
+                                                        AnnotatedString(
+                                                            textContent
+                                                        )
+                                                    )
+                                                    },
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(
+                                                        SFIcons.Document_On_Document,
+                                                        null,
+                                                        Modifier.size(20.dp)
+                                                    )
+                                                    Text("Copy")
+                                                }
+                                            }
+                                            if (canEdit) {
+                                                Row(
+                                                    Modifier.clickable {
+                                                        showMenu = false; onEdit(
+                                                        message
+                                                    )
+                                                    },
+                                                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                    verticalAlignment = Alignment.CenterVertically
+                                                ) {
+                                                    Icon(SFIcons.Pencil, null, Modifier.size(20.dp))
+                                                    Text("Edit")
+                                                }
+                                            }
+                                            Row(
+                                                Modifier.clickable {
+                                                    showMenu = false; onDelete(
+                                                    message.id
+                                                )
+                                                },
+                                                horizontalArrangement = Arrangement.spacedBy(8.dp),
+                                                verticalAlignment = Alignment.CenterVertically
+                                            ) {
+                                                Icon(
+                                                    SFIcons.Trash,
+                                                    null,
+                                                    Modifier.size(20.dp),
+                                                    tint = MiuixTheme.colorScheme.error
+                                                )
+                                                Text("Delete", color = MiuixTheme.colorScheme.error)
+                                            }
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
 
                     if (message.reactions.isNotEmpty()) {
                         MessageReactions(
+                            messageId = message.id,
+                            chatId = message.chatId,
                             reactions = message.reactions,
                             isOutgoing = message.isOutgoing,
                             bubbleWidth = bubbleWidthDp,

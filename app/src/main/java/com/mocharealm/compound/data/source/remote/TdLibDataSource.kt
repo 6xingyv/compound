@@ -38,6 +38,7 @@ class TdLibDataSource(
     val messageEditedFlow = updates.filterIsInstance<TdApi.UpdateMessageEdited>()
     val messageSendSucceededFlow = updates.filterIsInstance<TdApi.UpdateMessageSendSucceeded>()
     val fileUpdateFlow = updates.filterIsInstance<TdApi.UpdateFile>()
+    val deleteMessagesFlow = updates.filterIsInstance<TdApi.UpdateDeleteMessages>()
 
     suspend fun <T : TdApi.Object> send(query: TdApi.Function<T>): T =
         suspendCancellableCoroutine { cont ->
